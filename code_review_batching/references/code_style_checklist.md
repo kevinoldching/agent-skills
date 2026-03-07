@@ -32,6 +32,9 @@ from omni_npu.attention import ops
 
 ## 2) 命名规范
 
+### 文件名
+文件名要尽量规范，拼写正确，能够准确地表达文件的功能
+
 ### 类
 
 ```python
