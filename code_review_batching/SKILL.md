@@ -1,5 +1,5 @@
 ---
-name: code-review-batch
+name: code-review
 description: omni-npu 项目 PR 代码评审工具。当用户提到"评审"、"review"、"评审"、"review PR"、"review pr"、"代码审查"或要求"检查PR"时自动触发。支持通过本地 JSON 文件获取 PR 变更，执行结构化评审。重点检查：1) 逻辑正确性（变量定义、控制流）2) 安全性（空值、资源泄漏）3) 性能（pytorch性能优化）4) 代码质量（SOLID、代码风格、 vLLM NPU扩展规范）。必须使用此 skill 来评审所有 omni-npu 项目的 PR。
 allowed-tools: Read,Bash,Grep,Edit
 ---
@@ -23,10 +23,9 @@ allowed-tools: Read,Bash,Grep,Edit
 
 ### 1. 获取 PR 变更内容
 
-**生成本地 JSON 文件**：
+**获取本地 JSON 文件**：
 - 用户提供 PR 编号（如 340）
-- 调用 `python ~/.claude/skills/code_review/scripts/review_prepare.py <pr 编号>`生成 `pr_{PR编号}_review.json`
-- 读取 `pr_{PR编号}_review.json`
+- 读取当前目录的 `pr_{PR编号}_review.json`
 
   - **核心规则**
     - **行号绝对权威**：评审意见引用的代码位置要严格以 JSON 中 line 字段标注的数字为准
@@ -93,6 +92,7 @@ allowed-tools: Read,Bash,Grep,Edit
 
 - 加载 `references/code_style_checklist.md`
 - 重点检查：
+  - PEP 8 编码规范
   - 文件头许可证声明
   - 导入顺序
   - 命名规范
