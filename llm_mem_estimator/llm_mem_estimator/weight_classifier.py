@@ -12,15 +12,31 @@ class WeightClassifier:
 
     def __init__(self, rules: Dict[str, Any]):
         self.rules = rules
+        self._resolve_inheritance()
+
+    def _resolve_inheritance(self):
+        """Resolve 'inherit' directives in rules"""
+        for model_type, model_rules in list(self.rules.items()):
+            if isinstance(model_rules, dict) and 'inherit' in model_rules:
+                parent = model_rules['inherit']
+                if parent in self.rules:
+                    # Merge parent rules with current rules
+                    merged_rules = dict(self.rules[parent])
+                    # Override with current rules (excluding 'inherit' key)
+                    for key, value in model_rules.items():
+                        if key != 'inherit':
+                            merged_rules[key] = value
+                    self.rules[model_type] = merged_rules
 
     def classify_weight(self, weight_name: str, model_type: Optional[str] = None) -> str:
         """Classify a weight name to a module type"""
         # Try model-specific rules first
-        if model_type and model_type in self.rules.get('model_specific', {}):
-            model_rules = self.rules['model_specific'][model_type]
-            result = self._match_rules(weight_name, model_rules)
-            if result:
-                return result
+        if model_type and model_type in self.rules:
+            model_rules = self.rules[model_type]
+            if isinstance(model_rules, dict) and 'inherit' not in model_rules:
+                result = self._match_rules(weight_name, model_rules)
+                if result:
+                    return result
 
         # Try generic rules
         generic_rules = self.rules.get('generic', {})
@@ -61,9 +77,12 @@ class WeightClassifier:
 
     def _match_pattern(self, weight_name: str, pattern: str) -> bool:
         """Match a weight name against a pattern (supports wildcards)"""
-        # Convert pattern to regex
-        # Replace * with .* for wildcard matching
-        regex_pattern = pattern.replace('.', r'\.').replace('*', '.*')
-        regex_pattern = f"^{regex_pattern}$"
+        # Pattern is already in regex format from YAML (with \. for literal dots)
+        # Just wrap it with ^ and $
+        regex_pattern = f"^{pattern}$"
 
-        return bool(re.match(regex_pattern, weight_name))
+        try:
+            return bool(re.match(regex_pattern, weight_name))
+        except re.error:
+            # If regex is invalid, return False
+            return False

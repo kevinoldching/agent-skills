@@ -209,36 +209,62 @@ class ConfigGenerator:
     def _classify_weights(self, weights_metadata: Dict[str, Dict[str, Any]],
                          model_type: str, arch_config: ArchitectureConfig) -> Dict[str, Dict[str, WeightInfo]]:
         """Classify weights into module types"""
-        modules = {}
+        import re
+        from collections import defaultdict
+
+        # Step 1: Group weights by their base pattern (without layer numbers)
+        pattern_groups = defaultdict(list)
 
         for weight_name, metadata in weights_metadata.items():
-            module_type = self.classifier.classify_weight(weight_name, model_type)
+            # Extract base pattern by removing layer numbers
+            base_pattern = re.sub(r'\.layers?\.\d+\.', '.layers.N.', weight_name)
+            base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
+
+            pattern_groups[base_pattern].append((weight_name, metadata))
+
+        # Step 2: Classify and merge weights
+        modules = {}
+
+        for base_pattern, weight_list in pattern_groups.items():
+            # Use the first weight to get metadata
+            first_weight_name, first_metadata = weight_list[0]
+
+            # Classify the base pattern
+            module_type = self.classifier.classify_weight(first_weight_name, model_type)
 
             if module_type not in modules:
                 modules[module_type] = {}
 
-            # Determine number of layers this weight appears in
-            layers = self._count_weight_layers(weight_name, arch_config.num_layers)
+            # Determine if this is a per-layer weight
+            is_per_layer = '.layers.N.' in base_pattern or 'model.layers.N' in base_pattern
 
-            modules[module_type][weight_name] = WeightInfo(
-                shape=metadata['shape'],
-                dtype=metadata['dtype'],
-                layers=layers,
-                parallel_strategy="replicated",  # Default, can be customized
-                world_size=0
-            )
+            if is_per_layer and len(weight_list) > 1:
+                # This is a per-layer weight that appears in multiple layers
+                # Store it once with the base pattern name and set layers count
+                layers_count = len(weight_list)
+
+                # Use a simplified name (remove model.layers.N prefix if present)
+                simplified_name = base_pattern.replace('model.layers.N.', '')
+
+                modules[module_type][simplified_name] = WeightInfo(
+                    shape=first_metadata['shape'],
+                    dtype=first_metadata['dtype'],
+                    layers=layers_count,
+                    parallel_strategy="replicated",
+                    world_size=0
+                )
+            else:
+                # This is a shared weight (embedding, final norm, etc.) or single occurrence
+                # Store it with its original name
+                modules[module_type][first_weight_name] = WeightInfo(
+                    shape=first_metadata['shape'],
+                    dtype=first_metadata['dtype'],
+                    layers=1,
+                    parallel_strategy="replicated",
+                    world_size=0
+                )
 
         return modules
-
-    def _count_weight_layers(self, weight_name: str, total_layers: int) -> int:
-        """Count how many layers this weight appears in"""
-        # Check if weight name contains layer index
-        if 'layers.' in weight_name or 'layer.' in weight_name:
-            # This is a per-layer weight
-            return 1
-        else:
-            # This is a shared weight (e.g., embedding, final norm)
-            return 1
 
     def _generate_computation_rules(self, arch_config: ArchitectureConfig) -> Dict[str, str]:
         """Generate computation rules based on architecture"""

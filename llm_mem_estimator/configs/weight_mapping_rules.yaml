@@ -12,43 +12,37 @@ generic:
       - ".*word_embeddings.*"  # BERT style
 
   attention:
-    # 基于前缀匹配：所有 self_attn.* 都归类到 attention
     patterns:
       - "^self_attn\\..*"
       - ".*\\.self_attn\\..*"
 
-  ffn:
-    # Router/Gate 权重
-    router:
-      patterns:
-        - "^mlp\\.gate\\..*"
-        - "^mlp\\.router\\..*"
-        - ".*\\.mlp\\.gate\\..*"
-        - ".*\\.mlp\\.router\\..*"
+  ffn_router:
+    patterns:
+      - "^mlp\\.gate\\..*"
+      - "^mlp\\.router\\..*"
+      - ".*\\.mlp\\.gate\\..*"
+      - ".*\\.mlp\\.router\\..*"
 
-    # Router Experts
-    router_expert:
-      patterns:
-        - "^mlp\\.experts\\.\\d+\\..*"
-        - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"  # 融合权重（gpt-oss）
-        - ".*\\.mlp\\.experts\\..*"
-      exclude_patterns:
-        - ".*\\.shared_experts\\..*"
+  ffn_expert:
+    patterns:
+      - "^mlp\\.experts\\.\\d+\\..*"
+      - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"
+      - ".*\\.mlp\\.experts\\..*"
+    exclude:
+      - ".*\\.shared_experts\\..*"
 
-    # Shared Experts
-    shared_expert:
-      patterns:
-        - "^mlp\\.shared_experts\\..*"
-        - ".*\\.mlp\\.shared_experts\\..*"
+  ffn_shared_expert:
+    patterns:
+      - "^mlp\\.shared_experts\\..*"
+      - ".*\\.mlp\\.shared_experts\\..*"
 
-    # Dense MLP（非 MoE）
-    dense_mlp:
-      patterns:
-        - "^mlp\\.(gate_proj|up_proj|down_proj)\\..*"
-        - ".*\\.mlp\\.(gate_proj|up_proj|down_proj)\\..*"
-      exclude_patterns:
-        - ".*\\.experts\\..*"
-        - ".*\\.shared_experts\\..*"
+  ffn_dense:
+    patterns:
+      - "^mlp\\.(gate_proj|up_proj|down_proj)\\..*"
+      - ".*\\.mlp\\.(gate_proj|up_proj|down_proj)\\..*"
+    exclude:
+      - ".*\\.experts\\..*"
+      - ".*\\.shared_experts\\..*"
 
   norm:
     patterns:
@@ -69,41 +63,34 @@ deepseek:
       - "^shared_head\\.head\\.weight$"
 
   attention:
-    # 基于前缀匹配：所有 self_attn.* 都归类到 attention
-    # 包括 MLA 特有的 q_a/q_b, kv_a/kv_b, layernorm, scale 等
     patterns:
       - "^self_attn\\..*"
       - ".*\\.self_attn\\..*"
 
-  ffn:
-    # Router/Gate 权重（包括 e_score_correction_bias）
-    router:
-      patterns:
-        - "^mlp\\.gate\\..*"
-        - ".*\\.mlp\\.gate\\..*"
+  ffn_router:
+    patterns:
+      - "^mlp\\.gate\\..*"
+      - ".*\\.mlp\\.gate\\..*"
 
-    # Router Experts
-    router_expert:
-      patterns:
-        - "^mlp\\.experts\\.\\d+\\..*"
-        - ".*\\.mlp\\.experts\\.\\d+\\..*"
-      exclude_patterns:
-        - ".*\\.shared_experts\\..*"
+  ffn_expert:
+    patterns:
+      - "^mlp\\.experts\\.\\d+\\..*"
+      - ".*\\.mlp\\.experts\\.\\d+\\..*"
+    exclude:
+      - ".*\\.shared_experts\\..*"
 
-    # Shared Experts
-    shared_expert:
-      patterns:
-        - "^mlp\\.shared_experts\\..*"
-        - ".*\\.mlp\\.shared_experts\\..*"
+  ffn_shared_expert:
+    patterns:
+      - "^mlp\\.shared_experts\\..*"
+      - ".*\\.mlp\\.shared_experts\\..*"
 
-    # Dense MLP（前几层）
-    dense_mlp:
-      patterns:
-        - "^mlp\\.(gate_proj|up_proj|down_proj)\\..*"
-        - ".*\\.mlp\\.(gate_proj|up_proj|down_proj)\\..*"
-      exclude_patterns:
-        - ".*\\.experts\\..*"
-        - ".*\\.shared_experts\\..*"
+  ffn_dense:
+    patterns:
+      - "^mlp\\.(gate_proj|up_proj|down_proj)\\..*"
+      - ".*\\.mlp\\.(gate_proj|up_proj|down_proj)\\..*"
+    exclude:
+      - ".*\\.experts\\..*"
+      - ".*\\.shared_experts\\..*"
 
   norm:
     patterns:
@@ -112,31 +99,27 @@ deepseek:
       - ".*\\.input_layernorm\\..*"
       - ".*\\.post_attention_layernorm\\..*"
       - "^model\\.norm\\.weight$"
-      - "^enorm\\.weight$"        # MTP 模块
-      - "^hnorm\\.weight$"        # MTP 模块
+      - "^enorm\\.weight$"
+      - "^hnorm\\.weight$"
       - "^shared_head\\.norm\\.weight$"
 
   others:
     patterns:
-      - "^eh_proj\\.weight$"      # MTP 模块
+      - "^eh_proj\\.weight$"
 
 # GPT-OSS 特定规则（特殊 MoE 结构）
 gpt_oss:
-  # 继承通用规则
   inherit: generic
 
-  # 覆盖 FFN 规则以支持特殊的量化 MoE 结构
-  ffn:
-    router:
-      patterns:
-        - "^mlp\\.router\\..*"
-        - ".*\\.mlp\\.router\\..*"
+  ffn_router:
+    patterns:
+      - "^mlp\\.router\\..*"
+      - ".*\\.mlp\\.router\\..*"
 
-    # Experts（使用量化 blocks 和 scales）
-    router_expert:
-      patterns:
-        - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"
-        - ".*\\.mlp\\.experts\\.(gate_up_proj|down_proj).*"
+  ffn_expert:
+    patterns:
+      - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"
+      - ".*\\.mlp\\.experts\\.(gate_up_proj|down_proj).*"
 
 # Llama 系列（使用通用规则）
 llama:
@@ -147,7 +130,6 @@ qwen:
   inherit: generic
 
   attention:
-    # Qwen 使用融合的 QKV 投影
     patterns:
       - "^self_attn\\..*"
       - ".*\\.c_attn\\..*"
