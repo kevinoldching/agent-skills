@@ -55,7 +55,7 @@ def show_weight_details(weights_metadata, limit=20):
         print(f"   Dtype: {info['dtype']}")
 
 
-def test_weight_classification(weights_metadata, model_type="unknown"):
+def run_weight_classification(weights_metadata, model_type="unknown"):
     """测试权重分类"""
     print("\n" + "="*80)
     print("权重分类测试")
