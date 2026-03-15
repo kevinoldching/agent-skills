@@ -16,15 +16,12 @@ generic:
       - "^self_attn\\..*"
       - ".*\\.self_attn\\..*"
 
-  ffn_router:
+  ffn_moe:
     patterns:
       - "^mlp\\.gate\\..*"
       - "^mlp\\.router\\..*"
       - ".*\\.mlp\\.gate\\..*"
       - ".*\\.mlp\\.router\\..*"
-
-  ffn_expert:
-    patterns:
       - "^mlp\\.experts\\.\\d+\\..*"
       - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"
       - ".*\\.mlp\\.experts\\..*"
@@ -67,13 +64,10 @@ deepseek:
       - "^self_attn\\..*"
       - ".*\\.self_attn\\..*"
 
-  ffn_router:
+  ffn_moe:
     patterns:
       - "^mlp\\.gate\\..*"
       - ".*\\.mlp\\.gate\\..*"
-
-  ffn_expert:
-    patterns:
       - "^mlp\\.experts\\.\\d+\\..*"
       - ".*\\.mlp\\.experts\\.\\d+\\..*"
     exclude:
@@ -111,13 +105,10 @@ deepseek:
 gpt_oss:
   inherit: generic
 
-  ffn_router:
+  ffn_moe:
     patterns:
       - "^mlp\\.router\\..*"
       - ".*\\.mlp\\.router\\..*"
-
-  ffn_expert:
-    patterns:
       - "^mlp\\.experts\\.(gate_up_proj|down_proj).*"
       - ".*\\.mlp\\.experts\\.(gate_up_proj|down_proj).*"
 

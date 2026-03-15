@@ -65,15 +65,16 @@ class MemoryEstimator:
         formula = self.config.computation_rules['activation']
         dtype_bytes = get_dtype_bytes(dtype)
 
-        # Evaluate formula
+        # Evaluate formula with dtype_bytes included
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
-            seq_len=seq_len
+            seq_len=seq_len,
+            dtype_bytes=dtype_bytes
         )
 
         # Convert to GB
-        memory_gb = (memory_elements * dtype_bytes) / (1024 ** 3)
+        memory_gb = memory_elements / (1024 ** 3)
 
         # Apply parallel strategies
         memory_gb = memory_gb / tp / cp

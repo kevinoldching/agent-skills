@@ -4,7 +4,7 @@ Data structures and utility functions for LLM Memory Estimator
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 # ============================================================================
@@ -60,7 +60,7 @@ class ModelConfig:
     model_identity: ModelIdentity
     architecture_config: ArchitectureConfig
     modules: Dict[str, Dict[str, WeightInfo]]  # module_type -> {weight_name: WeightInfo}
-    computation_rules: Dict[str, str]  # rule_name -> formula
+    computation_rules: Dict[str, Any]  # rule_name -> formula or value
 
 
 @dataclass

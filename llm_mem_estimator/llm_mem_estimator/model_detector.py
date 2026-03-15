@@ -129,8 +129,20 @@ class ConfigGenerator:
         else:
             hf_config = ModelDetector.detect_from_huggingface(model_name_or_path)
 
-        # Get weights metadata
+        # Get weights metadata and calculate total parameters
         weights_metadata = ModelDetector.get_weights_metadata(model_name_or_path, is_local)
+
+        # Calculate total parameters from safetensors metadata
+        total_params = "unknown"
+        if not is_local:
+            try:
+                from huggingface_hub import get_safetensors_metadata
+                metadata = get_safetensors_metadata(model_name_or_path)
+                if hasattr(metadata, 'parameter_count') and metadata.parameter_count:
+                    total_params = str(sum(metadata.parameter_count.values()))
+            except Exception:
+                # Fallback to config if metadata not available
+                total_params = f"{hf_config.get('num_parameters', 'unknown')}"
 
         # Detect model type if not provided
         if not model_type:
@@ -139,7 +151,7 @@ class ConfigGenerator:
         # Build model identity
         model_identity = ModelIdentity(
             name=model_name_or_path.split('/')[-1] if '/' in model_name_or_path else model_name_or_path,
-            total_params=f"{hf_config.get('num_parameters', 'unknown')}",
+            total_params=total_params,
             num_layers=hf_config.get('num_hidden_layers', 0),
             quantization=hf_config.get('quantization_config', {}).get('quant_method') if 'quantization_config' in hf_config else None
         )
@@ -266,9 +278,15 @@ class ConfigGenerator:
 
         return modules
 
-    def _generate_computation_rules(self, arch_config: ArchitectureConfig) -> Dict[str, str]:
+    def _generate_computation_rules(self, arch_config: ArchitectureConfig) -> Dict[str, Any]:
         """Generate computation rules based on architecture"""
         rules = {}
+
+        # Default capacity factor (used for activation calculation)
+        # recommended_capacity_factor: 1.25 (industrial standard)
+        # ideal: 1.0, worst_case: 8.0
+        recommended_capacity_factor = 1.25
+        rules['recommended_capacity_factor'] = recommended_capacity_factor
 
         # KV Cache formula
         if arch_config.attention_type == "mla":
@@ -282,7 +300,26 @@ class ConfigGenerator:
             kv_dim = kv_heads * head_dim if kv_heads else arch_config.hidden_size
             rules['kv_cache'] = f"2 * batch_size * seq_len * {kv_dim} * num_layers"
 
-        # Activation formula (simplified)
-        rules['activation'] = f"4 * batch_size * seq_len * hidden_size * num_layers"
+        # Activation formula with capacity factor
+        # Formula: S * B * H * num_layers * topK * CF * dtype_bytes
+        # - S: sequence length
+        # - B: batch size
+        # - H: hidden size
+        # - num_layers: number of layers
+        # - topK: num_experts_per_tok (for MoE, otherwise 1)
+        # - CF: recommended_capacity_factor (1.25)
+        # - dtype_bytes: bytes per parameter
+        if arch_config.ffn_type == "moe" and arch_config.num_experts_per_tok:
+            # MoE model: include num_experts_per_tok in formula
+            rules['activation'] = (
+                f"batch_size * seq_len * hidden_size * num_layers * "
+                f"{arch_config.num_experts_per_tok} * {recommended_capacity_factor} * dtype_bytes"
+            )
+        else:
+            # Standard/Dense model
+            rules['activation'] = (
+                f"batch_size * seq_len * hidden_size * num_layers * "
+                f"{recommended_capacity_factor} * dtype_bytes"
+            )
 
         return rules

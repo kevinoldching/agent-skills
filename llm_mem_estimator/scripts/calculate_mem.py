@@ -145,16 +145,50 @@ def main():
             for module_type, weights in config.modules.items():
                 config_dict['modules'][module_type] = {}
                 for weight_name, weight_info in weights.items():
-                    config_dict['modules'][module_type][weight_name] = {
+                    # Build weight dict with only non-default values
+                    weight_dict = {
                         'shape': weight_info.shape,
                         'dtype': weight_info.dtype,
                         'layers': weight_info.layers,
-                        'parallel_strategy': weight_info.parallel_strategy,
-                        'world_size': weight_info.world_size
                     }
 
+                    # Determine if this weight should always include parallel fields
+                    # Include for:
+                    # 1. embedding module (all weights)
+                    # 2. ffn_* modules (all weights, especially for MoE)
+                    # 3. attention module projection weights (*_proj*)
+                    should_include_parallel = (
+                        module_type == 'embedding' or
+                        module_type.startswith('ffn_') or
+                        (module_type == 'attention' and '_proj' in weight_name)
+                    )
+
+                    # Add parallel_strategy and world_size
+                    if should_include_parallel:
+                        weight_dict['parallel_strategy'] = weight_info.parallel_strategy
+                        weight_dict['world_size'] = weight_info.world_size
+                    elif weight_info.parallel_strategy != "replicated":
+                        # For other weights, only add if not default
+                        weight_dict['parallel_strategy'] = weight_info.parallel_strategy
+                        if weight_info.world_size > 0:
+                            weight_dict['world_size'] = weight_info.world_size
+
+                    config_dict['modules'][module_type][weight_name] = weight_dict
+
+            # Custom YAML dumper for more compact format
+            class CompactDumper(yaml.SafeDumper):
+                pass
+
+            def represent_dict_compact(dumper, data):
+                # Use flow style for weight dictionaries (inline format)
+                if 'shape' in data and 'dtype' in data:
+                    return dumper.represent_mapping('tag:yaml.org,2002:map', data.items(), flow_style=True)
+                return dumper.represent_mapping('tag:yaml.org,2002:map', data.items(), flow_style=False)
+
+            CompactDumper.add_representer(dict, represent_dict_compact)
+
             with open(output_config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(config_dict, f, default_flow_style=False, allow_unicode=True)
+                yaml.dump(config_dict, f, Dumper=CompactDumper, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
             print(f"Config saved to: {output_config_path}")
 
