@@ -1,0 +1,70 @@
+{
+  "nvidia": {
+    "H100-80GB": {
+      "vram_gb": 80,
+      "bandwidth_gb_s": 3350,
+      "compute_capability": "9.0"
+    },
+    "H100-141GB": {
+      "vram_gb": 141,
+      "bandwidth_gb_s": 3350,
+      "compute_capability": "9.0"
+    },
+    "A100-80GB": {
+      "vram_gb": 80,
+      "bandwidth_gb_s": 2039,
+      "compute_capability": "8.0"
+    },
+    "A100-40GB": {
+      "vram_gb": 40,
+      "bandwidth_gb_s": 1555,
+      "compute_capability": "8.0"
+    },
+    "RTX-4090": {
+      "vram_gb": 24,
+      "bandwidth_gb_s": 1008,
+      "compute_capability": "8.9"
+    },
+    "RTX-3090": {
+      "vram_gb": 24,
+      "bandwidth_gb_s": 936,
+      "compute_capability": "8.6"
+    }
+  },
+  "huawei": {
+    "Ascend-910B-64GB": {
+      "vram_gb": 64,
+      "bandwidth_gb_s": 1200,
+      "compute_capability": "910B"
+    },
+    "Ascend-910B-32GB": {
+      "vram_gb": 32,
+      "bandwidth_gb_s": 1200,
+      "compute_capability": "910B"
+    }
+  },
+  "amd": {
+    "MI300X": {
+      "vram_gb": 192,
+      "bandwidth_gb_s": 5300,
+      "compute_capability": "MI300X"
+    },
+    "MI350X": {
+      "vram_gb": 288,
+      "bandwidth_gb_s": 8000,
+      "compute_capability": "MI350X"
+    }
+  },
+  "intel": {
+    "Gaudi2": {
+      "vram_gb": 96,
+      "bandwidth_gb_s": 2450,
+      "compute_capability": "Gaudi2"
+    },
+    "Gaudi3": {
+      "vram_gb": 128,
+      "bandwidth_gb_s": 3670,
+      "compute_capability": "Gaudi3"
+    }
+  }
+}
