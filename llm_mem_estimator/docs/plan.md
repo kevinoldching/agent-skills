@@ -43,6 +43,8 @@
 | DSA | kv_lora_rank, index_head_dim, index_n_heads, index_topk, num_attention_heads, num_key_value_heads, q_lora_rank, qk_rope_head_dim, qk_nope_head_dim |
 | GDN | linear_num_key_heads, linear_value_head_dim, linear_key_head_dim, linear_num_value_heads, linear_conv_kernel_dim |
 
+没有列出来的可以认为是`UNKNOWN`类型
+
 **各 Attention 类型详细参数**：
 
 **GQA (Grouped-Query Attention)**:
@@ -128,80 +130,162 @@
 
 **配置文件格式**: 每个模型一个 YAML 文件 (`configs/models/<model_name>.yaml`)
 
-采用模块化配置，包含：模型标识、架构配置、逻辑模块映射、并行策略、计算规则。
+采用模块化配置，包含：模型标识、架构配置、逻辑模块映射、计算规则。
+
+配置文件具体规则如下：
+- 非固定字段
+  - architecture_config下面的字段，不同模型的超参的名称和数量可能不一样
+  - modules下面embedding/attention/attention/ffn/others下面的字段名称，例如：embed_tokens/lm_head/shared_head，可能根据具体的模型权重不一样，但shape/dtype/parallel_strategy/world_size字段名称固定，又如attention.components下面的字段不固定，ffn.router_expert/ffn.shared_expert/ffn.dense_mlp下面的gate_proj/up_proj/down_proj/gate名称不固定
+- 固定字段：除非固定字段外，其余均为固定字段，方便程序实现
+- 可选字段：`parallel_strategy`及`world_size`是可选字段，在加载后可以被程序修改
+
+配置文件的生成：
+- 通过从HuggingFace或本地权重目录读取权重文件的metadata进行解析
+- 支持用户手动调用，以便确认生成的文件正确性，也可以根据实际模型名称自动触发调用
+- 示例代码如下：
+
+```python
+import re
+from collections import defaultdict
+from huggingface_hub import get_safetensors_metadata
+
+def analyze_model_weights(repo_id, token=None):
+    try:
+        metadata = get_safetensors_metadata(repo_id, token=token)
+        
+        # 1. 获取所有 Tensor 的维度映射
+        all_tensors = {}
+        f_meta = metadata.files_metadata
+        for tensor_name, file_name in metadata.weight_map.items():
+            file_obj = f_meta[file_name] if isinstance(f_meta, dict) else next(f for f in f_meta if getattr(f, 'file_name', '') == file_name)
+            if tensor_name in file_obj.tensors:
+                all_tensors[tensor_name] = file_obj.tensors[tensor_name]
+
+        # 2. 统计归类 (使用正则过滤掉层号等无关信息)
+        # 不同模型的权重名称可能不一样，需要预先设置过滤和映射规则集，以便将权重名称映射成我们定义的标准的YAML配置文件
+        for name, info in all_tensors.items():
+          ...
+
+        # 3. 获取config.json
+          ...
+
+        # 4. 生成标准的YAML文件
+          ...
+
+    except Exception as e:
+        print(f"解析失败: {e}")
+        return None
+
+# --- 运行分析 ---
+info = analyze_model_weights("deepseek-ai/DeepSeek-R1", token="Your HF Access Token")
+```
+
+以Deepseek-R1模型为例，其配置文件示例如下：
 
 ```yaml
-# ==============================================================================
-# DeepSeek-R1 工业级规格书
-# ==============================================================================
-
 model_identity:
   name: "DeepSeek-R1"
   total_params_b: 684.53
   num_layers: 62
   quantization: "FP8-Blockwise-128x128"
 
-# --- 1. 架构基因组 (来自 config.json) ---
+# --- 1. 架构参数组 (来自 config.json) ---
 architecture_config:
-  common:
-    num_layers: 62
-    hidden_size: 7168
-    intermediate_size: 18432
-    max_position_embeddings: 163840
-    vocab_size: 129280
+  num_layers: 62
+  hidden_size: 7168
+  intermediate_size: 18432
+  max_position_embeddings: 163840
+  vocab_size: 129280
+  num_heads: 128
+  q_lora_rank: 1536
+  kv_lora_rank: 512
+  qk_rope_head_dim: 64
+  v_head_dim: 128
+  num_experts: 256
+  num_experts_per_tok: 8
+  moe_layer_freq: 1
+  num_shared_experts: 1
 
-  attention:
-    num_heads: 128
-    q_lora_rank: 1536
-    kv_lora_rank: 512
-    qk_rope_head_dim: 64
-    v_head_dim: 128
-
-  moe:
-    num_experts: 256
-    num_experts_per_tok: 8
-    moe_layer_freq: 1
-    num_shared_experts: 1
-
-# --- 2. 逻辑模块映射与并行策略 ---
+# --- 2. 逻辑模块映射 ---
 modules:
-  # 输入/输出接口
-  io_interface:
-    embed_tokens: {shape: [129280, 7168], dtype: "BF16", parallel_strategy: "replicated"}
-    lm_head:      {shape: [129280, 7168], dtype: "BF16", parallel_strategy: "tp_col"}
+  # Embedding 模块 (全量存储/复制)
+  embedding:
+    embed_tokens_weight: {shape: [129280, 7168], dtype: "BF16", layers: 2, parallel_strategy: "replicated"}
+    lm_head_weight:      {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "tp_col", world_size: 0}
+    shared_head_weight:  {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
 
-  # MLA 注意力模块
-  attention_mla:
-    q_a_proj:
-      weight: {shape: [1536, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-    q_b_proj:
-      weight: {shape: [24576, 1536], dtype: "F8_E4M3", parallel_strategy: "tp_col"}
-    kv_a_proj_with_mqa:
-      weight: {shape: [576, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-    kv_b_proj:
-      weight: {shape: [32768, 512], dtype: "F8_E4M3", parallel_strategy: "tp_col"}
-    o_proj:
-      weight: {shape: [7168, 16384], dtype: "F8_E4M3", parallel_strategy: "tp_row"}
-    layer_norms:
-      input_layernorm: {shape: [7168], dtype: "BF16", parallel_strategy: "replicated"}
+  # Norm 模块 (层归一化)
+  norm:
+    model_norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
+    enorm_weight:      {shape: [7168], dtype: "BF16", layers: 1}
+    hnorm_weight:      {shape: [7168], dtype: "BF16", layers: 1}
+    shared_head_norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
+    input_layernorm_weight: {shape: [7168], dtype: "BF16", layers: 62}
+    post_attention_layernorm_weight: {shape: [7168], dtype: "BF16", layers: 62}
 
-  # MoE 专家模块
-  moe_experts:
-    gate_up_proj:
-      shape: [2048, 7168]
-      dtype: "F8_E4M3"
-      parallel_strategy: "expert_sharded"
-    down_proj:
-      shape: [7168, 2048]
-      dtype: "F8_E4M3"
-      parallel_strategy: "expert_sharded"
-    router:
+  # MLA 注意力模块 (共 62 层)
+  attention:
+    type: "MLA"
+    num_layers: 62
+    components:
+      # Q 投影 (A降维, B升维)
+      q_a_proj_weight: {shape: [1536, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      q_a_proj_weight_scale_inv:  {shape: [12, 56], dtype: "F32", parallel_strategy: "replicated"}
+      q_a_layernorm_weight:   {shape: [1536], dtype: "BF16"}
+      q_b_proj_weight: {shape: [24576, 1536], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
+      q_b_proj_weight_scale_inv:  {shape: [192, 12], dtype: "F32"}
+      
+      # KV 投影 (MLA 特有的多头潜变量压缩)
+      kv_a_proj_with_mqa_weight: {shape: [576, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      kv_a_proj_with_mqa_weight_scale_inv:  {shape: [5, 56], dtype: "F32", parallel_strategy: "replicated"}
+      kv_a_layernorm_weight:   {shape: [512], dtype: "BF16"}
+      kv_b_proj_weight: {shape: [32768, 512], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
+      kv_b_proj_weight_scale_inv:  {shape: [256, 4], dtype: "F32"}
+      
+      # 输出投影
+      o_proj_weight: {shape: [7168, 16384], dtype: "F8_E4M3", parallel_strategy: "tp_row", world_size: 0}
+      o_proj_weight_scale_inv :  {shape: [56, 128], dtype: "F32"}
+
+  # FFN 模块 (分三种子类型)
+  ffn:
+    # 1. 路由专家 (Router Experts) - 存在于 59 层中
+    router_expert:
+      layer_count: 59
+      count_per_layer: 256
+      gate_proj_weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      gate_proj_weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
+      down_proj_weight: {shape: [7168, 2048],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      down_proj_weight_scale_invscale: {shape: [56, 16],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
+      up_proj_weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      up_proj_weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
       gate_weight: {shape: [256, 7168], dtype: "BF16", parallel_strategy: "replicated"}
+      gate.e_score_correction_bias:   {shape: [256], dtype: "F32"}
 
-  # 共享专家
-  shared_expert:
-    gate_up: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-    down:    {shape: [7168, 2048], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+    # 2. 共享专家 (Shared Experts) - 每一层都有
+    shared_expert:
+      layer_count: 59
+      count_per_layer: 1
+      gate_proj: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      gate_proj_weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
+      up_proj: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      up_proj_weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
+      down_proj: {shape: [7168, 2048], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      down_proj_weight_scale_invscale:  {shape: [56, 16], dtype: "F32", parallel_strategy: "replicated"}
+
+    # 3. 稠密层 (Dense MLP) - 仅前几层存在
+    dense_mlp:
+      layer_count: 3
+      count_per_layer: 1
+      gate_proj_weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      gate_proj_weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
+      down_proj_weight: {shape: [7168, 18432],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      down_proj_weight_scale_inv: {shape: [56, 144],dtype: "F32",parallel_strategy: "replicated"}
+      up_proj_weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      up_proj_weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
+
+  # 其他组件
+  others:
+    eh_proj_weight: {shape: [7168, 14336], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
 
 # --- 3. 显存计算算子参考 ---
 computation_rules:
@@ -267,8 +351,10 @@ computation_rules:
 
 ## 输出
 
+输出详细的报告，以markdown文件保存
+
 - **总显存占用** (GB)
-- **各组件明细**：
+- **各组件明细（表格形式）**：
   - 模型权重显存
   - KV Cache 显存
   - 激活值显存
@@ -383,8 +469,8 @@ llm_mem_estimator/
 ├── SKILL.md           # Skill 接口定义
 ├── docs/
 │   └── plan.md        # 本计划文档
-└── scripts/
-    └── calculate_mem.py  # 核心计算脚本
+└── scripts/           # 核心计算脚本
+    └── xx.py  
 ```
 
 ## 触发关键词
