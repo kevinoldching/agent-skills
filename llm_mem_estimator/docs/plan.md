@@ -210,18 +210,18 @@ architecture_config:
 modules:
   # Embedding 模块 (全量存储/复制)
   embedding:
-    embed_tokens_weight: {shape: [129280, 7168], dtype: "BF16", layers: 2, parallel_strategy: "replicated"}
-    lm_head_weight:      {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "tp_col", world_size: 0}
-    shared_head_weight:  {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
+    embed_tokens.weight: {shape: [129280, 7168], dtype: "BF16", layers: 2, parallel_strategy: "replicated"}
+    lm_head.weight:      {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "tp_col", world_size: 0}
+    shared_head.weight:  {shape: [129280, 7168], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
 
   # Norm 模块 (层归一化)
   norm:
-    model_norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
-    enorm_weight:      {shape: [7168], dtype: "BF16", layers: 1}
-    hnorm_weight:      {shape: [7168], dtype: "BF16", layers: 1}
-    shared_head_norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
-    input_layernorm_weight: {shape: [7168], dtype: "BF16", layers: 62}
-    post_attention_layernorm_weight: {shape: [7168], dtype: "BF16", layers: 62}
+    model.norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
+    enorm.weight:      {shape: [7168], dtype: "BF16", layers: 1}
+    hnorm.weight:      {shape: [7168], dtype: "BF16", layers: 1}
+    shared_head.norm_weight: {shape: [7168], dtype: "BF16", layers: 1}
+    input_layernorm.weight: {shape: [7168], dtype: "BF16", layers: 62}
+    post_attention_layernorm.weight: {shape: [7168], dtype: "BF16", layers: 62}
 
   # MLA 注意力模块 (共 62 层)
   attention:
@@ -229,22 +229,22 @@ modules:
     num_layers: 62
     components:
       # Q 投影 (A降维, B升维)
-      q_a_proj_weight: {shape: [1536, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-      q_a_proj_weight_scale_inv:  {shape: [12, 56], dtype: "F32", parallel_strategy: "replicated"}
-      q_a_layernorm_weight:   {shape: [1536], dtype: "BF16"}
-      q_b_proj_weight: {shape: [24576, 1536], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
-      q_b_proj_weight_scale_inv:  {shape: [192, 12], dtype: "F32"}
+      q_a_proj.weight: {shape: [1536, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      q_a_proj.weight_scale_inv:  {shape: [12, 56], dtype: "F32", parallel_strategy: "replicated"}
+      q_a_layernorm.weight:   {shape: [1536], dtype: "BF16"}
+      q_b_pro._weight: {shape: [24576, 1536], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
+      q_b_proj.weight_scale_inv:  {shape: [192, 12], dtype: "F32"}
       
       # KV 投影 (MLA 特有的多头潜变量压缩)
-      kv_a_proj_with_mqa_weight: {shape: [576, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-      kv_a_proj_with_mqa_weight_scale_inv:  {shape: [5, 56], dtype: "F32", parallel_strategy: "replicated"}
-      kv_a_layernorm_weight:   {shape: [512], dtype: "BF16"}
-      kv_b_proj_weight: {shape: [32768, 512], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
-      kv_b_proj_weight_scale_inv:  {shape: [256, 4], dtype: "F32"}
+      kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      kv_a_proj_with_mqa.weight_scale_inv:  {shape: [5, 56], dtype: "F32", parallel_strategy: "replicated"}
+      kv_a_layernorm.weight:   {shape: [512], dtype: "BF16"}
+      kv_b_proj.weight: {shape: [32768, 512], dtype: "F8_E4M3", parallel_strategy: "tp_col", world_size: 0}
+      kv_b_proj.weight_scale_inv:  {shape: [256, 4], dtype: "F32"}
       
       # 输出投影
-      o_proj_weight: {shape: [7168, 16384], dtype: "F8_E4M3", parallel_strategy: "tp_row", world_size: 0}
-      o_proj_weight_scale_inv :  {shape: [56, 128], dtype: "F32"}
+      o_proj.weight: {shape: [7168, 16384], dtype: "F8_E4M3", parallel_strategy: "tp_row", world_size: 0}
+      o_proj.weight_scale_inv :  {shape: [56, 128], dtype: "F32"}
 
   # FFN 模块 (分三种子类型)
   ffn:
@@ -252,40 +252,40 @@ modules:
     router_expert:
       layer_count: 59
       count_per_layer: 256
-      gate_proj_weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
-      gate_proj_weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
-      down_proj_weight: {shape: [7168, 2048],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
-      down_proj_weight_scale_invscale: {shape: [56, 16],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
-      up_proj_weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
-      up_proj_weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
-      gate_weight: {shape: [256, 7168], dtype: "BF16", parallel_strategy: "replicated"}
+      gate_proj.weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      gate_proj.weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
+      down_proj.weight: {shape: [7168, 2048],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      down_proj.weight_scale_invscale: {shape: [56, 16],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
+      up_proj.weight: {shape: [2048, 7168],dtype: "F8_E4M3",parallel_strategy: "expert_sharded", world_size: 0}
+      up_proj.weight_scale_invscale: {shape: [16, 56],dtype: "F32",parallel_strategy: "expert_sharded", world_size: 0}
+      gate.weight: {shape: [256, 7168], dtype: "BF16", parallel_strategy: "replicated"}
       gate.e_score_correction_bias:   {shape: [256], dtype: "F32"}
 
     # 2. 共享专家 (Shared Experts) - 每一层都有
     shared_expert:
       layer_count: 59
       count_per_layer: 1
-      gate_proj: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-      gate_proj_weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
-      up_proj: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-      up_proj_weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
-      down_proj: {shape: [7168, 2048], dtype: "F8_E4M3", parallel_strategy: "replicated"}
-      down_proj_weight_scale_invscale:  {shape: [56, 16], dtype: "F32", parallel_strategy: "replicated"}
+      gate_proj.weight: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      gate_proj.weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
+      up_proj.weight: {shape: [2048, 7168], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      up_proj.weight_scale_invscale: {shape: [16, 56], dtype: "F32", parallel_strategy: "replicated"}
+      down_proj.weight: {shape: [7168, 2048], dtype: "F8_E4M3", parallel_strategy: "replicated"}
+      down_proj.weight_scale_invscale:  {shape: [56, 16], dtype: "F32", parallel_strategy: "replicated"}
 
     # 3. 稠密层 (Dense MLP) - 仅前几层存在
     dense_mlp:
       layer_count: 3
       count_per_layer: 1
-      gate_proj_weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
-      gate_proj_weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
-      down_proj_weight: {shape: [7168, 18432],dtype: "F8_E4M3",parallel_strategy: "replicated"}
-      down_proj_weight_scale_inv: {shape: [56, 144],dtype: "F32",parallel_strategy: "replicated"}
-      up_proj_weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
-      up_proj_weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
+      gate_proj.weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      gate_proj.weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
+      down_proj.weight: {shape: [7168, 18432],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      down_proj.weight_scale_inv: {shape: [56, 144],dtype: "F32",parallel_strategy: "replicated"}
+      up_proj.weight: {shape: [18432, 7168],dtype: "F8_E4M3",parallel_strategy: "replicated"}
+      up_proj.weight_scale_inv: {shape: [144, 56],dtype: "F32",parallel_strategy: "replicated"}
 
   # 其他组件
   others:
-    eh_proj_weight: {shape: [7168, 14336], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
+    eh_proj.weight: {shape: [7168, 14336], dtype: "BF16", layers: 1, parallel_strategy: "replicated"}
 
 # --- 3. 显存计算算子参考 ---
 computation_rules:

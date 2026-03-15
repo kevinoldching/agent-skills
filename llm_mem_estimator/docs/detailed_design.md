@@ -1235,11 +1235,12 @@ max_batch_size = estimator.estimate_max_batch_size(
 print(f"最大 Batch Size: {max_batch_size}")
 ```
 
-### 5.4 生成报告
+### 5.4 生成报告并保存
 
 ```python
 from llm_mem_estimator import ReportGenerator
 
+# 生成报告
 report = ReportGenerator.generate_report(
     result=result,
     model_config=model_config,
@@ -1249,9 +1250,13 @@ report = ReportGenerator.generate_report(
     seq_len=8192
 )
 
-# 保存报告
-with open("memory_report.md", "w") as f:
+# 保存报告（使用模型名称命名）
+output_filename = f"{model_config.model_identity.name}_memory_report.md"
+with open(output_filename, "w") as f:
     f.write(report)
+print(f"报告已保存到: {output_filename}")
+# 输出: 报告已保存到: DeepSeek-R1_memory_report.md
+```
 ```
 
 ### 5.5 从 HuggingFace 生成配置
@@ -1282,8 +1287,20 @@ python scripts/calculate_mem.py \
     --pp 1 \
     --dp 1 \
     --batch-size 1 \
+    --seq-len 8192
+# 自动生成报告: DeepSeek-R1_memory_report.md
+```
+
+或指定输出路径：
+```bash
+python scripts/calculate_mem.py \
+    --model configs/models/deepseek_r1.yaml \
+    --chip H100_80GB \
+    --tp 8 \
+    --ep 8 \
+    --batch-size 1 \
     --seq-len 8192 \
-    --output memory_report.md
+    --output /path/to/custom_report.md
 ```
 
 ### 6.2 参数说明
@@ -1300,7 +1317,7 @@ python scripts/calculate_mem.py \
 | `--cp` | Context Parallel 大小 | 1 | 否 |
 | `--batch-size` | Batch Size | 1 | 否 |
 | `--seq-len` | 序列长度 | 8192 | 否 |
-| `--output` | 输出报告路径 | stdout | 否 |
+| `--output` | 输出报告路径（不指定则使用 `<model_name>_memory_report.md`） | `<model_name>_memory_report.md` | 否 |
 | `--estimate-max-seq` | 估算最大序列长度 | False | 否 |
 | `--estimate-max-batch` | 估算最大 Batch Size | False | 否 |
 
@@ -1351,11 +1368,15 @@ def main():
 
     # 输出报告
     if args.output:
-        with open(args.output, "w") as f:
-            f.write(report)
-        print(f"Report saved to {args.output}")
+        output_path = args.output
     else:
-        print(report)
+        # 默认使用模型名称命名: <model_name>_memory_report.md
+        model_name = model_config.model_identity.name.replace(" ", "_")
+        output_path = f"{model_name}_memory_report.md"
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(report)
+    print(f"报告已保存到: {output_path}")
 
     # 估算最大序列长度
     if args.estimate_max_seq:
