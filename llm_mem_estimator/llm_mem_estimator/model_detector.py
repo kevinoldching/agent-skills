@@ -242,6 +242,22 @@ class ConfigGenerator:
             except Exception:
                 # Fallback to config if metadata not available
                 total_params = f"{hf_config.get('num_parameters', 'unknown')}"
+        else:
+            # For local weights, calculate from weights metadata
+            try:
+                from llm_mem_estimator.model_config import get_dtype_bytes
+                total_elements = 0
+                for weight_name, weight_info in weights_metadata.items():
+                    shape = weight_info.get('shape', [])
+                    dtype = weight_info.get('dtype', 'fp16')
+                    elements = 1
+                    for dim in shape:
+                        elements *= dim
+                    total_elements += elements
+                if total_elements > 0:
+                    total_params = str(total_elements)
+            except Exception:
+                pass
 
         # Detect model type if not provided
         if not model_type:
