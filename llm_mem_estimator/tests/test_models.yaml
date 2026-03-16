@@ -1,0 +1,51 @@
+# 测试模型配置
+
+# 用于指定需要测试的模型列表
+# test_model_detection.py 会为这些模型生成配置文件到 outputs/ 目录
+# 其他测试用例会基于 outputs/ 目录下的配置进行测试
+
+models:
+  # HuggingFace 公开模型（需要网络访问，生成配置到 outputs/）
+  # 本地模型（configs/models/）已有配置，会被 outputs/ 目录的测试自动覆盖
+
+  #小模型测试
+  - name: Qwen2.5-0.5B
+    type: huggingface
+    path: Qwen/Qwen2.5-0.5B
+    description: Qwen 0.5B 模型，用于测试标准 GQA 架构
+
+  - name: Qwen2.5-1.5B
+    type: huggingface
+    path: Qwen/Qwen2.5-1.5B
+    description: Qwen 1.5B 模型，用于测试标准 GQA 架构
+
+  # 国内大模型
+  - name: DeepSeek-V3
+    type: huggingface
+    path: deepseek-ai/DeepSeek-V3
+    description: DeepSeek V3 大模型，使用 MLA 和 MoE 架构
+
+  - name: Kimi-K2.5
+    type: huggingface
+    path: moonshotai/Kimi-K2.5
+    description: Kimi K2.5 大模型
+
+  - name: MiniMax-M2.5
+    type: huggingface
+    path: MiniMaxAI/MiniMax-M2.5
+    description: MiniMax M2.5 大模型
+
+  - name: GLM-5
+    type: huggingface
+    path: zai-org/GLM-5
+    description: GLM-5 大模型
+
+  - name: gpt-oss-120b
+    type: huggingface
+    path: openai/gpt-oss-120b
+    description: GPT-OSS 120B 模型配置
+
+  - name: gpt-oss-20b
+    type: huggingface
+    path: openai/gpt-oss-20b
+    description: GPT-OSS 20B 模型配置

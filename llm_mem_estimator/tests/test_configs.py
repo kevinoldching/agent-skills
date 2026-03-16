@@ -7,54 +7,6 @@ import pytest
 from pathlib import Path
 
 from llm_mem_estimator import ConfigLoader
-from llm_mem_estimator.memory_estimator import MemoryEstimator
-
-
-class TestModelConfigs:
-    """Test cases for validating model configuration files"""
-
-    def test_all_model_configs_exist(self):
-        """Test that model config directory exists"""
-        config_dir = Path("configs/models")
-        assert config_dir.exists(), "configs/models directory should exist"
-
-    def test_gpt_oss_120b_config_valid(self):
-        """Test gpt-oss-120b configuration is valid"""
-        config = ConfigLoader.load_yaml_config("configs/models/gpt-oss-120b.yaml")
-
-        # Verify required fields
-        assert config.model_identity.name is not None
-        assert config.model_identity.num_layers > 0
-        assert config.architecture_config.hidden_size > 0
-
-        # Verify modules exist
-        assert len(config.modules) > 0
-
-        # Verify computation rules exist
-        assert "kv_cache" in config.computation_rules
-        assert "activation" in config.computation_rules
-
-    def test_config_has_required_sections(self):
-        """Test that config has all required sections"""
-        config = ConfigLoader.load_yaml_config("configs/models/gpt-oss-120b.yaml")
-
-        # Check model_identity
-        assert hasattr(config, 'model_identity')
-        assert config.model_identity.name == "gpt-oss-120b"
-
-        # Check architecture_config
-        assert hasattr(config, 'architecture_config')
-        assert config.architecture_config.hidden_size == 2880
-        assert config.architecture_config.num_layers == 36
-        assert config.architecture_config.attention_type == "gqa"
-
-        # Check modules
-        assert hasattr(config, 'modules')
-        assert isinstance(config.modules, dict)
-
-        # Check computation_rules
-        assert hasattr(config, 'computation_rules')
-        assert isinstance(config.computation_rules, dict)
 
 
 class TestWeightMappingRules:
@@ -112,40 +64,6 @@ class TestChipsConfig:
         first_chip_info = vendor_chips[first_chip_name]
         assert "vram_gb" in first_chip_info
         assert "bandwidth_gb_s" in first_chip_info
-
-
-class TestEstimatorWithConfig:
-    """Test that estimator works with configuration files"""
-
-    def test_estimator_works_with_gpt_oss_config(self):
-        """Test that estimator can work with gpt-oss-120b config"""
-        config = ConfigLoader.load_yaml_config("configs/models/gpt-oss-120b.yaml")
-        estimator = MemoryEstimator(config)
-
-        # Should be able to calculate weights memory
-        total_memory, breakdown = estimator.calculate_weights_memory()
-        assert total_memory > 0
-
-    def test_estimator_computation_rules_work(self):
-        """Test that computation rules can be evaluated"""
-        config = ConfigLoader.load_yaml_config("configs/models/gpt-oss-120b.yaml")
-        estimator = MemoryEstimator(config)
-
-        # Should be able to calculate KV cache
-        kv_memory = estimator.calculate_kv_cache_memory(
-            batch_size=1,
-            seq_len=2048,
-            dtype="fp16"
-        )
-        assert kv_memory > 0
-
-        # Should be able to calculate activation
-        act_memory = estimator.calculate_activation_memory(
-            batch_size=1,
-            seq_len=2048,
-            dtype="fp16"
-        )
-        assert act_memory > 0
 
 
 class TestConfigFilesListing:

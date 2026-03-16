@@ -133,7 +133,7 @@ def main():
     show_weight_details(weights_metadata, limit=30)
 
     # 5. 测试权重分类
-    test_weight_classification(weights_metadata, config.get('model_type', 'unknown'))
+    run_weight_classification(weights_metadata, config.get('model_type', 'unknown'))
 
     # 6. 保存原始元数据到文件
     output_file = f"metadata_{model_name.replace('/', '_')}.json"

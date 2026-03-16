@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Tests for WeightClassifier
+Tests for Model Detector and Weight Classifier
+Combines test_weight_classifier.py
 """
 
 import pytest
+from collections import defaultdict
 
-from llm_mem_estimator import ConfigLoader
-from llm_mem_estimator import WeightClassifier
+from llm_mem_estimator import ConfigLoader, WeightClassifier, ModelDetector
 
 
 class TestWeightClassifier:
@@ -172,3 +173,17 @@ class TestWeightClassifierInheritance:
         # gpt_oss has specific ffn_moe rules that should override generic
         result = classifier.classify_weight("mlp.router.weight", model_type="gpt_oss")
         assert result == "ffn_moe"
+
+
+class TestModelDetector:
+    """Test cases for ModelDetector"""
+
+    def test_detect_from_huggingface_with_local_config(self):
+        """Test detecting model config from local config.json"""
+        # Use local model for testing
+        config = ModelDetector.detect_from_huggingface("Qwen/Qwen2.5-0.5B")
+
+        # Verify key fields exist
+        assert config.get("hidden_size") is not None
+        assert config.get("num_hidden_layers") is not None
+        assert config.get("model_type") is not None

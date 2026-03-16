@@ -1,0 +1,188 @@
+# calculate_mem.py 使用说明
+
+LLM Memory Estimator CLI 工具，用于估算大语言模型的 GPU 显存占用。
+
+## 基本用法
+
+```bash
+python scripts/calculate_mem.py [选项]
+```
+
+## 输入选项（必选一项）
+
+| 选项 | 说明 | 示例 |
+|------|------|------|
+| `--config` | 指定模型 YAML 配置文件路径 | `--config configs/models/gpt-oss-120b.yaml` |
+| `--model` | HuggingFace 模型名称 | `--model Qwen/Qwen2.5-0.5B` |
+| `--local` | 本地模型权重路径 | `--local ./models/llama-weights` |
+
+## 配置生成选项
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--generate-config` | 从模型生成 YAML 配置并保存 | 不生成 |
+| `--output-config` | 指定生成配置的输出路径 | `configs/models/<model_name>.yaml` |
+
+### 示例：生成配置
+
+```bash
+# 从 HuggingFace 模型生成配置
+python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config
+
+# 指定输出路径
+python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --output-config ./my_config.yaml
+```
+
+## 估算参数
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--batch-size` | 批处理大小 | 1 |
+| `--seq-len` | 序列长度 | 2048 |
+| `--kv-dtype` | KV Cache 数据类型 | fp16 |
+| `--activation-dtype` | 激活值数据类型 | fp16 |
+
+支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`
+
+## 并行配置
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--tp` | Tensor Parallel (TP) 并行度 | 1 |
+| `--pp` | Pipeline Parallel (PP) 并行度 | 1 |
+| `--dp` | Data Parallel (DP) 并行度 | 1 |
+| `--cp` | Context Parallel (CP) 并行度 | 1 |
+
+### 示例：多卡并行估算
+
+```bash
+# 8卡 Tensor Parallel
+python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 8
+
+# 2路并行 (TP=2, PP=2)
+python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 2 --pp 2
+```
+
+## 硬件配置
+
+| 选项 | 说明 |
+|------|------|
+| `--chip` | 芯片名称 (如 `nvidia/H100-80GB`) |
+| `--find-max-seq-len` | 根据芯片显存查找最大支持序列长度 |
+| `--system-reserved` | 系统保留显存 (GB) | 2.0 |
+
+### 支持的芯片
+
+在 `configs/chips.json` 中定义了支持的芯片，包括：
+- `nvidia/H100-80GB` / `nvidia/H100-141GB`
+- `nvidia/A100-80GB`
+- `nvidia/RTX-4090`
+- `huawei/Ascend-910B`
+- `amd/MI300X`
+- `intel/Gaudi3`
+
+### 示例：查找最大序列长度
+
+```bash
+# 查找在 H100-80GB 上的最大序列长度
+python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
+    --chip nvidia/H100-80GB --find-max-seq-len --batch-size 1
+```
+
+## 输出选项
+
+| 选项 | 说明 |
+|------|------|
+| `--output` | 将报告保存到指定文件 |
+
+### 示例：保存报告
+
+```bash
+python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
+    --batch-size 8 --seq-len 4096 --tp 8 --output memory_report.txt
+```
+
+## 使用示例
+
+### 示例 1：使用预定义配置文件估算
+
+```bash
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --batch-size 4 \
+    --seq-len 2048 \
+    --tp 4
+```
+
+输出示例：
+```
+==================================================
+LLM Memory Estimation Report
+==================================================
+Model: gpt-oss-120b
+Configuration:
+  Batch Size: 4
+  Sequence Length: 2048
+  TP: 4 | PP: 1 | DP: 1 | CP: 1
+
+Memory Breakdown (per GPU):
+  Weights:           32.50 GB
+  KV Cache:          16.00 GB
+  Activations:        8.25 GB
+  System Reserved:    2.00 GB
+  ─────────────────────────────
+  Total:             58.75 GB
+==================================================
+```
+
+### 示例 2：从 HuggingFace 模型直接估算
+
+```bash
+python scripts/calculate_mem.py \
+    --model Qwen/Qwen2.5-1.5B \
+    --batch-size 1 \
+    --seq-len 4096
+```
+
+### 示例 3：查找硬件最大支持序列长度
+
+```bash
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip nvidia/H100-80GB \
+    --find-max-seq-len \
+    --batch-size 1 \
+    --tp 8
+
+# 输出: Maximum sequence length: 16,384
+```
+
+### 示例 4：使用不同数据类型的量化
+
+```bash
+# 使用 FP8 量化
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --kv-dtype fp8 \
+    --activation-dtype fp8
+```
+
+## 完整选项列表
+
+```
+usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
+                       [--generate-config] [--output-config OUTPUT_CONFIG]
+                       [--batch-size BATCH_SIZE] [--seq-len SEQ_LEN]
+                       [--kv-dtype KV_DTYPE] [--activation-dtype ACTIVATION_DTYPE]
+                       [--tp TP] [--pp PP] [--dp DP] [--cp CP]
+                       [--chip CHIP] [--find-max-seq-len]
+                       [--system-reserved SYSTEM_RESERVED]
+                       [--output OUTPUT]
+```
+
+## 注意事项
+
+1. **输入优先级**：`--config` > `--model` > `--local`，三者互斥
+2. **查找最大序列长度时**：必须指定 `--chip` 参数
+3. **并行度影响显存**：TP/PP/DP/CP 会影响每张卡的显存占用
+4. **系统保留显存**：默认保留 2GB，可根据实际情况调整
