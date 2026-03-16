@@ -209,12 +209,49 @@ modules:
 - `num_experts_per_tok`: MoE 激活专家数（从 architecture_config 获取）
 - 其他架构参数（如 `kv_lora_rank`）
 
+**支持的函数**：
+
+公式中可以使用以下内置函数：
+
+| 函数 | 说明 | 示例 |
+|------|------|------|
+| `min(a, b, ...)` | 返回最小值 | `min(seq_len, 4096)` |
+| `max(a, b, ...)` | 返回最大值 | `max(batch_size, 1)` |
+| `abs(x)` | 返回绝对值 | `abs(x - y)` |
+| `round(x)` | 四舍五入 | `round(x)` |
+| `pow(x, y)` | 幂运算，等同于 `x ** y` | `pow(2, 10)` |
+
+**注意事项**：
+- 公式中的字符串必须用**双引号**包裹
+- **不要使用方括号 `[...]`**，YAML 会将其解析为列表
+- 函数调用语法与 Python 相同
+
 **示例**：
+
+1. **基础公式**：
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
-  kv_cache: 2 * batch_size * seq_len * 360 * num_layers
-  activation: batch_size * seq_len * hidden_size * num_layers * 1.25 * dtype_bytes
+  kv_cache: "2 * batch_size * seq_len * 360 * num_layers"
+  activation: "batch_size * seq_len * hidden_size * num_layers * 1.25 * dtype_bytes"
+```
+
+2. **使用 min/max 函数**（用于限制峰值）：
+```yaml
+computation_rules:
+  recommended_capacity_factor: 1.25
+  # KV Cache: 使用 min 限制序列长度峰值
+  kv_cache: "18 * (batch_size * seq_len) + 18 * min(batch_size * seq_len, 128) * kv_dim * num_layers"
+  # Activation: 使用 min 限制激活值峰值
+  activation: "batch_size * min(seq_len, 4096) * hidden_size * num_layers * 1.25 * dtype_bytes"
+```
+
+3. **GQA 注意力**：
+```yaml
+computation_rules:
+  recommended_capacity_factor: 1.25
+  kv_cache: "2 * batch_size * seq_len * kv_heads * head_dim * num_layers"
+  activation: "batch_size * seq_len * hidden_size * num_layers * 4 * 1.25 * dtype_bytes"
 ```
 
 ---

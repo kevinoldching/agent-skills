@@ -11,7 +11,7 @@ This module combines:
 import json
 import re
 import yaml
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional
 
 
@@ -48,6 +48,7 @@ class ArchitectureConfig:
     norm_type: str
     vocab_size: int
     # Optional fields for specific architectures
+    head_dim: int = 0
     num_attention_heads: Optional[int] = None
     num_key_value_heads: Optional[int] = None
     intermediate_size: Optional[int] = None
@@ -163,8 +164,18 @@ class ConfigLoader:
 
         # Parse architecture config
         arch_data = data.get('architecture_config', {})
+
+        # Get head_dim from config or calculate from hidden_size / num_attention_heads
+        head_dim = arch_data.get('head_dim', 0)
+        if not head_dim:
+            hidden_size = arch_data.get('hidden_size', 0)
+            num_attention_heads = arch_data.get('num_attention_heads')
+            if hidden_size and num_attention_heads:
+                head_dim = hidden_size // num_attention_heads
+
         architecture_config = ArchitectureConfig(
             hidden_size=arch_data.get('hidden_size', 0),
+            head_dim=head_dim,
             num_layers=arch_data.get('num_layers', 0),
             attention_type=arch_data.get('attention_type', 'unknown'),
             ffn_type=arch_data.get('ffn_type', 'unknown'),
@@ -220,6 +231,80 @@ class ConfigLoader:
         with open(rules_path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
 
+    @staticmethod
+    def save_yaml_config(config: ModelConfig, output_path: str) -> None:
+        """Save model configuration to YAML file in compact format"""
+        yaml_content = ConfigLoader.config_to_yaml(config)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(yaml_content)
+
+    @staticmethod
+    def format_params_billions(total_params: str) -> str:
+        """Convert total_params to billions (B) format"""
+        try:
+            # Try to parse as integer
+            params = int(total_params)
+            billions = params / 1e9
+            return f"{billions:.2f}B"
+        except (ValueError, TypeError):
+            # If already in B format or invalid, return as-is
+            return total_params
+
+    @staticmethod
+    def config_to_yaml(config: ModelConfig) -> str:
+        """Convert ModelConfig to compact YAML format string"""
+        lines = []
+
+        # model_identity
+        lines.append("model_identity:")
+        lines.append(f"  name: {config.model_identity.name}")
+        lines.append(f"  total_params: '{ConfigLoader.format_params_billions(config.model_identity.total_params)}'")
+        lines.append(f"  num_layers: {config.model_identity.num_layers}")
+        if config.model_identity.quantization:
+            lines.append(f"  quantization: {config.model_identity.quantization}")
+
+        # architecture_config
+        lines.append("architecture_config:")
+        arch = config.architecture_config
+        lines.append(f"  hidden_size: {arch.hidden_size}")
+        lines.append(f"  num_layers: {arch.num_layers}")
+        lines.append(f"  attention_type: {arch.attention_type}")
+        lines.append(f"  ffn_type: {arch.ffn_type}")
+        lines.append(f"  norm_type: {arch.norm_type}")
+        lines.append(f"  vocab_size: {arch.vocab_size}")
+
+        # Optional fields
+        if arch.head_dim:
+            lines.append(f"  head_dim: {arch.head_dim}")
+        if arch.num_attention_heads:
+            lines.append(f"  num_attention_heads: {arch.num_attention_heads}")
+        if arch.num_key_value_heads:
+            lines.append(f"  num_key_value_heads: {arch.num_key_value_heads}")
+        if arch.intermediate_size:
+            lines.append(f"  intermediate_size: {arch.intermediate_size}")
+        if arch.num_experts_per_tok:
+            lines.append(f"  num_experts_per_tok: {arch.num_experts_per_tok}")
+
+        # modules - using compact format
+        lines.append("modules:")
+        for module_type, module_weights in config.modules.items():
+            lines.append(f"  {module_type}:")
+            for weight_name, weight_info in module_weights.items():
+                # Compact format: weight_name: {shape: [...], dtype: XXX, layers: N, ...}
+                shape_str = str(weight_info.shape)
+                parts = [f"shape: {shape_str}", f"dtype: {weight_info.dtype}",
+                         f"layers: {weight_info.layers}", f"parallel_strategy: {weight_info.parallel_strategy}"]
+                if weight_info.world_size > 0:
+                    parts.append(f"world_size: {weight_info.world_size}")
+                lines.append(f"    {weight_name}: {{{', '.join(parts)}}}")
+
+        # computation_rules
+        lines.append("computation_rules:")
+        for key, value in config.computation_rules.items():
+            lines.append(f"  {key}: {value}")
+
+        return "\n".join(lines)
+
 
 # ============================================================================
 # Formula Evaluator
@@ -267,13 +352,26 @@ class FormulaEvaluator:
         return context
 
     def evaluate(self, formula: str, **kwargs) -> float:
-        """Evaluate a formula string with given context"""
+        """Evaluate a formula string with given context
+
+        Supports common built-in functions: min, max, abs, round, pow, len
+        Example formula: '(18 * seq_len + 18 * min(seq_len, 128)) * kv_dim * num_layers'
+        """
         # Merge kwargs into context
         eval_context = {**self.context, **kwargs}
 
+        # Add safe built-in functions
+        safe_builtins = {
+            'min': min,
+            'max': max,
+            'abs': abs,
+            'round': round,
+            'pow': pow,
+        }
+
         try:
             # Safely evaluate the formula
-            result = eval(formula, {"__builtins__": {}}, eval_context)
+            result = eval(formula, {"__builtins__": safe_builtins}, eval_context)
             return float(result)
         except Exception as e:
             raise ValueError(f"Failed to evaluate formula '{formula}': {e}")

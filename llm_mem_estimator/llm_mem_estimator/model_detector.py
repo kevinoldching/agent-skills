@@ -11,7 +11,7 @@ This module combines:
 import json
 import re
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from collections import defaultdict
 
 from .model_config import (
@@ -255,29 +255,58 @@ class ConfigGenerator:
             quantization=hf_config.get('quantization_config', {}).get('quant_method') if 'quantization_config' in hf_config else None
         )
 
-        # Build architecture config
+        # Get weight mapping rules for architecture config mapping and expert detection
+        weight_rules = self.classifier.rules
+        # Get model-specific rules or fall back to generic
+        model_rules = weight_rules.get(model_type, weight_rules.get('generic', {}))
+
+        # Get architecture config field mappings
+        arch_config_mapping = weight_rules.get('architecture_config', {}).get('field_mappings', {})
+
+        # Helper function to get config value using field mappings
+        def get_config_value(field_name: str, default: Any = None) -> Any:
+            """Get config value using field mappings"""
+            mapping_keys = arch_config_mapping.get(field_name, [field_name])
+            for key in mapping_keys:
+                if key in hf_config and hf_config[key] is not None:
+                    return hf_config[key]
+            return default
+
+        # Get head_dim from config or calculate from hidden_size / num_attention_heads
+        head_dim = get_config_value('head_dim')
+        if not head_dim:
+            hidden_size = get_config_value('hidden_size', 0)
+            num_attention_heads = get_config_value('num_attention_heads')
+            if hidden_size and num_attention_heads:
+                head_dim = hidden_size // num_attention_heads
+
+        # Build architecture config using field mappings
         architecture_config = ArchitectureConfig(
-            hidden_size=hf_config.get('hidden_size', 0),
-            num_layers=hf_config.get('num_hidden_layers', 0),
+            hidden_size=get_config_value('hidden_size', 0),
+            head_dim=head_dim or 0,
+            num_layers=get_config_value('num_layers', 0),
             attention_type=self._detect_attention_type(hf_config),
-            ffn_type=self._detect_ffn_type(hf_config),
+            ffn_type=self._detect_ffn_type(hf_config, get_config_value('num_experts')),
             norm_type=self._detect_norm_type(hf_config),
-            vocab_size=hf_config.get('vocab_size', 0),
-            num_attention_heads=hf_config.get('num_attention_heads'),
-            num_key_value_heads=hf_config.get('num_key_value_heads'),
-            intermediate_size=hf_config.get('intermediate_size'),
-            num_experts=hf_config.get('num_experts'),
-            num_experts_per_tok=hf_config.get('num_experts_per_tok'),
-            moe_intermediate_size=hf_config.get('moe_intermediate_size'),
-            q_lora_rank=hf_config.get('q_lora_rank'),
-            kv_lora_rank=hf_config.get('kv_lora_rank'),
-            qk_rope_head_dim=hf_config.get('qk_rope_head_dim'),
-            v_head_dim=hf_config.get('v_head_dim'),
-            qk_nope_head_dim=hf_config.get('qk_nope_head_dim')
+            vocab_size=get_config_value('vocab_size', 0),
+            num_attention_heads=get_config_value('num_attention_heads'),
+            num_key_value_heads=get_config_value('num_key_value_heads'),
+            intermediate_size=get_config_value('intermediate_size'),
+            num_experts=get_config_value('num_experts'),
+            num_experts_per_tok=get_config_value('num_experts_per_tok'),
+            moe_intermediate_size=get_config_value('moe_intermediate_size'),
+            q_lora_rank=get_config_value('q_lora_rank'),
+            kv_lora_rank=get_config_value('kv_lora_rank'),
+            qk_rope_head_dim=get_config_value('qk_rope_head_dim'),
+            v_head_dim=get_config_value('v_head_dim'),
+            qk_nope_head_dim=get_config_value('qk_nope_head_dim')
         )
 
-        # Classify weights
-        modules = self._classify_weights(weights_metadata, model_type, architecture_config)
+        # Get ffn_moe patterns for expert detection
+        ffn_moe_patterns = model_rules.get('ffn_moe', {}).get('patterns', [])
+
+        # Classify weights (pass ffn_moe patterns for expert detection)
+        modules = self._classify_weights(weights_metadata, model_type, architecture_config, ffn_moe_patterns)
 
         # Generate computation rules (simplified)
         computation_rules = self._generate_computation_rules(architecture_config)
@@ -300,9 +329,16 @@ class ConfigGenerator:
         else:
             return "mha"
 
-    def _detect_ffn_type(self, config: Dict[str, Any]) -> str:
-        """Detect FFN type from config"""
-        if config.get('num_experts'):
+    def _detect_ffn_type(self, config: Dict[str, Any], num_experts: Any = None) -> str:
+        """Detect FFN type from config
+
+        Args:
+            config: HuggingFace model config
+            num_experts: Pre-resolved num_experts value (optional)
+        """
+        # Use provided num_experts or try to get from config
+        experts = num_experts if num_experts is not None else config.get('num_experts')
+        if experts:
             return "moe"
         elif 'hidden_act' in config and 'swiglu' in config['hidden_act'].lower():
             return "swiglu"
@@ -318,19 +354,69 @@ class ConfigGenerator:
             return "layernorm"
 
     def _classify_weights(self, weights_metadata: Dict[str, Dict[str, Any]],
-                         model_type: str, arch_config: ArchitectureConfig) -> Dict[str, Dict[str, WeightInfo]]:
-        """Classify weights into module types"""
-        # Step 1: Group weights by their base pattern (without layer numbers)
+                         model_type: str, arch_config: ArchitectureConfig,
+                         ffn_moe_patterns: List[str] = None) -> Dict[str, Dict[str, WeightInfo]]:
+        """Classify weights into module types
+
+        Args:
+            weights_metadata: Dictionary of weight names to metadata
+            model_type: Model type identifier
+            arch_config: Architecture configuration
+            ffn_moe_patterns: List of patterns for matching MoE expert weights
+        """
+
+        # Step 0: Detect MoE expert count using ffn_moe patterns from weight_mapping_rules
+        all_weight_names = list(weights_metadata.keys())
+        expert_indices = set()
+        expert_pattern_regex = None
+        is_moe = False
+        num_experts = 0
+
+        if ffn_moe_patterns:
+            for weight_name in all_weight_names:
+                for pattern in ffn_moe_patterns:
+                    # Try to match the pattern
+                    if re.match(pattern, weight_name):
+                        # Match found, extract numeric indices from weight name
+                        # Use all numeric indices, then take the max as expert count
+                        indices = re.findall(r'\.(\d+)\.', weight_name)
+                        for idx in indices:
+                            expert_indices.add(int(idx))
+                        # Build regex pattern for replacement if first match
+                        if expert_pattern_regex is None:
+                            # Try to find the expert index pattern in the weight name
+                            match = re.search(r'(\.experts?\d*\.)\d+(\.)', weight_name)
+                            if match:
+                                expert_pattern_regex = match.group(1) + '{}' + match.group(2)
+                        break
+
+            # Calculate total expert count as max index + 1
+            if expert_indices:
+                num_experts = max(expert_indices) + 1
+                is_moe = num_experts > 0
+
+        # Step 1: Group weights by their base pattern
+        # If MoE detected, also remove expert numbers during grouping
         pattern_groups = defaultdict(list)
 
         for weight_name, metadata in weights_metadata.items():
-            # Extract base pattern by removing layer numbers
+            # Only remove layer numbers first
             base_pattern = re.sub(r'\.layers?\.\d+\.', '.layers.N.', weight_name)
             base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
 
+            # For MoE models, also remove expert numbers to consolidate
+            if is_moe and expert_pattern_regex:
+                # Replace expert index with N
+                base_pattern = re.sub(r'\.experts?(?:_?idx_?)\.\d+(\.)', '.experts.N\\1', base_pattern)
+
             pattern_groups[base_pattern].append((weight_name, metadata))
 
-        # Step 2: Classify and merge weights
+        # Update architecture config if MoE detected
+        if is_moe and not arch_config.num_experts:
+            arch_config.num_experts = num_experts
+            arch_config.ffn_type = "moe"
+
+        # Step 2: Process each group
         modules = {}
 
         for base_pattern, weight_list in pattern_groups.items():
@@ -346,16 +432,37 @@ class ConfigGenerator:
             # Determine if this is a per-layer weight
             is_per_layer = '.layers.N.' in base_pattern or 'model.layers.N' in base_pattern
 
+            # Check if this group has expert consolidation
+            has_experts_in_pattern = is_moe and '.experts.N.' in base_pattern
+
             if is_per_layer and len(weight_list) > 1:
-                # This is a per-layer weight that appears in multiple layers
-                # Store it once with the base pattern name and set layers count
-                layers_count = len(weight_list)
+                # For MoE: layers_count = num_layers (not total weight count)
+                if has_experts_in_pattern and num_experts > 0:
+                    layers_count = arch_config.num_layers or len(weight_list)
+                else:
+                    layers_count = len(weight_list)
 
                 # Use a simplified name (remove model.layers.N prefix if present)
                 simplified_name = base_pattern.replace('model.layers.N.', '')
 
+                # For MoE expert weights, incorporate expert dimension into shape
+                shape = first_metadata['shape'].copy()
+                if has_experts_in_pattern and num_experts > 0:
+                    # Insert expert count as the first dimension
+                    # Shape format: [hidden, intermediate] -> [num_experts, hidden, intermediate]
+                    if len(shape) >= 2:
+                        shape.insert(0, num_experts)
+
                 modules[module_type][simplified_name] = WeightInfo(
-                    shape=first_metadata['shape'],
+                    shape=shape,
+                    dtype=first_metadata['dtype'],
+                    layers=layers_count,
+                    parallel_strategy="replicated",
+                    world_size=0
+                )
+
+                modules[module_type][simplified_name] = WeightInfo(
+                    shape=shape,
                     dtype=first_metadata['dtype'],
                     layers=layers_count,
                     parallel_strategy="replicated",
@@ -388,11 +495,15 @@ class ConfigGenerator:
         if arch_config.attention_type == "mla":
             # MLA uses compressed KV cache
             if arch_config.kv_lora_rank:
-                rules['kv_cache'] = f"2 * batch_size * seq_len * {arch_config.kv_lora_rank} * num_layers"
+                rules['kv_cache'] = f"2 * batch_size * seq_len * ({arch_config.kv_lora_rank} + {arch_config.qk_rope_head_dim}) * num_layers"
         elif arch_config.attention_type in ["mha", "gqa", "mqa"]:
             # Standard KV cache
             kv_heads = arch_config.num_key_value_heads or arch_config.num_attention_heads
-            head_dim = arch_config.hidden_size // arch_config.num_attention_heads if arch_config.num_attention_heads else 128
+            if arch_config.head_dim:
+                head_dim = arch_config.head_dim
+            else:
+                head_dim = arch_config.hidden_size // arch_config.num_attention_heads if arch_config.num_attention_heads else 128
+            
             kv_dim = kv_heads * head_dim if kv_heads else arch_config.hidden_size
             rules['kv_cache'] = f"2 * batch_size * seq_len * {kv_dim} * num_layers"
 

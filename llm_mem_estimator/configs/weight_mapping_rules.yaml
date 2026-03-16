@@ -125,3 +125,56 @@ qwen:
       - "^self_attn\\..*"
       - ".*\\.c_attn\\..*"
       - ".*\\.c_proj\\..*"
+
+# ============================================================================
+# Architecture Config 字段映射
+# 将不同模型的 config.json 字段映射到标准字段名
+# ============================================================================
+architecture_config:
+  # 标准字段名 -> 模型config中可能使用的字段名
+  field_mappings:
+    hidden_size:
+      - "hidden_size"
+    head_dim:
+      - "head_dim"
+    num_layers:
+      - "num_hidden_layers"
+      - "n_layer"
+      - "num_layers"
+    vocab_size:
+      - "vocab_size"
+    num_attention_heads:
+      - "num_attention_heads"
+      - "n_heads"
+    num_key_value_heads:
+      - "num_key_value_heads"
+      - "num_kv_heads"
+      - "n_kv_heads"
+    intermediate_size:
+      - "intermediate_size"
+      - "ffn_hidden_size"
+    num_experts:
+      - "num_experts"
+      - "n_routed_experts"
+      - "num_local_experts"
+    num_experts_per_tok:
+      - "num_experts_per_tok"
+      - "top_k"
+      - "moe_top_k"
+    moe_intermediate_size:
+      - "moe_intermediate_size"
+      - "moe_ffn_hidden_size"
+    q_lora_rank:
+      - "q_lora_rank"
+      - "q_rank"
+    kv_lora_rank:
+      - "kv_lora_rank"
+      - "kv_rank"
+    v_head_dim:
+      - "v_head_dim"
+      - "v_head_ratio"
+    qk_rope_head_dim:
+      - "qk_rope_head_dim"
+      - "rope_head_dim"
+    qk_nope_head_dim:
+      - "qk_nope_head_dim"
