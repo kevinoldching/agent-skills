@@ -8,7 +8,7 @@ import tempfile
 import os
 from pathlib import Path
 
-from llm_mem_estimator.config_loader import ConfigLoader
+from llm_mem_estimator import ConfigLoader
 from llm_mem_estimator.model_config import (
     ModelConfig, ModelIdentity, ArchitectureConfig, WeightInfo
 )

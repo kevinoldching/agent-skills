@@ -11,13 +11,12 @@ from .model_config import (
     MemoryResult,
     get_dtype_bytes,
     calculate_weight_memory,
+    ConfigLoader,
+    FormulaEvaluator,
 )
-from .config_loader import ConfigLoader
-from .formula_evaluator import FormulaEvaluator
 from .memory_estimator import MemoryEstimator
 from .report_generator import ReportGenerator
-from .weight_classifier import WeightClassifier
-from .model_detector import ModelDetector, ConfigGenerator
+from .model_detector import ModelDetector, ConfigGenerator, WeightClassifier
 from .exceptions import (
     ConfigError,
     FormulaError,

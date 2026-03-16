@@ -5,8 +5,8 @@ Tests for WeightClassifier
 
 import pytest
 
-from llm_mem_estimator.config_loader import ConfigLoader
-from llm_mem_estimator.weight_classifier import WeightClassifier
+from llm_mem_estimator import ConfigLoader
+from llm_mem_estimator import WeightClassifier
 
 
 class TestWeightClassifier:

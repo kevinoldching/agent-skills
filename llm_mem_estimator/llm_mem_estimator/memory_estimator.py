@@ -5,8 +5,7 @@ Memory estimator for LLM Memory Estimator
 
 from typing import Dict, Tuple
 
-from .model_config import ModelConfig, MemoryResult, calculate_weight_memory, get_dtype_bytes
-from .formula_evaluator import FormulaEvaluator
+from .model_config import ModelConfig, MemoryResult, calculate_weight_memory, get_dtype_bytes, FormulaEvaluator
 
 
 class MemoryEstimator:

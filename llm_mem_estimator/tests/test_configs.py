@@ -6,7 +6,7 @@ Tests for configuration files validation
 import pytest
 from pathlib import Path
 
-from llm_mem_estimator.config_loader import ConfigLoader
+from llm_mem_estimator import ConfigLoader
 from llm_mem_estimator.memory_estimator import MemoryEstimator
 
 

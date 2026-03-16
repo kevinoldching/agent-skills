@@ -5,7 +5,7 @@ Tests for FormulaEvaluator
 
 import pytest
 
-from llm_mem_estimator.formula_evaluator import FormulaEvaluator
+from llm_mem_estimator import FormulaEvaluator
 from llm_mem_estimator.model_config import ArchitectureConfig
 
 
