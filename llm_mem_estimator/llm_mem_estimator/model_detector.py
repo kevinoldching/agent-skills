@@ -519,13 +519,14 @@ class ConfigGenerator:
         if arch_config.ffn_type == "moe" and arch_config.num_experts_per_tok:
             # MoE model: include num_experts_per_tok in formula
             rules['activation'] = (
-                f"batch_size * seq_len * hidden_size * num_layers * "
+                f"batch_size * seq_len * hidden_size * "
                 f"{arch_config.num_experts_per_tok} * {recommended_capacity_factor} * dtype_bytes"
             )
         else:
             # Standard/Dense model
+            # Note: This is for inference (forward pass only). For training, multiply by num_layers.
             rules['activation'] = (
-                f"batch_size * seq_len * hidden_size * num_layers * "
+                f"batch_size * seq_len * hidden_size * "
                 f"{recommended_capacity_factor} * dtype_bytes"
             )
 
