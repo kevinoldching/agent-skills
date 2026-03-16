@@ -5,7 +5,6 @@ LLM Memory Estimator - CLI Interface
 
 import argparse
 import sys
-import yaml
 from pathlib import Path
 
 # Add parent directory to path to import llm_mem_estimator package
@@ -95,101 +94,7 @@ def main():
         if args.generate_config:
             output_config_path = args.output_config or str(script_dir / "configs" / "models" / f"{model_name}.yaml")
             Path(output_config_path).parent.mkdir(parents=True, exist_ok=True)
-
-            # Convert config to dict for YAML serialization
-            config_dict = {
-                'model_identity': {
-                    'name': config.model_identity.name,
-                    'total_params': config.model_identity.total_params,
-                    'num_layers': config.model_identity.num_layers,
-                    'quantization': config.model_identity.quantization
-                },
-                'architecture_config': {
-                    'hidden_size': config.architecture_config.hidden_size,
-                    'num_layers': config.architecture_config.num_layers,
-                    'attention_type': config.architecture_config.attention_type,
-                    'ffn_type': config.architecture_config.ffn_type,
-                    'norm_type': config.architecture_config.norm_type,
-                    'vocab_size': config.architecture_config.vocab_size,
-                },
-                'modules': {},
-                'computation_rules': config.computation_rules
-            }
-
-            # Add optional architecture fields
-            arch_config = config.architecture_config
-            if arch_config.num_attention_heads:
-                config_dict['architecture_config']['num_attention_heads'] = arch_config.num_attention_heads
-            if arch_config.num_key_value_heads:
-                config_dict['architecture_config']['num_key_value_heads'] = arch_config.num_key_value_heads
-            if arch_config.intermediate_size:
-                config_dict['architecture_config']['intermediate_size'] = arch_config.intermediate_size
-            if arch_config.num_experts:
-                config_dict['architecture_config']['num_experts'] = arch_config.num_experts
-            if arch_config.num_experts_per_tok:
-                config_dict['architecture_config']['num_experts_per_tok'] = arch_config.num_experts_per_tok
-            if arch_config.moe_intermediate_size:
-                config_dict['architecture_config']['moe_intermediate_size'] = arch_config.moe_intermediate_size
-            if arch_config.q_lora_rank:
-                config_dict['architecture_config']['q_lora_rank'] = arch_config.q_lora_rank
-            if arch_config.kv_lora_rank:
-                config_dict['architecture_config']['kv_lora_rank'] = arch_config.kv_lora_rank
-            if arch_config.qk_rope_head_dim:
-                config_dict['architecture_config']['qk_rope_head_dim'] = arch_config.qk_rope_head_dim
-            if arch_config.v_head_dim:
-                config_dict['architecture_config']['v_head_dim'] = arch_config.v_head_dim
-            if arch_config.qk_nope_head_dim:
-                config_dict['architecture_config']['qk_nope_head_dim'] = arch_config.qk_nope_head_dim
-
-            # Convert modules
-            for module_type, weights in config.modules.items():
-                config_dict['modules'][module_type] = {}
-                for weight_name, weight_info in weights.items():
-                    # Build weight dict with only non-default values
-                    weight_dict = {
-                        'shape': weight_info.shape,
-                        'dtype': weight_info.dtype,
-                        'layers': weight_info.layers,
-                    }
-
-                    # Determine if this weight should always include parallel fields
-                    # Include for:
-                    # 1. embedding module (all weights)
-                    # 2. ffn_* modules (all weights, especially for MoE)
-                    # 3. attention module projection weights (*_proj*)
-                    should_include_parallel = (
-                        module_type == 'embedding' or
-                        module_type.startswith('ffn_') or
-                        (module_type == 'attention' and '_proj' in weight_name)
-                    )
-
-                    # Add parallel_strategy and world_size
-                    if should_include_parallel:
-                        weight_dict['parallel_strategy'] = weight_info.parallel_strategy
-                        weight_dict['world_size'] = weight_info.world_size
-                    elif weight_info.parallel_strategy != "replicated":
-                        # For other weights, only add if not default
-                        weight_dict['parallel_strategy'] = weight_info.parallel_strategy
-                        if weight_info.world_size > 0:
-                            weight_dict['world_size'] = weight_info.world_size
-
-                    config_dict['modules'][module_type][weight_name] = weight_dict
-
-            # Custom YAML dumper for more compact format
-            class CompactDumper(yaml.SafeDumper):
-                pass
-
-            def represent_dict_compact(dumper, data):
-                # Use flow style for weight dictionaries (inline format)
-                if 'shape' in data and 'dtype' in data:
-                    return dumper.represent_mapping('tag:yaml.org,2002:map', data.items(), flow_style=True)
-                return dumper.represent_mapping('tag:yaml.org,2002:map', data.items(), flow_style=False)
-
-            CompactDumper.add_representer(dict, represent_dict_compact)
-
-            with open(output_config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(config_dict, f, Dumper=CompactDumper, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
+            ConfigLoader.save_yaml_config(config, output_config_path)
             print(f"Config saved to: {output_config_path}")
 
             if not args.find_max_seq_len:

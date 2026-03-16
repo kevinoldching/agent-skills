@@ -45,4 +45,4 @@ modules:
 computation_rules:
   recommended_capacity_factor: 1.25
   kv_cache: 12 * (batch_size * seq_len) * 2048 + 12 * min(batch_size * seq_len, 128) * 2048
-  activation: batch_size * seq_len * hidden_size * num_layers * 4 * 1.25 * dtype_bytes
+  activation: batch_size * seq_len * hidden_size * 4 * 1.25 * dtype_bytes
