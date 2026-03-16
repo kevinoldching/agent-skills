@@ -1039,7 +1039,7 @@ class ChipConfigError(Exception):
 
 ### 4.1 单元测试
 
-**测试文件**: `tests/test_config_loader.py`
+**测试文件**: `tests/test_model_config.py` (包含原 test_config_loader.py, test_formula_evaluator.py)
 ```python
 def test_load_model_config():
     """测试加载模型配置"""
@@ -1054,7 +1054,7 @@ def test_validate_config_missing_fields():
         ConfigLoader.validate_config(config)
 ```
 
-**测试文件**: `tests/test_formula_evaluator.py`
+**测试文件**: `tests/test_model_config.py`
 ```python
 def test_evaluate_simple_formula():
     """测试简单公式计算"""
@@ -1129,7 +1129,7 @@ def test_end_to_end_deepseek_r1():
     assert "模型权重" in report
 ```
 
-**测试文件**: `tests/test_weight_classifier.py`
+**测试文件**: `tests/test_model_detector.py` (包含原 test_weight_classifier.py)
 ```python
 def test_classify_llama_weights():
     """测试 Llama 模型权重分类"""
@@ -1413,26 +1413,20 @@ llm_mem_estimator/
 │   └── weight_mapping_rules.yaml  # 权重分类规则
 ├── llm_mem_estimator/          # 主包
 │   ├── __init__.py
-│   ├── config_loader.py        # ConfigLoader
-│   ├── model_config.py         # ModelConfig 数据类
-│   ├── formula_evaluator.py   # FormulaEvaluator
+│   ├── model_config.py         # 数据结构 + 配置加载 + 公式评估
+│   ├── model_detector.py      # 模型检测 + 配置生成 + 权重分类
 │   ├── memory_estimator.py    # MemoryEstimator
 │   ├── report_generator.py    # ReportGenerator
-│   ├── parallel_config.py     # ParallelConfig
-│   ├── chip_config.py         # ChipConfig
-│   ├── weight_classifier.py   # WeightClassifier
-│   ├── model_detector.py      # ModelDetector
 │   └── exceptions.py          # 自定义异常
 ├── scripts/
 │   └── calculate_mem.py       # CLI 入口
 └── tests/
     ├── __init__.py
-    ├── test_config_loader.py
-    ├── test_formula_evaluator.py
-    ├── test_memory_estimator.py
-    ├── test_weight_classifier.py
-    ├── test_integration.py
-    └── test_configs.py
+    ├── test_model_config.py     # 数据结构、配置加载、公式评估测试
+    ├── test_model_detector.py   # 模型检测、权重分类测试
+    ├── test_memory_estimator.py # 显存估算测试
+    ├── test_integration.py     # 集成测试
+    └── test_configs.py         # 配置文件验证测试
 ```
 
 ## 8. 实现步骤
@@ -1455,37 +1449,29 @@ llm_mem_estimator/
 
 ### 阶段 2: 核心功能 (3-4 天)
 
-4. **实现 ConfigLoader**
-   - `config_loader.py`: 加载和验证 YAML 配置
-   - 实现配置验证逻辑
+4. **实现 model_config 模块**
+   - `model_config.py`: 数据结构定义、配置加载、公式评估
+   - 数据结构: WeightInfo, ModelIdentity, ArchitectureConfig, ModelConfig, MemoryResult
+   - ConfigLoader: 加载 YAML 配置、chips.json、weight_mapping_rules
+   - FormulaEvaluator: 安全的公式解析和计算
 
-5. **实现 FormulaEvaluator**
-   - `formula_evaluator.py`: 安全的公式解析和计算
-   - 使用 `ast.parse` 实现安全计算
-
-6. **实现 MemoryEstimator**
+5. **实现 MemoryEstimator**
    - `memory_estimator.py`: 核心显存计算逻辑
    - 实现权重、KV Cache、激活值计算
    - 实现并行策略应用
    - 实现最大序列长度和 Batch Size 估算
 
-### 阶段 3: 权重分类和配置生成 (2-3 天)
+### 阶段 3: 模型检测和配置生成 (2-3 天)
 
-7. **创建权重分类规则**
+6. **创建权重分类规则**
    - `configs/weight_mapping_rules.yaml`: 通用规则和模型特定规则
-   - 支持 generic, deepseek, llama, qwen 等模型类型
+   - 支持 generic, deepseek, llama, qwen, gpt_oss 等模型类型
 
-8. **实现 WeightClassifier**
-   - `weight_classifier.py`: 权重分类器
-   - 实现规则加载和匹配逻辑
-   - 实现层号和专家编号提取
-
-9. **实现 ModelDetector**
-   - `model_detector.py`: 模型类型自动检测
-   - 基于 config.json 和权重名称特征
-
-10. **实现配置生成功能**
-    - 在 `config_loader.py` 中实现 `generate_config_from_weights`
+7. **实现 model_detector 模块**
+   - `model_detector.py`: 模型检测、配置生成、权重分类
+   - WeightClassifier: 权重分类器，实现规则加载和匹配
+   - ModelDetector: 从 HuggingFace 或本地检测模型架构
+   - ConfigGenerator: 从权重自动生成 YAML 配置
     - 集成 HuggingFace `get_safetensors_metadata`
     - 实现权重统计和 YAML 生成逻辑
 
