@@ -233,7 +233,7 @@ modules:
 computation_rules:
   recommended_capacity_factor: 1.25
   kv_cache: "2 * batch_size * seq_len * 360 * num_layers"
-  activation: "batch_size * seq_len * hidden_size * num_layers * 1.25 * dtype_bytes"
+  activation: "batch_size * seq_len * hidden_size * 1.25 * dtype_bytes"
 ```
 
 2. **使用 min/max 函数**（用于限制峰值）：
@@ -243,7 +243,7 @@ computation_rules:
   # KV Cache: 使用 min 限制序列长度峰值
   kv_cache: "18 * (batch_size * seq_len) + 18 * min(batch_size * seq_len, 128) * kv_dim * num_layers"
   # Activation: 使用 min 限制激活值峰值
-  activation: "batch_size * min(seq_len, 4096) * hidden_size * num_layers * 1.25 * dtype_bytes"
+  activation: "batch_size * min(seq_len, 4096) * hidden_size * 1.25 * dtype_bytes"
 ```
 
 3. **GQA 注意力**：
@@ -251,7 +251,7 @@ computation_rules:
 computation_rules:
   recommended_capacity_factor: 1.25
   kv_cache: "2 * batch_size * seq_len * kv_heads * head_dim * num_layers"
-  activation: "batch_size * seq_len * hidden_size * num_layers * 4 * 1.25 * dtype_bytes"
+  activation: "batch_size * seq_len * hidden_size * 4 * 1.25 * dtype_bytes"
 ```
 
 ---
