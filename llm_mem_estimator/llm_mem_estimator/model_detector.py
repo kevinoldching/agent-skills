@@ -405,9 +405,10 @@ class ConfigGenerator:
             base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
 
             # For MoE models, also remove expert numbers to consolidate
+            # Match patterns like: .experts.0. or .experts0. or .block_sparse_moe.experts.0.
             if is_moe and expert_pattern_regex:
                 # Replace expert index with N
-                base_pattern = re.sub(r'\.experts?(?:_?idx_?)\.\d+(\.)', '.experts.N\\1', base_pattern)
+                base_pattern = re.sub(r'(\.experts?\d*)\.\d+(\.)', r'\1.N\2', base_pattern)
 
             pattern_groups[base_pattern].append((weight_name, metadata))
 

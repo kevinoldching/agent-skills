@@ -127,7 +127,7 @@ qwen:
       - ".*\\.c_proj\\..*"
 
 # MiniMax 系列
-minimax:
+minimax_m2:
   inherit: generic
 
   # MiniMax 使用 block_sparse_moe 作为 MoE 模块名
@@ -137,19 +137,6 @@ minimax:
       - "^block_sparse_moe\\.gate.*"
       - ".*\\.block_sparse_moe\\.experts\\.\\d+.*"
       - ".*\\.block_sparse_moe\\.gate.*"
-    exclude:
-      - ".*shared_experts.*"
-
-  ffn_shared_expert:
-    patterns:
-      - "^block_sparse_moe\\.shared_experts.*"
-      - ".*\\.block_sparse_moe\\.shared_experts.*"
-
-  # MiniMax attention patterns
-  attention:
-    patterns:
-      - "^self_attn\\..*"
-      - ".*\\.core_attn\\..*"
 
 # ============================================================================
 # Architecture Config 字段映射
