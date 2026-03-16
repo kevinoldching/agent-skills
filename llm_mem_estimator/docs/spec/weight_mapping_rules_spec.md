@@ -33,6 +33,62 @@ generic:
 
 ---
 
+## 架构配置字段映射（Architecture Config Field Mappings）
+
+### 概述
+
+`architecture_config` 部分定义了如何将不同模型的 `config.json` 字段映射到标准的字段名。因为不同模型可能使用不同的字段名来表示相同的参数（例如 `num_hidden_layers` vs `n_layer`），这个映射机制可以自动识别并转换。
+
+### 字段说明
+
+| 标准字段名 | 可能使用的字段名 | 说明 |
+|-----------|-----------------|------|
+| `hidden_size` | `hidden_size` | 隐藏层维度 |
+| `head_dim` | `head_dim` | 注意力头维度 |
+| `num_layers` | `num_hidden_layers`, `n_layer`, `num_layers` | Transformer 层数 |
+| `vocab_size` | `vocab_size` | 词表大小 |
+| `num_attention_heads` | `num_attention_heads`, `n_heads` | 注意力头数 |
+| `num_key_value_heads` | `num_key_value_heads`, `num_kv_heads`, `n_kv_heads` | KV 头数 |
+| `intermediate_size` | `intermediate_size`, `ffn_hidden_size` | FFN 中间层维度 |
+| `num_experts` | `num_experts`, `n_routed_experts`, `num_local_experts` | MoE 专家总数 |
+| `num_experts_per_tok` | `num_experts_per_tok`, `top_k`, `moe_top_k` | 每个 token 激活的专家数 |
+| `moe_intermediate_size` | `moe_intermediate_size`, `moe_ffn_hidden_size` | MoE 专家中间层维度 |
+| `q_lora_rank` | `q_lora_rank`, `q_rank` | MLA Q LoRA 秩 |
+| `kv_lora_rank` | `kv_lora_rank`, `kv_rank` | MLA KV LoRA 秩 |
+| `v_head_dim` | `v_head_dim`, `v_head_ratio` | V 头维度 |
+| `qk_rope_head_dim` | `qk_rope_head_dim`, `rope_head_dim` | RoPE 头维度 |
+| `qk_nope_head_dim` | `qk_nope_head_dim` | 非 RoPE 头维度 |
+
+### 自动计算 head_dim
+
+如果模型 config 中没有直接提供 `head_dim`，系统会自动计算：
+```
+head_dim = hidden_size / num_attention_heads
+```
+
+### 示例
+
+```yaml
+architecture_config:
+  field_mappings:
+    hidden_size:
+      - "hidden_size"
+    num_layers:
+      - "num_hidden_layers"
+      - "n_layer"
+    num_attention_heads:
+      - "num_attention_heads"
+      - "n_heads"
+    num_key_value_heads:
+      - "num_key_value_heads"
+      - "num_kv_heads"
+    num_experts:
+      - "num_experts"
+      - "n_routed_experts"
+```
+
+---
+
 ## 模块类型
 
 支持的模块类型（`<module_type>`）：
