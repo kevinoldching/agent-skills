@@ -156,33 +156,24 @@ class ModelDetector:
         """Get weights metadata from HuggingFace using HTTP Range Requests (no download)"""
         try:
             from huggingface_hub import get_safetensors_metadata
-
-            # Use get_safetensors_metadata to read metadata without downloading
+            
+            # 核心：只抓取元数据
             metadata = get_safetensors_metadata(model_name)
-
-            # Extract all tensor information
             all_tensors = {}
-            f_meta = metadata.files_metadata
 
-            for tensor_name, file_name in metadata.weight_map.items():
-                # Get file metadata
-                if isinstance(f_meta, dict):
-                    file_obj = f_meta[file_name]
-                else:
-                    file_obj = next(f for f in f_meta if getattr(f, 'file_name', '') == file_name)
-
-                # Get tensor info from file metadata
-                if tensor_name in file_obj.tensors:
-                    tensor_info = file_obj.tensors[tensor_name]
+            # 遍历所有文件和其中的张量
+            for file_name, file_info in metadata.files_metadata.items():
+                for tensor_name, tensor_info in file_info.tensors.items():
                     all_tensors[tensor_name] = {
                         'shape': list(tensor_info.shape),
                         'dtype': str(tensor_info.dtype)
                     }
-
+            
             return all_tensors
 
         except Exception as e:
-            raise RuntimeError(f"Failed to get HuggingFace weights metadata: {e}")
+            # 常见错误：Repo 不含 safetensors，或者网络连不通 HF
+            raise RuntimeError(f"无法获取元数据 (请检查是否包含 safetensors): {e}")
 
     @staticmethod
     def _get_local_weights_metadata(weights_path: str) -> Dict[str, Dict[str, Any]]:
