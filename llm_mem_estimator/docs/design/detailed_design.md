@@ -1120,7 +1120,11 @@ def test_end_to_end_deepseek_r1():
 
     # 3. 生成报告
     report = ReportGenerator.generate_report(
-        result, config, parallel_config, chip_config, 1, 8192
+        config=config,
+        result=result,
+        batch_size=1,
+        seq_len=8192,
+        parallel_config={'tp': 1, 'pp': 1, 'dp': 1, 'cp': 1}
     )
 
     # 4. 验证报告内容
@@ -1242,12 +1246,12 @@ from llm_mem_estimator import ReportGenerator
 
 # 生成报告
 report = ReportGenerator.generate_report(
+    config=model_config,
     result=result,
-    model_config=model_config,
-    parallel_config=parallel_config,
-    chip_config=chip_config,
     batch_size=1,
-    seq_len=8192
+    seq_len=8192,
+    parallel_config={'tp': 1, 'pp': 1, 'dp': 1, 'cp': 1},
+    chip_info=None
 )
 
 # 保存报告（使用模型名称命名）
@@ -1362,8 +1366,12 @@ def main():
 
     # 生成报告
     report = ReportGenerator.generate_report(
-        result, model_config, parallel_config, chip_config,
-        args.batch_size, args.seq_len
+        config=model_config,
+        result=result,
+        batch_size=args.batch_size,
+        seq_len=args.seq_len,
+        parallel_config=parallel_config,
+        chip_info=None
     )
 
     # 输出报告
