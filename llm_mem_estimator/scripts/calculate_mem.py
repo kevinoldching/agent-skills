@@ -36,7 +36,8 @@ def main():
 
     # Estimation parameters
     parser.add_argument('--batch-size', type=int, default=1, help="Batch size")
-    parser.add_argument('--seq-len', type=int, default=2048, help="Sequence length")
+    parser.add_argument('--prompt-len', type=int, default=4096, help="Input prompt length")
+    parser.add_argument('--gen-len', type=int, default=1024, help="Generated output length")
     parser.add_argument('--kv-dtype', type=str, default="fp16", help="KV cache dtype")
     parser.add_argument('--activation-dtype', type=str, default="fp16", help="Activation dtype")
 
@@ -127,9 +128,10 @@ def main():
             print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
             sys.exit(1)
 
-        max_seq_len = estimator.find_max_sequence_length(
+        max_gen_len = estimator.find_max_sequence_length(
             available_memory_gb=available_memory_gb,
             batch_size=args.batch_size,
+            prompt_len=args.prompt_len,
             kv_dtype=args.kv_dtype,
             activation_dtype=args.activation_dtype,
             tp=args.tp,
@@ -142,7 +144,8 @@ def main():
         # Generate report with max sequence length
         result = estimator.estimate_memory(
             batch_size=args.batch_size,
-            seq_len=max_seq_len,
+            prompt_len=args.prompt_len,
+            gen_len=max_gen_len,
             kv_dtype=args.kv_dtype,
             activation_dtype=args.activation_dtype,
             tp=args.tp,
@@ -165,15 +168,16 @@ def main():
             config=config,
             result=result,
             batch_size=args.batch_size,
-            seq_len=max_seq_len,
             parallel_config=parallel_config,
+            prompt_len=args.prompt_len,
+            gen_len=max_gen_len,
             chip_info=chip_info
         )
 
         print(report)
 
         # Print max sequence length calculation explanation
-        print("\n## How to Calculate the Maximum Sequence Length")
+        print("\n## How to Calculate the Maximum Generated Length")
         print("")
 
         # Calculate fixed memory
@@ -182,43 +186,52 @@ def main():
         )
         fixed_memory = weights_memory + args.system_reserved
 
+        # KV for prompt (fixed)
+        prompt_kv_memory = estimator.calculate_kv_cache_memory(
+            args.batch_size, args.prompt_len, 0, args.kv_dtype, args.tp, args.cp
+        )
+
         print("### Fixed Memory")
         print(f"- Model weights (per device, after TP/EP sharding): {weights_memory:.2f} GB")
         print(f"- System reserved: {args.system_reserved:.2f} GB")
-        print(f"- **Total fixed memory: {fixed_memory:.2f} GB**")
+        print(f"- KV Cache for prompt ({args.prompt_len:,}): {prompt_kv_memory:.2f} GB")
+        print(f"- **Total fixed memory: {fixed_memory + prompt_kv_memory:.2f} GB**")
 
-        print(f"\n### Available Memory")
+        available_dyn = available_memory_gb - fixed_memory - prompt_kv_memory
+
+        print(f"\n### Available Memory for Generation")
         print(f"- Total chip VRAM: {available_memory_gb} GB")
-        print(f"- Available for dynamic (KV + Activation): {available_memory_gb - fixed_memory:.2f} GB")
+        print(f"- Available for gen KV + Activation: {available_dyn:.2f} GB")
 
-        # Calculate per-unit memory
-        kv_memory_per_seq = estimator.calculate_kv_cache_memory(
-            args.batch_size, 1, args.kv_dtype, args.tp, args.cp
+        # Calculate per-unit gen memory
+        kv_memory_per_gen = estimator.calculate_kv_cache_memory(
+            args.batch_size, 0, 1, args.kv_dtype, args.tp, args.cp
         )
-        act_memory_per_seq = estimator.calculate_activation_memory(
+        act_memory_per_gen = estimator.calculate_activation_memory(
             args.batch_size, 1, args.activation_dtype, args.tp, args.cp
         )
-        total_per_seq = kv_memory_per_seq + act_memory_per_seq
+        total_per_gen = kv_memory_per_gen + act_memory_per_gen
 
-        print(f"\n### Memory per Unit Sequence Length")
-        print(f"- KV Cache: {kv_memory_per_seq:.6f} GB")
-        print(f"- Activation: {act_memory_per_seq:.6f} GB")
-        print(f"- **Total: {total_per_seq:.6f} GB**")
+        print(f"\n### Memory per Unit Generated Token")
+        print(f"- KV Cache (incremental): {kv_memory_per_gen:.6f} GB")
+        print(f"- Activation: {act_memory_per_gen:.6f} GB")
+        print(f"- **Total: {total_per_gen:.6f} GB**")
 
         print(f"\n### Calculation")
-        print(f"Maximum sequence length = Available memory / Memory per unit")
-        print(f"= {available_memory_gb - fixed_memory:.2f} / {total_per_seq:.6f}")
-        print(f"= **{max_seq_len:,}**")
+        print(f"Max gen_len = Available memory / Memory per generated token")
+        print(f"= {available_dyn:.2f} / {total_per_gen:.6f}")
+        print(f"= **{max_gen_len:,}**")
 
         print(f"\n### Result")
-        print(f"- **Maximum sequence length: {max_seq_len:,}**")
+        print(f"- **Maximum generated length: {max_gen_len:,}**")
 
         return
 
     # Estimate memory
     result = estimator.estimate_memory(
         batch_size=args.batch_size,
-        seq_len=args.seq_len,
+        prompt_len=args.prompt_len,
+        gen_len=args.gen_len,
         kv_dtype=args.kv_dtype,
         activation_dtype=args.activation_dtype,
         tp=args.tp,
@@ -242,8 +255,9 @@ def main():
         config=config,
         result=result,
         batch_size=args.batch_size,
-        seq_len=args.seq_len,
         parallel_config=parallel_config,
+        prompt_len=args.prompt_len,
+        gen_len=args.gen_len,
         chip_info=chip_info
     )
 

@@ -13,8 +13,8 @@ class ReportGenerator:
 
     @staticmethod
     def generate_report(config: ModelConfig, result: MemoryResult,
-                       batch_size: int, seq_len: int,
-                       parallel_config: Dict[str, int],
+                       batch_size: int, parallel_config: Dict[str, int],
+                       prompt_len: int = 0, gen_len: int = 0,
                        chip_info: Optional[Dict[str, Any]] = None) -> str:
         """Generate a markdown report"""
         lines = []
@@ -40,7 +40,10 @@ class ReportGenerator:
         lines.append("## Configuration")
         lines.append("")
         lines.append(f"- **Batch Size**: {batch_size}")
-        lines.append(f"- **Sequence Length**: {seq_len}")
+        if prompt_len > 0:
+            lines.append(f"- **Prompt Length**: {prompt_len}")
+        if gen_len > 0:
+            lines.append(f"- **Generated Length**: {gen_len}")
         lines.append(f"- **Tensor Parallel (TP)**: {parallel_config.get('tp', 1)}")
         lines.append(f"- **Pipeline Parallel (PP)**: {parallel_config.get('pp', 1)}")
         lines.append(f"- **Data Parallel (DP)**: {parallel_config.get('dp', 1)}")

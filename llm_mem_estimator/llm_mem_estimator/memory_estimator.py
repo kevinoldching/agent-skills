@@ -39,20 +39,34 @@ class MemoryEstimator:
 
         return total_memory, breakdown
 
-    def calculate_kv_cache_memory(self, batch_size: int, seq_len: int,
+    def calculate_kv_cache_memory(self, batch_size: int, prompt_len: int, gen_len: int,
                                    dtype: str = "fp16", tp: int = 1, cp: int = 1) -> float:
-        """Calculate KV cache memory"""
+        """Calculate KV cache memory
+
+        Args:
+            batch_size: Batch size
+            prompt_len: Input prompt length
+            gen_len: Generated output length
+            dtype: KV cache data type
+            tp: Tensor Parallel degree
+            cp: Context Parallel degree
+        """
         if 'kv_cache' not in self.config.computation_rules:
             return 0.0
 
         formula = self.config.computation_rules['kv_cache']
         dtype_bytes = get_dtype_bytes(dtype)
 
+        # Total sequence length = prompt + generated
+        total_seq_len = prompt_len + gen_len
+
         # Evaluate formula
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
-            seq_len=seq_len
+            prompt_len=prompt_len,
+            gen_len=gen_len,
+            seq_len=total_seq_len
         )
 
         # Convert to GB
@@ -63,9 +77,17 @@ class MemoryEstimator:
 
         return memory_gb
 
-    def calculate_activation_memory(self, batch_size: int, seq_len: int,
+    def calculate_activation_memory(self, batch_size: int, gen_len: int,
                                      dtype: str = "fp16", tp: int = 1, cp: int = 1) -> float:
-        """Calculate activation memory"""
+        """Calculate activation memory
+
+        Args:
+            batch_size: Batch size
+            gen_len: Generated output length (activation only depends on gen_len)
+            dtype: Activation data type
+            tp: Tensor Parallel degree
+            cp: Context Parallel degree
+        """
         if 'activation' not in self.config.computation_rules:
             return 0.0
 
@@ -76,7 +98,7 @@ class MemoryEstimator:
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
-            seq_len=seq_len
+            gen_len=gen_len
         )
 
         # Convert to GB (multiply by dtype_bytes)
@@ -87,7 +109,7 @@ class MemoryEstimator:
 
         return memory_gb
 
-    def estimate_memory(self, batch_size: int = 1, seq_len: int = 2048,
+    def estimate_memory(self, batch_size: int = 1, prompt_len: int = 4096, gen_len: int = 1024,
                         kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                         tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                         system_reserved_gb: float = 2.0) -> MemoryResult:
@@ -95,7 +117,8 @@ class MemoryEstimator:
 
         Args:
             batch_size: Batch size
-            seq_len: Sequence length
+            prompt_len: Input prompt length
+            gen_len: Generated output length
             kv_dtype: KV cache data type
             activation_dtype: Activation data type
             tp: Tensor Parallel degree
@@ -110,14 +133,14 @@ class MemoryEstimator:
             tp=tp, pp=pp, dp=dp, cp=cp, ep=ep
         )
 
-        # Calculate KV cache memory
+        # Calculate KV cache memory (prompt_len + gen_len)
         kv_cache_memory = self.calculate_kv_cache_memory(
-            batch_size, seq_len, kv_dtype, tp, cp
+            batch_size, prompt_len, gen_len, kv_dtype, tp, cp
         )
 
-        # Calculate activation memory
+        # Calculate activation memory (only gen_len)
         activation_memory = self.calculate_activation_memory(
-            batch_size, seq_len, activation_dtype, tp, cp
+            batch_size, gen_len, activation_dtype, tp, cp
         )
 
         # Total memory
@@ -134,35 +157,62 @@ class MemoryEstimator:
         )
 
     def find_max_sequence_length(self, available_memory_gb: float, batch_size: int = 1,
+                                  prompt_len: int = 4096,
                                   kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                                   tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                                   system_reserved_gb: float = 2.0) -> int:
-        """Binary search to find maximum sequence length"""
+        """Binary search to find maximum generated length (gen_len)
+
+        Args:
+            available_memory_gb: Available GPU memory in GB
+            batch_size: Batch size
+            prompt_len: Input prompt length (fixed)
+            kv_dtype: KV cache data type
+            activation_dtype: Activation data type
+            tp: Tensor Parallel degree
+            pp: Pipeline Parallel degree
+            cp: Context Parallel degree
+            ep: Expert Parallel degree
+            system_reserved_gb: System reserved memory in GB
+        """
         # Calculate fixed memory (weights + system reserved)
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
         fixed_memory = weights_memory + system_reserved_gb
 
-        if fixed_memory >= available_memory_gb:
+        # KV cache for prompt (fixed)
+        prompt_kv_memory = self.calculate_kv_cache_memory(
+            batch_size, prompt_len, 0, kv_dtype, tp, cp
+        )
+
+        # Total fixed memory including prompt KV
+        total_fixed = fixed_memory + prompt_kv_memory
+
+        if total_fixed >= available_memory_gb:
             return 0
 
-        # Available memory for KV cache and activation
-        dynamic_memory = available_memory_gb - fixed_memory
+        # Available memory for generated KV + activation
+        dynamic_memory = available_memory_gb - total_fixed
 
-        # Binary search for max sequence length
+        # Binary search for max generated length
         left, right = 1, 1000000
-        max_seq_len = 0
+        max_gen_len = 0
 
         while left <= right:
             mid = (left + right) // 2
 
-            kv_memory = self.calculate_kv_cache_memory(batch_size, mid, kv_dtype, tp, cp)
-            act_memory = self.calculate_activation_memory(batch_size, mid, activation_dtype, tp, cp)
+            # KV grows with prompt + gen_len, activation only with gen_len
+            kv_memory = self.calculate_kv_cache_memory(
+                batch_size, prompt_len, mid, kv_dtype, tp, cp
+            )
+            act_memory = self.calculate_activation_memory(
+                batch_size, mid, activation_dtype, tp, cp
+            )
             total_dynamic = kv_memory + act_memory
 
             if total_dynamic <= dynamic_memory:
-                max_seq_len = mid
+                max_gen_len = mid
                 left = mid + 1
             else:
                 right = mid - 1
 
-        return max_seq_len
+        return max_gen_len
