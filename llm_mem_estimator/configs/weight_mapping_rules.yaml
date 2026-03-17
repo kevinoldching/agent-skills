@@ -50,6 +50,23 @@ generic:
       - "^model\\.norm\\.weight$"
       - "^norm\\.weight$"
 
+  # 默认并行策略配置
+  parallel_defaults:
+    embedding: TP
+    attention:
+      bias: replicated
+      scale: replicated
+      default: TP
+    ffn_moe:
+      bias: replicated
+      default: EP
+    ffn_dense:
+      bias: replicated
+      default: TP
+    ffn_shared_expert: replicated
+    norm: replicated
+    others: replicated
+
 # DeepSeek 特定规则（MLA 架构 + MoE + MTP）
 deepseek:
   embedding:

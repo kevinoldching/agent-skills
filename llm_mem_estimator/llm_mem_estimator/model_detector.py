@@ -63,6 +63,51 @@ class WeightClassifier:
         # Default to others
         return "others"
 
+    def get_parallel_strategy(self, weight_name: str, module_type: str, model_type: Optional[str] = None) -> str:
+        """Determine parallel strategy based on weight name and module type
+
+        Args:
+            weight_name: The weight name (e.g., 'mlp.experts.0.gate_proj.weight')
+            module_type: The module type (e.g., 'ffn_moe', 'attention', 'embedding')
+            model_type: Optional model type for model-specific rules
+
+        Returns:
+            Parallel strategy (e.g., 'TP', 'EP', 'replicated')
+        """
+        # Get parallel_defaults from model-specific or generic rules
+        parallel_defaults = None
+
+        # Try model-specific rules first
+        if model_type and model_type in self.rules:
+            model_rules = self.rules[model_type]
+            parallel_defaults = model_rules.get('parallel_defaults')
+
+        # Fall back to generic rules
+        if not parallel_defaults:
+            generic_rules = self.rules.get('generic', {})
+            parallel_defaults = generic_rules.get('parallel_defaults', {})
+
+        if not parallel_defaults:
+            return 'replicated'
+
+        # Get module-specific defaults
+        module_defaults = parallel_defaults.get(module_type, 'replicated')
+
+        # If it's a simple string, return directly
+        if isinstance(module_defaults, str):
+            return module_defaults
+
+        # If it's a dict, match by keyword
+        if isinstance(module_defaults, dict):
+            # First check for specific keyword matches
+            for keyword, strategy in module_defaults.items():
+                if keyword != 'default' and keyword in weight_name:
+                    return strategy
+            # Return default if no match
+            return module_defaults.get('default', 'replicated')
+
+        return 'replicated'
+
     def _match_rules(self, weight_name: str, rules: Dict[str, Any]) -> Optional[str]:
         """Match weight name against rules"""
         for module_type, rule_config in rules.items():
@@ -461,29 +506,31 @@ class ConfigGenerator:
                     if len(shape) >= 2:
                         shape.insert(0, num_experts)
 
-                modules[module_type][simplified_name] = WeightInfo(
-                    shape=shape,
-                    dtype=first_metadata['dtype'],
-                    layers=layers_count,
-                    parallel_strategy="replicated",
-                    world_size=0
+                # Determine parallel strategy using classifier
+                parallel_strategy = self.classifier.get_parallel_strategy(
+                    simplified_name, module_type, model_type
                 )
 
                 modules[module_type][simplified_name] = WeightInfo(
                     shape=shape,
                     dtype=first_metadata['dtype'],
                     layers=layers_count,
-                    parallel_strategy="replicated",
+                    parallel_strategy=parallel_strategy,
                     world_size=0
                 )
             else:
                 # This is a shared weight (embedding, final norm, etc.) or single occurrence
                 # Store it with its original name
+                # Determine parallel strategy using classifier
+                parallel_strategy = self.classifier.get_parallel_strategy(
+                    first_weight_name, module_type, model_type
+                )
+
                 modules[module_type][first_weight_name] = WeightInfo(
                     shape=first_metadata['shape'],
                     dtype=first_metadata['dtype'],
                     layers=1,
-                    parallel_strategy="replicated",
+                    parallel_strategy=parallel_strategy,
                     world_size=0
                 )
 
