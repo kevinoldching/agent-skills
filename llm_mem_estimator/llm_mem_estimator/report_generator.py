@@ -77,9 +77,11 @@ class ReportGenerator:
             lines.append("| Module Type | Weight Name | Shape | Layers | Memory (GB) | Percentage | Data Type | Parallel Strategy | World Size |")
             lines.append("|-------------|-------------|-------|--------|-------------|------------|-----------|-------------------|------------|")
 
-            # Calculate each weight's memory and build table rows
-            weight_rows = []
-            for module_type in sorted(result.breakdown.keys(), key=lambda x: result.breakdown.get(x, 0), reverse=True):
+            # Define module order
+            module_order = ['embedding', 'attention', 'ffn_moe', 'ffn_shared_expert', 'ffn_dense', 'norm', 'others']
+
+            # Print rows grouped by module type (in defined order)
+            for module_type in module_order:
                 if module_type not in config.modules:
                     continue
 
@@ -87,9 +89,7 @@ class ReportGenerator:
                 if not module_weights:
                     continue
 
-                module_memory = result.breakdown.get(module_type, 0)
-
-                for weight_name, weight_info in sorted(module_weights.items()):
+                for weight_name, weight_info in module_weights.items():
                     # Calculate memory
                     dtype_bytes_val = get_dtype_bytes(weight_info.dtype)
                     params = 1
@@ -108,21 +108,7 @@ class ReportGenerator:
                     parallel_strategy = weight_info.parallel_strategy or "N/A"
                     world_size = weight_info.world_size if weight_info.world_size > 0 else 1
 
-                    weight_rows.append((
-                        module_type,
-                        weight_name,
-                        shape_str,
-                        weight_info.layers,
-                        weight_memory,
-                        pct,
-                        weight_info.dtype,
-                        parallel_strategy,
-                        world_size
-                    ))
-
-            # Print rows sorted by memory (descending)
-            for row in sorted(weight_rows, key=lambda x: x[4], reverse=True):
-                lines.append(f"| {row[0]} | {row[1]} | {row[2]} | {row[3]} | {row[4]:.4f} | {row[5]:.1f}% | {row[6]} | {row[7]} | {row[8]} |")
+                    lines.append(f"| {module_type} | {weight_name} | {shape_str} | {weight_info.layers} | {weight_memory:.4f} | {pct:.1f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
 
             # Print Total row
             lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.4f}** | **100.0%** | - | - | - |")
