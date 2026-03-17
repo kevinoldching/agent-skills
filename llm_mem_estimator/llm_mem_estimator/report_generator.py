@@ -70,6 +70,19 @@ class ReportGenerator:
         lines.append(f"| **Total** | **{total:.2f}** | **100.0%** |")
         lines.append("")
 
+        # Add computation rules
+        computation_rules = config.computation_rules
+        if computation_rules:
+            lines.append("**计算公式说明：**")
+            lines.append("")
+            if 'kv_cache' in computation_rules:
+                kv_formula = computation_rules['kv_cache']
+                lines.append(f"- KV Cache: `{kv_formula}`")
+            if 'activation' in computation_rules:
+                act_formula = computation_rules['activation']
+                lines.append(f"- Activation: `{act_formula}`")
+            lines.append("")
+
         # Weights Breakdown - combined table with all details
         if result.breakdown and config.modules:
             lines.append("## Weights Breakdown by Module")
