@@ -193,16 +193,21 @@ class MemoryEstimator:
         # Available memory for generated KV + activation
         dynamic_memory = available_memory_gb - total_fixed
 
-        # Estimate per-token memory: when seq_len > 128, min() is saturated
-        # So we use prompt_len=0, gen_len=1 to get the incremental cost
-        per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
+        # Calculate actual per-token cost when prompt_len > 128 (min is saturated)
+        # KV increment: 18 * batch_size * 1 * kv_dim (ignoring min part)
+        # This is more accurate for large prompt_len
+        if prompt_len * batch_size > 128:
+            # When min() is saturated, use a larger per-token estimate for upper bound
+            per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
+        else:
+            per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
         per_token_act = self.calculate_activation_memory(batch_size, 1, activation_dtype, tp, cp)
         per_token_total = per_token_kv + per_token_act
 
-        # Set upper bound: available memory / per-token memory * 10
-        # Use a safe upper bound if per_token_total is too small
+        # Set upper bound: available memory / per-token memory * 50 (use 50 for safety)
+        # Use a much larger upper bound to ensure we find the correct max
         if per_token_total > 0:
-            upper_bound = min(int(dynamic_memory / per_token_total * 10), 10000000)
+            upper_bound = min(int(dynamic_memory / per_token_total * 50), 100000000)
         else:
             upper_bound = 1000000
 
