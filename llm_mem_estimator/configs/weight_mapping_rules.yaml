@@ -54,18 +54,13 @@ generic:
   parallel_defaults:
     embedding: TP
     attention:
-      bias: replicated
-      scale: replicated
-      default: TP
+      q_proj.weight: TP
+      k_proj.weight: TP
+      v_proj.weight: TP
+      o_proj.weight: TP
     ffn_moe:
-      bias: replicated
-      router: replicated
-      gate: replicated
       experts: EP
-      default: EP
-    ffn_dense:
-      bias: replicated
-      default: TP
+    ffn_dense: TP
     ffn_shared_expert: replicated
     norm: replicated
     others: replicated

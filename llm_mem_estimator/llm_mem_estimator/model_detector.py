@@ -91,9 +91,13 @@ class WeightClassifier:
             return 'replicated'
 
         # Get module-specific defaults
-        module_defaults = parallel_defaults.get(module_type, 'replicated')
+        module_defaults = parallel_defaults.get(module_type)
 
-        # If it's a simple string, return directly
+        # If module not in parallel_defaults, default to replicated
+        if module_defaults is None:
+            return 'replicated'
+
+        # If it's a simple string (e.g., 'TP', 'EP'), return directly
         if isinstance(module_defaults, str):
             return module_defaults
 
@@ -102,16 +106,28 @@ class WeightClassifier:
             # Sort keywords by length (longest first) to match more specific patterns first
             # e.g., 'experts' should match before 'gate' in 'mlp.experts.0.gate_proj.weight'
             sorted_keywords = sorted(
-                [k for k in module_defaults.keys() if k != 'default'],
+                [k for k in module_defaults.keys()],
                 key=len,
                 reverse=True
             )
             # First check for specific keyword matches (longer keywords first)
+            import re
             for keyword in sorted_keywords:
-                if keyword in weight_name:
-                    return module_defaults[keyword]
-            # Return default if no match
-            return module_defaults.get('default', 'replicated')
+                # Match keyword as complete segment:
+                # - keyword ends with .weight: match exactly 'keyword' in weight_name
+                # - keyword is a simple name: match as segment in weight_name.split('.')
+                if keyword.endswith('.weight'):
+                    # For patterns like 'q_proj.weight', check if weight_name ends with it
+                    if weight_name.endswith(keyword):
+                        return module_defaults[keyword]
+                else:
+                    # For simple keywords like 'experts', check if it's a complete segment
+                    # Split and check exact match
+                    weight_parts = weight_name.split('.')
+                    if keyword in weight_parts:
+                        return module_defaults[keyword]
+            # Return replicated if no match
+            return 'replicated'
 
         return 'replicated'
 
