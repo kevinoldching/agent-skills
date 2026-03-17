@@ -15,15 +15,23 @@ class MemoryEstimator:
         self.config = config
         self.evaluator = FormulaEvaluator(config.architecture_config)
 
-    def calculate_weights_memory(self) -> Tuple[float, Dict[str, float]]:
-        """Calculate total weights memory and breakdown by module type"""
+    def calculate_weights_memory(self, tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1) -> Tuple[float, Dict[str, float]]:
+        """Calculate total weights memory and breakdown by module type
+
+        Args:
+            tp: Tensor Parallel degree
+            pp: Pipeline Parallel degree
+            dp: Data Parallel degree
+            cp: Context Parallel degree
+            ep: Expert Parallel degree
+        """
         total_memory = 0.0
         breakdown = {}
 
         for module_type, weights in self.config.modules.items():
             module_memory = 0.0
             for weight_name, weight_info in weights.items():
-                weight_memory = calculate_weight_memory(weight_info)
+                weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
                 module_memory += weight_memory
 
             breakdown[module_type] = module_memory
@@ -82,14 +90,26 @@ class MemoryEstimator:
 
     def estimate_memory(self, batch_size: int = 1, seq_len: int = 2048,
                         kv_dtype: str = "fp16", activation_dtype: str = "fp16",
-                        tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1,
+                        tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                         system_reserved_gb: float = 2.0) -> MemoryResult:
-        """Estimate total memory usage"""
-        # Calculate weights memory
-        weights_memory, weights_breakdown = self.calculate_weights_memory()
+        """Estimate total memory usage
 
-        # Apply pipeline parallel
-        weights_memory = weights_memory / pp
+        Args:
+            batch_size: Batch size
+            seq_len: Sequence length
+            kv_dtype: KV cache data type
+            activation_dtype: Activation data type
+            tp: Tensor Parallel degree
+            pp: Pipeline Parallel degree
+            dp: Data Parallel degree
+            cp: Context Parallel degree
+            ep: Expert Parallel degree
+            system_reserved_gb: System reserved memory in GB
+        """
+        # Calculate weights memory (with parallel strategy sharding)
+        weights_memory, weights_breakdown = self.calculate_weights_memory(
+            tp=tp, pp=pp, dp=dp, cp=cp, ep=ep
+        )
 
         # Calculate KV cache memory
         kv_cache_memory = self.calculate_kv_cache_memory(

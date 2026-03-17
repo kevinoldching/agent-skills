@@ -45,6 +45,7 @@ def main():
     parser.add_argument('--pp', type=int, default=1, help="Pipeline parallel size")
     parser.add_argument('--dp', type=int, default=1, help="Data parallel size")
     parser.add_argument('--cp', type=int, default=1, help="Context parallel size")
+    parser.add_argument('--ep', type=int, default=1, help="Expert parallel size")
 
     # Hardware configuration
     parser.add_argument('--chip', type=str, help="Chip name (e.g., nvidia/H100-80GB)")
@@ -147,6 +148,7 @@ def main():
         pp=args.pp,
         dp=args.dp,
         cp=args.cp,
+        ep=args.ep,
         system_reserved_gb=args.system_reserved
     )
 
@@ -155,7 +157,8 @@ def main():
         'tp': args.tp,
         'pp': args.pp,
         'dp': args.dp,
-        'cp': args.cp
+        'cp': args.cp,
+        'ep': args.ep
     }
 
     report = ReportGenerator.generate_report(

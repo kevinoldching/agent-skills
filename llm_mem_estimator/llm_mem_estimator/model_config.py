@@ -117,8 +117,17 @@ def get_dtype_bytes(dtype: str) -> float:
     return dtype_map[dtype_lower]
 
 
-def calculate_weight_memory(weight_info: WeightInfo) -> float:
-    """Calculate memory for a single weight in GB"""
+def calculate_weight_memory(weight_info: WeightInfo, tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1) -> float:
+    """Calculate memory for a single weight in GB
+
+    Args:
+        weight_info: Weight information
+        tp: Tensor Parallel degree
+        pp: Pipeline Parallel degree
+        dp: Data Parallel degree
+        cp: Context Parallel degree
+        ep: Expert Parallel degree
+    """
     # Calculate total elements
     total_elements = 1
     for dim in weight_info.shape:
@@ -133,9 +142,19 @@ def calculate_weight_memory(weight_info: WeightInfo) -> float:
     # Calculate total bytes
     total_bytes = total_elements * bytes_per_element
 
-    # Apply parallel strategy sharding
-    if weight_info.parallel_strategy != "replicated" and weight_info.world_size > 0:
-        total_bytes /= weight_info.world_size
+    # Apply parallel strategy sharding based on parallel_strategy
+    strategy = weight_info.parallel_strategy.upper() if weight_info.parallel_strategy else ""
+    if strategy == "TP":
+        total_bytes /= tp
+    elif strategy == "PP":
+        total_bytes /= pp
+    elif strategy == "DP":
+        total_bytes /= dp
+    elif strategy == "CP":
+        total_bytes /= cp
+    elif strategy == "EP":
+        total_bytes /= ep
+    # replicated: no sharding
 
     # Convert to GB
     return total_bytes / (1024 ** 3)
