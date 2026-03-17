@@ -37,7 +37,7 @@ def main():
     # Estimation parameters
     parser.add_argument('--batch-size', type=int, default=1, help="Batch size")
     parser.add_argument('--prompt-len', type=int, required=True, help="Input prompt length")
-    parser.add_argument('--gen-len', type=int, required=True, help="Generated output length")
+    parser.add_argument('--gen-len', type=int, default=None, help="Generated output length (required without --find-max-seq-len)")
     parser.add_argument('--kv-dtype', type=str, default="fp16", help="KV cache dtype")
     parser.add_argument('--activation-dtype', type=str, default="fp16", help="Activation dtype")
 
@@ -61,6 +61,10 @@ def main():
     parser.add_argument('--output', type=str, help="Output report path")
 
     args = parser.parse_args()
+
+    # Validate: gen-len is required when NOT using --find-max-seq-len
+    if not args.find_max_seq_len and args.gen_len is None:
+        parser.error("--gen-len is required when not using --find-max-seq-len")
 
     # Get script directory
     script_dir = Path(__file__).parent.parent
@@ -228,11 +232,13 @@ def main():
 
         return
 
-    # Estimate memory
+    # Estimate memory (use default gen_len if not specified)
+    effective_gen_len = args.gen_len if args.gen_len is not None else 1024
+
     result = estimator.estimate_memory(
         batch_size=args.batch_size,
         prompt_len=args.prompt_len,
-        gen_len=args.gen_len,
+        gen_len=effective_gen_len,
         kv_dtype=args.kv_dtype,
         activation_dtype=args.activation_dtype,
         tp=args.tp,
@@ -258,7 +264,7 @@ def main():
         batch_size=args.batch_size,
         parallel_config=parallel_config,
         prompt_len=args.prompt_len,
-        gen_len=args.gen_len,
+        gen_len=effective_gen_len,
         chip_info=chip_info
     )
 
