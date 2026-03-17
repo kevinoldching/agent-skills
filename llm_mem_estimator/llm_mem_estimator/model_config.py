@@ -314,10 +314,7 @@ class ConfigLoader:
                 shape_str = str(weight_info.shape)
                 parts = [f"shape: {shape_str}", f"dtype: {weight_info.dtype}",
                          f"layers: {weight_info.layers}", f"parallel_strategy: {weight_info.parallel_strategy}"]
-                # Show world_size for non-replicated strategies (default is 1)
-                if weight_info.parallel_strategy != "replicated":
-                    world_size = weight_info.world_size if weight_info.world_size > 0 else 1
-                    parts.append(f"world_size: {world_size}")
+                # Note: world_size is determined by CLI parameters (--tp/--ep/etc), not stored in YAML
                 lines.append(f"    {weight_name}: {{{', '.join(parts)}}}")
 
         # computation_rules
