@@ -173,9 +173,8 @@ def main():
         print(report)
 
         # Print max sequence length calculation explanation
-        print("\n" + "=" * 60)
-        print("最大序列长度计算过程")
-        print("=" * 60)
+        print("\n## How to Calculate the Maximum Sequence Length")
+        print("")
 
         # Calculate fixed memory
         weights_memory, _ = estimator.calculate_weights_memory(
@@ -183,14 +182,14 @@ def main():
         )
         fixed_memory = weights_memory + args.system_reserved
 
-        print(f"\n【固定内存】")
-        print(f"  - 模型权重 (per device, 已除 TP/EP): {weights_memory:.2f} GB")
-        print(f"  - 系统预留: {args.system_reserved:.2f} GB")
-        print(f"  - 固定内存合计: {fixed_memory:.2f} GB")
+        print("### Fixed Memory")
+        print(f"- Model weights (per device, after TP/EP sharding): {weights_memory:.2f} GB")
+        print(f"- System reserved: {args.system_reserved:.2f} GB")
+        print(f"- **Total fixed memory: {fixed_memory:.2f} GB**")
 
-        print(f"\n【可用内存】")
-        print(f"  - 芯片总显存: {available_memory_gb} GB")
-        print(f"  - 可用动态内存: {available_memory_gb - fixed_memory:.2f} GB")
+        print(f"\n### Available Memory")
+        print(f"- Total chip VRAM: {available_memory_gb} GB")
+        print(f"- Available for dynamic (KV + Activation): {available_memory_gb - fixed_memory:.2f} GB")
 
         # Calculate per-unit memory
         kv_memory_per_seq = estimator.calculate_kv_cache_memory(
@@ -201,19 +200,18 @@ def main():
         )
         total_per_seq = kv_memory_per_seq + act_memory_per_seq
 
-        print(f"\n【每单位序列长度内存】")
-        print(f"  - KV Cache: {kv_memory_per_seq:.6f} GB")
-        print(f"  - Activation: {act_memory_per_seq:.6f} GB")
-        print(f"  - 合计: {total_per_seq:.6f} GB")
+        print(f"\n### Memory per Unit Sequence Length")
+        print(f"- KV Cache: {kv_memory_per_seq:.6f} GB")
+        print(f"- Activation: {act_memory_per_seq:.6f} GB")
+        print(f"- **Total: {total_per_seq:.6f} GB**")
 
-        max_calc = int((available_memory_gb - fixed_memory) / total_per_seq)
-        print(f"\n【计算】")
-        print(f"  - 最大序列长度 = 可用内存 / 每单位内存")
-        print(f"  - = {available_memory_gb - fixed_memory:.2f} / {total_per_seq:.6f}")
-        print(f"  - = {max_calc:,}")
+        print(f"\n### Calculation")
+        print(f"Maximum sequence length = Available memory / Memory per unit")
+        print(f"= {available_memory_gb - fixed_memory:.2f} / {total_per_seq:.6f}")
+        print(f"= **{max_seq_len:,}**")
 
-        print(f"\n【最终结论】")
-        print(f"  - 最大序列长度: {max_seq_len:,}")
+        print(f"\n### Result")
+        print(f"- **Maximum sequence length: {max_seq_len:,}**")
 
         return
 
