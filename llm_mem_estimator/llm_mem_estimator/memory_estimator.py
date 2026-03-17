@@ -193,23 +193,9 @@ class MemoryEstimator:
         # Available memory for generated KV + activation
         dynamic_memory = available_memory_gb - total_fixed
 
-        # Calculate actual per-token cost when prompt_len > 128 (min is saturated)
-        # KV increment: 18 * batch_size * 1 * kv_dim (ignoring min part)
-        # This is more accurate for large prompt_len
-        if prompt_len * batch_size > 128:
-            # When min() is saturated, use a larger per-token estimate for upper bound
-            per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
-        else:
-            per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
-        per_token_act = self.calculate_activation_memory(batch_size, 1, activation_dtype, tp, cp)
-        per_token_total = per_token_kv + per_token_act
-
-        # Set upper bound: available memory / per-token memory * 50 (use 50 for safety)
-        # Use a much larger upper bound to ensure we find the correct max
-        if per_token_total > 0:
-            upper_bound = min(int(dynamic_memory / per_token_total * 50), 100000000)
-        else:
-            upper_bound = 1000000
+        # Use a fixed large upper bound for binary search
+        # The actual max will be found by the binary search using the real formula
+        upper_bound = 100_000_000  # 100 million
 
         # Binary search for max generated length
         left, right = 1, upper_bound
