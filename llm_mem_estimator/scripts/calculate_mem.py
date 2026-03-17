@@ -36,8 +36,8 @@ def main():
 
     # Estimation parameters
     parser.add_argument('--batch-size', type=int, default=1, help="Batch size")
-    parser.add_argument('--prompt-len', type=int, default=4096, help="Input prompt length")
-    parser.add_argument('--gen-len', type=int, default=1024, help="Generated output length")
+    parser.add_argument('--prompt-len', type=int, required=True, help="Input prompt length")
+    parser.add_argument('--gen-len', type=int, required=True, help="Generated output length")
     parser.add_argument('--kv-dtype', type=str, default="fp16", help="KV cache dtype")
     parser.add_argument('--activation-dtype', type=str, default="fp16", help="Activation dtype")
 
@@ -203,12 +203,13 @@ def main():
         print(f"- Total chip VRAM: {available_memory_gb} GB")
         print(f"- Available for gen KV + Activation: {available_dyn:.2f} GB")
 
-        # Calculate per-unit gen memory
+        # Calculate per-unit gen memory (batch_size=1, prompt_len+gen_len=1)
+        # This gives the memory cost for a single token
         kv_memory_per_gen = estimator.calculate_kv_cache_memory(
-            args.batch_size, 0, 1, args.kv_dtype, args.tp, args.cp
+            1, 0, 1, args.kv_dtype, args.tp, args.cp
         )
         act_memory_per_gen = estimator.calculate_activation_memory(
-            args.batch_size, 1, args.activation_dtype, args.tp, args.cp
+            1, 1, args.activation_dtype, args.tp, args.cp
         )
         total_per_gen = kv_memory_per_gen + act_memory_per_gen
 
