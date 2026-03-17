@@ -72,8 +72,8 @@ class MemoryEstimator:
         # Convert to GB
         memory_gb = (memory_elements * dtype_bytes) / (1024 ** 3)
 
-        # Apply parallel strategies (only CP, TP/EP don't affect per-device memory)
-        memory_gb = memory_gb / cp
+        # Apply parallel strategies: TP (num_kv_heads sharded), CP (sequence sharded)
+        memory_gb = memory_gb / tp / cp
 
         return memory_gb
 
