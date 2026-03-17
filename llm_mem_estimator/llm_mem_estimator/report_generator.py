@@ -5,7 +5,7 @@ Report generator for LLM Memory Estimator
 
 from typing import Dict, Optional, Any
 
-from .model_config import ModelConfig, MemoryResult, get_dtype_bytes
+from .model_config import ModelConfig, MemoryResult, get_dtype_bytes, calculate_weight_memory
 
 
 class ReportGenerator:
@@ -103,13 +103,13 @@ class ReportGenerator:
                     continue
 
                 for weight_name, weight_info in module_weights.items():
-                    # Calculate memory
-                    dtype_bytes_val = get_dtype_bytes(weight_info.dtype)
-                    params = 1
-                    for dim in weight_info.shape:
-                        params *= dim
-                    params *= weight_info.layers
-                    weight_memory = params * dtype_bytes_val / (1024 ** 3)
+                    # Calculate memory with parallel strategy
+                    tp = parallel_config.get('tp', 1)
+                    pp = parallel_config.get('pp', 1)
+                    dp = parallel_config.get('dp', 1)
+                    cp = parallel_config.get('cp', 1)
+                    ep = parallel_config.get('ep', 1)
+                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
 
                     # Calculate percentage relative to total weights memory
                     pct = weight_memory / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
