@@ -111,11 +111,14 @@ def main():
         chips_path = script_dir / "configs" / "chips.json"
         if chips_path.exists():
             chips_config = ConfigLoader.load_chips_config(str(chips_path))
-            if args.chip in chips_config:
-                chip_info = chips_config[args.chip]
-                chip_info['name'] = args.chip
-                available_memory_gb = chip_info.get('vram_gb')
-            else:
+            # Search in nested vendor structure
+            for vendor, chips in chips_config.items():
+                if args.chip in chips:
+                    chip_info = chips[args.chip].copy()
+                    chip_info['name'] = f"{vendor}/{args.chip}"
+                    available_memory_gb = chip_info.get('vram_gb')
+                    break
+            if not chip_info:
                 print(f"Warning: Chip '{args.chip}' not found in chips.json", file=sys.stderr)
 
     # Find max sequence length if requested

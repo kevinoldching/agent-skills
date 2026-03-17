@@ -67,26 +67,30 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 2
 
 | 选项 | 说明 |
 |------|------|
-| `--chip` | 芯片名称 (如 `nvidia/H100-80GB`) |
+| `--chip` | 芯片名称 (如 `H100-80GB` 或 `nvidia/H100-80GB`) |
 | `--find-max-seq-len` | 根据芯片显存查找最大支持序列长度 |
 | `--system-reserved` | 系统保留显存 (GB) | 2.0 |
 
 ### 支持的芯片
 
 在 `configs/chips.json` 中定义了支持的芯片，包括：
-- `nvidia/H100-80GB` / `nvidia/H100-141GB`
-- `nvidia/A100-80GB`
-- `nvidia/RTX-4090`
-- `huawei/Ascend-910B`
-- `amd/MI300X`
-- `intel/Gaudi3`
+- `H100-80GB` / `H100-141GB` (nvidia)
+- `A100-80GB` / `A100-40GB` (nvidia)
+- `RTX-4090` / `RTX-3090` (nvidia)
+- `Ascend-910B-64GB` / `Ascend-910B-32GB` (huawei)
+- `MI300X` / `MI350X` (amd)
+- `Gaudi2` / `Gaudi3` (intel)
+
+支持两种命名格式：
+- 简短格式：`H100-80GB`（推荐）
+- 完整格式：`nvidia/H100-80GB`
 
 ### 示例：查找最大序列长度
 
 ```bash
 # 查找在 H100-80GB 上的最大序列长度
 python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
-    --chip nvidia/H100-80GB --find-max-seq-len --batch-size 1
+    --chip H100-80GB --find-max-seq-len --batch-size 1
 ```
 
 ## 输出选项
