@@ -90,9 +90,8 @@ class ReportGenerator:
                     continue
 
                 for weight_name, weight_info in module_weights.items():
-                    # Calculate memory (considering quantization)
-                    quantization = config.model_identity.quantization
-                    dtype_bytes_val = get_dtype_bytes(weight_info.dtype, quantization)
+                    # Calculate memory
+                    dtype_bytes_val = get_dtype_bytes(weight_info.dtype)
                     params = 1
                     for dim in weight_info.shape:
                         params *= dim

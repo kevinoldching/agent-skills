@@ -20,13 +20,10 @@ class MemoryEstimator:
         total_memory = 0.0
         breakdown = {}
 
-        # Get quantization from model identity
-        quantization = self.config.model_identity.quantization
-
         for module_type, weights in self.config.modules.items():
             module_memory = 0.0
             for weight_name, weight_info in weights.items():
-                weight_memory = calculate_weight_memory(weight_info, quantization)
+                weight_memory = calculate_weight_memory(weight_info)
                 module_memory += weight_memory
 
             breakdown[module_type] = module_memory

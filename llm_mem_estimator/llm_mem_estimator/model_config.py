@@ -89,14 +89,8 @@ class MemoryResult:
 # Utility Functions
 # ============================================================================
 
-def get_dtype_bytes(dtype: str, quantization: str = None) -> float:
-    """Get the number of bytes for a given data type
-
-    Args:
-        dtype: The data type string (e.g., 'BF16', 'U8', 'FP16')
-        quantization: Optional quantization method (e.g., 'mxfp4', 'int4', 'fp8')
-                     If provided, overrides the dtype's default byte size for quantized types
-    """
+def get_dtype_bytes(dtype: str) -> float:
+    """Get the number of bytes for a given data type"""
     dtype_map = {
         "fp32": 4,
         "float32": 4,
@@ -117,27 +111,14 @@ def get_dtype_bytes(dtype: str, quantization: str = None) -> float:
         "uint4": 0.5,
         "u4": 0.5,
     }
-
-    # Handle quantization overrides
-    if quantization:
-        quant_lower = quantization.lower()
-        if quant_lower in ["mxfp4", "fp4", "int4", "4bit"]:
-            # For 4-bit quantization, use 0.5 bytes per parameter
-            return 0.5
-
     dtype_lower = dtype.lower()
     if dtype_lower not in dtype_map:
         raise ValueError(f"Unknown dtype: {dtype}")
     return dtype_map[dtype_lower]
 
 
-def calculate_weight_memory(weight_info: WeightInfo, quantization: str = None) -> float:
-    """Calculate memory for a single weight in GB
-
-    Args:
-        weight_info: Weight information
-        quantization: Optional quantization method (e.g., 'mxfp4', 'fp8')
-    """
+def calculate_weight_memory(weight_info: WeightInfo) -> float:
+    """Calculate memory for a single weight in GB"""
     # Calculate total elements
     total_elements = 1
     for dim in weight_info.shape:
@@ -146,8 +127,8 @@ def calculate_weight_memory(weight_info: WeightInfo, quantization: str = None) -
     # Multiply by number of layers
     total_elements *= weight_info.layers
 
-    # Get bytes per element (considering quantization)
-    bytes_per_element = get_dtype_bytes(weight_info.dtype, quantization)
+    # Get bytes per element
+    bytes_per_element = get_dtype_bytes(weight_info.dtype)
 
     # Calculate total bytes
     total_bytes = total_elements * bytes_per_element
