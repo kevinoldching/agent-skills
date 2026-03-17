@@ -119,7 +119,19 @@ class ReportGenerator:
 
                     # Format parallel strategy
                     parallel_strategy = weight_info.parallel_strategy or "N/A"
-                    world_size = weight_info.world_size if weight_info.world_size > 0 else 1
+                    # Calculate actual world size based on parallel strategy and CLI params
+                    if parallel_strategy.upper() == "TP":
+                        world_size = tp
+                    elif parallel_strategy.upper() == "EP":
+                        world_size = ep
+                    elif parallel_strategy.upper() == "PP":
+                        world_size = pp
+                    elif parallel_strategy.upper() == "DP":
+                        world_size = dp
+                    elif parallel_strategy.upper() == "CP":
+                        world_size = cp
+                    else:
+                        world_size = 1  # replicated
 
                     lines.append(f"| {module_type} | {weight_name} | {shape_str} | {weight_info.layers} | {weight_memory:.4f} | {pct:.1f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
 
