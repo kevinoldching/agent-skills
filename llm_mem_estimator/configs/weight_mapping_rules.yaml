@@ -59,6 +59,9 @@ generic:
       default: TP
     ffn_moe:
       bias: replicated
+      router: replicated
+      gate: replicated
+      experts: EP
       default: EP
     ffn_dense:
       bias: replicated

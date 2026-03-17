@@ -99,10 +99,17 @@ class WeightClassifier:
 
         # If it's a dict, match by keyword
         if isinstance(module_defaults, dict):
-            # First check for specific keyword matches
-            for keyword, strategy in module_defaults.items():
-                if keyword != 'default' and keyword in weight_name:
-                    return strategy
+            # Sort keywords by length (longest first) to match more specific patterns first
+            # e.g., 'experts' should match before 'gate' in 'mlp.experts.0.gate_proj.weight'
+            sorted_keywords = sorted(
+                [k for k in module_defaults.keys() if k != 'default'],
+                key=len,
+                reverse=True
+            )
+            # First check for specific keyword matches (longer keywords first)
+            for keyword in sorted_keywords:
+                if keyword in weight_name:
+                    return module_defaults[keyword]
             # Return default if no match
             return module_defaults.get('default', 'replicated')
 
