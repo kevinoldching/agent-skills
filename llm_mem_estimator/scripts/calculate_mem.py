@@ -66,6 +66,10 @@ def main():
     if not args.find_max_seq_len and args.gen_len is None:
         parser.error("--gen-len is required when not using --find-max-seq-len")
 
+    # Validate: --gen-len cannot be used with --find-max-seq-len
+    if args.find_max_seq_len and args.gen_len is not None:
+        parser.error("--gen-len cannot be used with --find-max-seq-len")
+
     # Get script directory
     script_dir = Path(__file__).parent.parent
 
