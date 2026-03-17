@@ -1,0 +1,38 @@
+model_identity:
+  name: Qwen2.5-1.5B
+  total_params: '1.54B'
+  num_layers: 28
+architecture_config:
+  hidden_size: 1536
+  num_layers: 28
+  attention_type: gqa
+  ffn_type: standard
+  norm_type: rmsnorm
+  vocab_size: 151936
+  head_dim: 128
+  num_attention_heads: 12
+  num_key_value_heads: 2
+  intermediate_size: 8960
+modules:
+  embedding:
+    model.embed_tokens.weight: {shape: [151936, 1536], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  norm:
+    input_layernorm.weight: {shape: [1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    post_attention_layernorm.weight: {shape: [1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    model.norm.weight: {shape: [1536], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  ffn_dense:
+    mlp.down_proj.weight: {shape: [1536, 8960], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    mlp.gate_proj.weight: {shape: [8960, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    mlp.up_proj.weight: {shape: [8960, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+  attention:
+    self_attn.k_proj.bias: {shape: [256], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.k_proj.weight: {shape: [256, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.o_proj.weight: {shape: [1536, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.q_proj.bias: {shape: [1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.q_proj.weight: {shape: [1536, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.v_proj.bias: {shape: [256], dtype: BF16, layers: 28, parallel_strategy: replicated}
+    self_attn.v_proj.weight: {shape: [256, 1536], dtype: BF16, layers: 28, parallel_strategy: replicated}
+computation_rules:
+  recommended_capacity_factor: 1.25
+  kv_cache: 2 * batch_size * seq_len * 256 * num_layers
+  activation: batch_size * seq_len * hidden_size * 1.25 * dtype_bytes
