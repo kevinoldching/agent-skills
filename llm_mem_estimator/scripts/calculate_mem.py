@@ -211,13 +211,13 @@ def main():
         print(f"- Total chip VRAM: {available_memory_gb} GB")
         print(f"- Available for gen KV + Activation: {available_dyn:.2f} GB")
 
-        # Calculate per-unit gen memory (batch_size=1, prompt_len+gen_len=1)
+        # Calculate per-unit gen memory: prompt_len=0 to get incremental cost
         # This gives the memory cost for a single token
         kv_memory_per_gen = estimator.calculate_kv_cache_memory(
-            1, 0, 1, args.kv_dtype, args.tp, args.cp
+            args.batch_size, 0, 1, args.kv_dtype, args.tp, args.cp
         )
         act_memory_per_gen = estimator.calculate_activation_memory(
-            1, 1, args.activation_dtype, args.tp, args.cp
+            args.batch_size, 1, args.activation_dtype, args.tp, args.cp
         )
         total_per_gen = kv_memory_per_gen + act_memory_per_gen
 

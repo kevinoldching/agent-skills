@@ -193,8 +193,9 @@ class MemoryEstimator:
         # Available memory for generated KV + activation
         dynamic_memory = available_memory_gb - total_fixed
 
-        # Estimate per-token memory with seq_len=1 to set upper bound
-        per_token_kv = self.calculate_kv_cache_memory(batch_size, prompt_len, 1, kv_dtype, tp, cp)
+        # Estimate per-token memory: when seq_len > 128, min() is saturated
+        # So we use prompt_len=0, gen_len=1 to get the incremental cost
+        per_token_kv = self.calculate_kv_cache_memory(batch_size, 0, 1, kv_dtype, tp, cp)
         per_token_act = self.calculate_activation_memory(batch_size, 1, activation_dtype, tp, cp)
         per_token_total = per_token_kv + per_token_act
 
