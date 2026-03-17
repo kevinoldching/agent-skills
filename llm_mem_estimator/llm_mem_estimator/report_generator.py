@@ -134,10 +134,10 @@ class ReportGenerator:
                     else:
                         world_size = 1  # replicated
 
-                    lines.append(f"| {module_type} | {weight_name} | {shape_str} | {weight_info.layers} | {weight_memory:.4f} | {pct:.1f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
+                    lines.append(f"| {module_type} | {weight_name} | {shape_str} | {weight_info.layers} | {weight_memory:.5f} | {pct:.2f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
 
             # Print Total row
-            lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.4f}** | **100.0%** | - | - | - |")
+            lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.5f}** | **100.00%** | - | - | - |")
 
             lines.append("")
 
