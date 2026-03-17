@@ -45,6 +45,7 @@ class ReportGenerator:
         lines.append(f"- **Pipeline Parallel (PP)**: {parallel_config.get('pp', 1)}")
         lines.append(f"- **Data Parallel (DP)**: {parallel_config.get('dp', 1)}")
         lines.append(f"- **Context Parallel (CP)**: {parallel_config.get('cp', 1)}")
+        lines.append(f"- **Expert Parallel (EP)**: {parallel_config.get('ep', 1)}")
         lines.append("")
 
         # Hardware Information
