@@ -38,9 +38,17 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `--batch-size` | 批处理大小 | 1 |
-| `--seq-len` | 序列长度 | 2048 |
+| `--prompt-len` | 输入提示词长度 | 4096 |
+| `--gen-len` | 生成输出长度 | 1024 |
 | `--kv-dtype` | KV Cache 数据类型 | fp16 |
 | `--activation-dtype` | 激活值数据类型 | fp16 |
+
+> **注意**：对于 Prefill/Decode 分离部署场景：
+> - `--prompt-len` 表示输入的 prompt 长度（固定）
+> - `--gen-len` 表示生成的 token 长度
+> - KV Cache 使用 `(prompt_len + gen_len)` 计算
+> - Activation 只使用 `gen_len` 计算
+> - `--find-max-seq-len` 用于查找最大可生成的 token 数量
 
 支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`
 
@@ -52,6 +60,7 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 | `--pp` | Pipeline Parallel (PP) 并行度 | 1 |
 | `--dp` | Data Parallel (DP) 并行度 | 1 |
 | `--cp` | Context Parallel (CP) 并行度 | 1 |
+| `--ep` | Expert Parallel (EP) 并行度 | 1 |
 
 ### 示例：多卡并行估算
 
@@ -103,7 +112,7 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
 
 ```bash
 python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
-    --batch-size 8 --seq-len 4096 --tp 8 --output memory_report.txt
+    --batch-size 8 --prompt-len 4096 --gen-len 1024 --tp 8 --output memory_report.txt
 ```
 
 ## 使用示例
@@ -114,7 +123,8 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml \
 python scripts/calculate_mem.py \
     --config configs/models/gpt-oss-120b.yaml \
     --batch-size 4 \
-    --seq-len 2048 \
+    --prompt-len 4096 \
+    --gen-len 1024 \
     --tp 4
 ```
 
@@ -145,10 +155,11 @@ Memory Breakdown (per GPU):
 python scripts/calculate_mem.py \
     --model Qwen/Qwen2.5-1.5B \
     --batch-size 1 \
-    --seq-len 4096
+    --prompt-len 4096 \
+    --gen-len 1024
 ```
 
-### 示例 3：查找硬件最大支持序列长度
+### 示例 3：查找硬件最大支持生成长度
 
 ```bash
 python scripts/calculate_mem.py \
@@ -156,6 +167,7 @@ python scripts/calculate_mem.py \
     --chip nvidia/H100-80GB \
     --find-max-seq-len \
     --batch-size 1 \
+    --prompt-len 4096 \
     --tp 8
 
 # 输出: Maximum sequence length: 16,384
@@ -176,9 +188,9 @@ python scripts/calculate_mem.py \
 ```
 usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
                        [--generate-config] [--output-config OUTPUT_CONFIG]
-                       [--batch-size BATCH_SIZE] [--seq-len SEQ_LEN]
+                       [--batch-size BATCH_SIZE] [--prompt-len PROMPT_LEN] [--gen-len GEN_LEN]
                        [--kv-dtype KV_DTYPE] [--activation-dtype ACTIVATION_DTYPE]
-                       [--tp TP] [--pp PP] [--dp DP] [--cp CP]
+                       [--tp TP] [--pp PP] [--dp DP] [--cp CP] [--ep EP]
                        [--chip CHIP] [--find-max-seq-len]
                        [--system-reserved SYSTEM_RESERVED]
                        [--output OUTPUT]

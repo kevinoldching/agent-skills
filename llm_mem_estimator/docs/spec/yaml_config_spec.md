@@ -202,12 +202,18 @@ modules:
 
 **公式变量**（在公式中使用的占位符）：
 - `batch_size`: 批大小（用户运行时传入）
-- `seq_len`: 序列长度（用户运行时传入）
+- `prompt_len`: 输入提示词长度（用户运行时传入）
+- `gen_len`: 生成输出长度（用户运行时传入）
+- `seq_len`: 总序列长度 = prompt_len + gen_len（用户运行时传入）
 - `hidden_size`: 隐藏层维度（从 architecture_config 获取）
 - `num_layers`: 层数（从 architecture_config 获取）
-- `dtype_bytes`: 数据类型字节数（根据激活数据类型确定）
+- `dtype_bytes`: 数据类型字节数（根据数据类型自动计算）
 - `num_experts_per_tok`: MoE 激活专家数（从 architecture_config 获取）
 - 其他架构参数（如 `kv_lora_rank`）
+
+**公式设计原则**：
+- **KV Cache**：需要存储完整的上下文，使用 `(prompt_len + gen_len)` 或 `seq_len`
+- **Activation**：只需要考虑生成的 token，使用 `gen_len`
 
 **支持的函数**：
 
@@ -215,7 +221,7 @@ modules:
 
 | 函数 | 说明 | 示例 |
 |------|------|------|
-| `min(a, b, ...)` | 返回最小值 | `min(seq_len, 4096)` |
+| `min(a, b, ...)` | 返回最小值 | `min(batch_size * seq_len, 128)` |
 | `max(a, b, ...)` | 返回最大值 | `max(batch_size, 1)` |
 | `abs(x)` | 返回绝对值 | `abs(x - y)` |
 | `round(x)` | 四舍五入 | `round(x)` |
@@ -232,26 +238,28 @@ modules:
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
-  kv_cache: "2 * batch_size * seq_len * 360 * num_layers"
-  activation: "batch_size * seq_len * hidden_size * 1.25 * dtype_bytes"
+  # KV Cache: 存储完整上下文 (prompt + generated)
+  kv_cache: "2 * batch_size * (prompt_len + gen_len) * kv_dim * num_layers"
+  # Activation: 只考虑生成的 token
+  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
 ```
 
-2. **使用 min/max 函数**（用于限制峰值）：
+2. **带峰值限制的公式**（用于 Prefill/Decode 分离部署）：
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
   # KV Cache: 使用 min 限制序列长度峰值
-  kv_cache: "18 * (batch_size * seq_len) + 18 * min(batch_size * seq_len, 128) * kv_dim * num_layers"
-  # Activation: 使用 min 限制激活值峰值
-  activation: "batch_size * min(seq_len, 4096) * hidden_size * 1.25 * dtype_bytes"
+  kv_cache: "18 * (batch_size * (prompt_len + gen_len)) + 18 * min(batch_size * (prompt_len + gen_len), 128) * kv_dim * num_layers"
+  # Activation: 只使用 gen_len
+  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
 ```
 
 3. **GQA 注意力**：
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
-  kv_cache: "2 * batch_size * seq_len * kv_heads * head_dim * num_layers"
-  activation: "batch_size * seq_len * hidden_size * 4 * 1.25 * dtype_bytes"
+  kv_cache: "2 * batch_size * (prompt_len + gen_len) * kv_heads * head_dim * num_layers"
+  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
 ```
 
 ---
