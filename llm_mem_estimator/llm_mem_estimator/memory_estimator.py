@@ -135,12 +135,11 @@ class MemoryEstimator:
 
     def find_max_sequence_length(self, available_memory_gb: float, batch_size: int = 1,
                                   kv_dtype: str = "fp16", activation_dtype: str = "fp16",
-                                  tp: int = 1, pp: int = 1, cp: int = 1,
+                                  tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                                   system_reserved_gb: float = 2.0) -> int:
         """Binary search to find maximum sequence length"""
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory()
-        weights_memory = weights_memory / pp
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
         fixed_memory = weights_memory + system_reserved_gb
 
         if fixed_memory >= available_memory_gb:

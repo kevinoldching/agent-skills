@@ -135,6 +135,7 @@ def main():
             tp=args.tp,
             pp=args.pp,
             cp=args.cp,
+            ep=args.ep,
             system_reserved_gb=args.system_reserved
         )
 
