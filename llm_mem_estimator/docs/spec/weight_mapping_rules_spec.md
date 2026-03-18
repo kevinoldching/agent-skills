@@ -89,6 +89,49 @@ architecture_config:
 
 ---
 
+## 计算规则（Computation Rules）
+
+### 概述
+
+`computation_rules` 定义了 KV Cache 和 Activation 的显存计算公式，以及系统预留显存和 GPU 利用率配置。
+
+### 字段说明
+
+| 字段 | 类型 | 是否必填 | 说明 |
+|------|------|---------|------|
+| `recommended_capacity_factor` | float 或 dict | 否 | 激活值计算的容量因子。<br>旧格式：单一浮点数，默认 1.25<br>新格式：字典 `{has_prefill: 1.25, decode: 12.5}` |
+| `system_reserved_gb` | float | 否 | 系统预留显存（GB），默认 2.0 |
+| `gpu_util` | float | 否 | GPU 利用率（0-1.0），默认 1.0。<br>可用显存 = 实际显存 × gpu_util |
+| `kv_cache` | string | 是 | KV Cache 显存计算公式 |
+| `activation` | string | 是 | Activation 显存计算公式 |
+
+### recommended_capacity_factor 说明
+
+- **has_prefill**: Prefill 阶段或混部场景使用（默认 1.25）
+- **decode**: 纯 Decode 阶段使用（默认 12.5）
+
+### 使用场景
+
+| 场景 | factor |
+|------|--------|
+| 搜索最大 gen_len（Decode） | decode |
+| 搜索最大 prompt_len（Prefill） | has_prefill |
+
+### 示例
+
+```yaml
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  system_reserved_gb: 2.0
+  gpu_util: 0.9
+  kv_cache: "2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
+  activation: "batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size"
+```
+
+---
+
 ## 模块类型
 
 支持的模块类型（`<module_type>`）：

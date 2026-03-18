@@ -47,8 +47,22 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 > - `--prompt-len` 表示输入的 prompt 长度（固定）
 > - `--gen-len` 表示生成的 token 长度
 > - KV Cache 使用 `(prompt_len + gen_len)` 计算
-> - Activation 只使用 `gen_len` 计算
-> - `--find-max-seq-len` 用于查找最大可生成的 token 数量
+> - Activation 根据场景使用不同因子：
+>   - **Decode 阶段**（固定 seq_len=1）：使用 decode 因子 (12.5)
+>   - **Prefill 阶段**（seq_len = prompt_len + gen_len）：使用 has_prefill 因子 (1.25)
+
+### 场景说明
+
+| 场景 | `--find-max-seq-len` | `--gen-len` | `--prompt-len` | 处理逻辑 |
+|-----|:---:|:---:|:---:|---------|
+| 1 | ✗ | ✓ | ✓ | 正常估算，使用 **decode** factor (12.5) |
+| 2 | ✗ | ✓ | ✗ | **报错**: `--prompt-len is required` |
+| 3 | ✗ | ✗ | ✓ | **报错**: `--gen-len is required` |
+| 4 | ✗ | ✗ | ✗ | **报错**: `--prompt-len and --gen-len are required` |
+| 5 | ✓ | ✗ | ✗ | prompt_len=默认值(4096)，搜索 max gen_len，使用 **decode** factor |
+| 6 | ✓ | ✗ | ✓ | prompt_len=用户指定，搜索 max gen_len，使用 **decode** factor |
+| 7 | ✓ | ✓ | ✗ | gen_len=用户指定，搜索 max prompt_len，使用 **has_prefill** factor |
+| 8 | ✓ | ✓ | ✓ | 警告: 两者都指定，按场景1处理 |
 
 支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`
 
@@ -77,7 +91,7 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 2
 | 选项 | 说明 |
 |------|------|
 | `--chip` | 芯片名称 (如 `H100-80GB` 或 `nvidia/H100-80GB`) |
-| `--find-max-seq-len` | 根据芯片显存查找最大支持序列长度 |
+| `--find-max-seq-len` | 根据芯片显存查找最大支持序列长度。<br>• 仅指定 `--gen-len` 时：搜索 max prompt_len (Prefill 场景)<br>• 仅指定 `--prompt-len` 时：搜索 max gen_len (Decode 场景)<br>• 两者都指定：正常估算 |
 | `--system-reserved` | 系统保留显存 (GB) | 2.0 |
 
 ### 支持的芯片
@@ -159,7 +173,7 @@ python scripts/calculate_mem.py \
     --gen-len 1024
 ```
 
-### 示例 3：查找硬件最大支持生成长度
+### 示例 3：查找硬件最大支持生成长度 (Decode 场景)
 
 ```bash
 python scripts/calculate_mem.py \
@@ -170,10 +184,25 @@ python scripts/calculate_mem.py \
     --prompt-len 4096 \
     --tp 8
 
-# 输出: Maximum sequence length: 16,384
+# 输出: Maximum generated length: 16,384
 ```
 
-### 示例 4：使用不同数据类型的量化
+### 示例 4：查找硬件最大支持 Prompt 长度 (Prefill 场景)
+
+```bash
+# 固定 gen_len=1，搜索最大 prompt_len
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip nvidia/H100-80GB \
+    --find-max-seq-len \
+    --gen-len 1 \
+    --batch-size 1 \
+    --tp 8
+
+# 输出: Maximum prompt length: xxx
+```
+
+### 示例 5：使用不同数据类型的量化
 
 ```bash
 # 使用 FP8 量化
