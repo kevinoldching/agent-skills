@@ -94,6 +94,7 @@ class MemoryResult:
 def get_dtype_bytes(dtype: str) -> float:
     """Get the number of bytes for a given data type"""
     dtype_map = {
+        # Float types
         "fp32": 4,
         "float32": 4,
         "f32": 4,
@@ -106,12 +107,23 @@ def get_dtype_bytes(dtype: str) -> float:
         "float8": 1,
         "f8_e4m3": 1,
         "float8_e4m3fn": 1,
+        # Integer types
         "int8": 1,
         "uint8": 1,
         "u8": 1,
         "int4": 0.5,
         "uint4": 0.5,
         "u4": 0.5,
+        "i32": 4,
+        "int32": 4,
+        "i16": 2,
+        "int16": 2,
+        "i8": 1,
+        "int8": 1,
+        "u32": 4,
+        "uint32": 4,
+        "u16": 2,
+        "uint16": 2,
     }
     dtype_lower = dtype.lower()
     if dtype_lower not in dtype_map:
@@ -385,6 +397,11 @@ class FormulaEvaluator:
                 context['recommended_capacity_factor'] = rcf
 
         # Add optional fields if present
+        if self.arch.head_dim:
+            context['head_dim'] = self.arch.head_dim
+        elif self.arch.hidden_size and self.arch.num_attention_heads:
+            # Calculate head_dim from hidden_size and num_attention_heads
+            context['head_dim'] = self.arch.hidden_size // self.arch.num_attention_heads
         if self.arch.num_attention_heads:
             context['num_attention_heads'] = self.arch.num_attention_heads
         if self.arch.num_key_value_heads:
