@@ -309,6 +309,16 @@ class ConfigLoader:
             lines.append(f"  num_experts_per_tok: {arch.num_experts_per_tok}")
         if arch.window_size:
             lines.append(f"  window_size: {arch.window_size}")
+        if arch.q_lora_rank:
+            lines.append(f"  q_lora_rank: {arch.q_lora_rank}")
+        if arch.kv_lora_rank:
+            lines.append(f"  kv_lora_rank: {arch.kv_lora_rank}")
+        if arch.qk_rope_head_dim:
+            lines.append(f"  qk_rope_head_dim: {arch.qk_rope_head_dim}")
+        if arch.v_head_dim:
+            lines.append(f"  v_head_dim: {arch.v_head_dim}")
+        if arch.qk_nope_head_dim:
+            lines.append(f"  qk_nope_head_dim: {arch.qk_nope_head_dim}")
 
         # modules - using compact format
         lines.append("modules:")
