@@ -150,11 +150,14 @@ gpt-oss-120b:
 
   # 覆盖 computation_rules
   computation_rules:
-    kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
+    kv_cache: "(18 * batch_size * seq_len * 1024 + 18 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
 
 # GPT-OSS-20B 特定规则（继承 gpt_oss，复用 computation_rules）
 gpt-oss-20b:
   inherit: gpt_oss
+  # 覆盖 computation_rules
+  computation_rules:
+    kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
 
 # Qwen 系列
 qwen:

@@ -383,7 +383,8 @@ class ConfigGenerator:
             kv_lora_rank=get_config_value('kv_lora_rank'),
             qk_rope_head_dim=get_config_value('qk_rope_head_dim'),
             v_head_dim=get_config_value('v_head_dim'),
-            qk_nope_head_dim=get_config_value('qk_nope_head_dim')
+            qk_nope_head_dim=get_config_value('qk_nope_head_dim'),
+            window_size=get_config_value('window_size')
         )
 
         # Get ffn_moe patterns for expert detection
@@ -392,8 +393,13 @@ class ConfigGenerator:
         # Classify weights (pass ffn_moe patterns for expert detection)
         modules = self._classify_weights(weights_metadata, model_type, architecture_config, ffn_moe_patterns)
 
-        # Generate computation rules (simplified)
-        computation_rules = self._generate_computation_rules(architecture_config)
+        # Get computation rules from weight_mapping_rules.yaml
+        # Priority: model_name > model_type > generic
+        computation_rules = model_rules.get('computation_rules', {})
+
+        # If not found in model_rules, generate from architecture
+        if not computation_rules:
+            computation_rules = self._generate_computation_rules(architecture_config)
 
         return ModelConfig(
             model_identity=model_identity,
