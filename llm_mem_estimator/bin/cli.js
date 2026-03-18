@@ -64,7 +64,8 @@ function installSkill(target) {
       !src.includes("node_modules") &&
       !src.includes("__pycache__") &&
       !src.includes(".claude") &&
-      !src.endsWith("CLAUDE.md"),
+      !src.endsWith("CLAUDE.md") &&
+      !src.includes("/tests"),
   });
   console.log(`Installed to: ${target}`);
 }

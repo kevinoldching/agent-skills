@@ -74,7 +74,8 @@ function installToSkills() {
       !src.includes("__pycache__") &&
       !src.includes(".claude") &&
       !src.endsWith("CLAUDE.md") &&
-      !src.endsWith("package-lock.json"),
+      !src.endsWith("package-lock.json") &&
+      !src.includes("/tests"),
   });
 
   console.log(`Installed to: ${SKILL_TARGET}`);
