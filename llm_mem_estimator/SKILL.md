@@ -202,3 +202,9 @@ batch_size * seq_len * hidden_size * num_experts * has_prefill_factor / cp
 5. **Run and Analyze**:
    - Review memory breakdown in the report
    - Check calculation steps for verification
+
+## Reference Documentation
+
+- [CLI 详细说明](./docs/spec/calculate_mem_cli_spec.md)
+- [YAML 配置规范](./docs/spec/yaml_config_spec.md)
+- [权重映射规则](./docs/spec/weight_mapping_rules_spec.md)
