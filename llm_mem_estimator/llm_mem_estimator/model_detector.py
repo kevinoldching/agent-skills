@@ -188,6 +188,12 @@ class ModelDetector:
         """Detect model architecture from HuggingFace model name"""
         try:
             from huggingface_hub import hf_hub_download
+            import os
+
+            # Set HF_TOKEN from environment variable if available
+            hf_token = os.environ.get('HF_TOKEN')
+            if hf_token:
+                os.environ['HF_HUB_TOKEN'] = hf_token
 
             # Download config.json
             config_path = hf_hub_download(repo_id=model_name, filename="config.json")
@@ -228,7 +234,13 @@ class ModelDetector:
         """Get weights metadata from HuggingFace using HTTP Range Requests (no download)"""
         try:
             from huggingface_hub import get_safetensors_metadata
-            
+            import os
+
+            # Set HF_TOKEN from environment variable if available
+            hf_token = os.environ.get('HF_TOKEN')
+            if hf_token:
+                os.environ['HF_HUB_TOKEN'] = hf_token
+
             # 核心：只抓取元数据
             metadata = get_safetensors_metadata(model_name)
             all_tensors = {}
@@ -240,7 +252,7 @@ class ModelDetector:
                         'shape': list(tensor_info.shape),
                         'dtype': str(tensor_info.dtype)
                     }
-            
+
             return all_tensors
 
         except Exception as e:
@@ -299,6 +311,13 @@ class ConfigGenerator:
         if not is_local:
             try:
                 from huggingface_hub import get_safetensors_metadata
+                import os
+
+                # Set HF_TOKEN from environment variable if available
+                hf_token = os.environ.get('HF_TOKEN')
+                if hf_token:
+                    os.environ['HF_HUB_TOKEN'] = hf_token
+
                 metadata = get_safetensors_metadata(model_name_or_path)
                 if hasattr(metadata, 'parameter_count') and metadata.parameter_count:
                     total_params = str(sum(metadata.parameter_count.values()))
@@ -624,5 +643,13 @@ class ConfigGenerator:
                 resolved['activation'] = activation.get(ffn_type, activation.get('default', ''))
             else:
                 resolved['activation'] = activation
+
+        # system_reserved_gb - direct copy
+        if 'system_reserved_gb' in raw_rules:
+            resolved['system_reserved_gb'] = raw_rules['system_reserved_gb']
+
+        # gpu_util - direct copy
+        if 'gpu_util' in raw_rules:
+            resolved['gpu_util'] = raw_rules['gpu_util']
 
         return resolved

@@ -61,6 +61,13 @@ modules:
     mlp.shared_experts.up_proj.weight_scale_inv: {shape: [16, 56], dtype: F32, layers: 59, parallel_strategy: replicated}
     mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: F8_E4M3, layers: 59, parallel_strategy: replicated}
     mlp.shared_experts.down_proj.weight_scale_inv: {shape: [56, 16], dtype: F32, layers: 59, parallel_strategy: replicated}
+  others:
+    model.layers.61.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.enorm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
+    model.layers.61.hnorm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
+    model.layers.61.eh_proj.weight: {shape: [7168, 14336], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.shared_head.norm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
+    model.layers.61.shared_head.head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
   embedding:
     model.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
     lm_head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
@@ -71,14 +78,11 @@ modules:
     mlp.up_proj.weight_scale_inv: {shape: [144, 56], dtype: F32, layers: 3, parallel_strategy: TP}
     mlp.down_proj.weight: {shape: [7168, 18432], dtype: F8_E4M3, layers: 3, parallel_strategy: TP}
     mlp.down_proj.weight_scale_inv: {shape: [56, 144], dtype: F32, layers: 3, parallel_strategy: TP}
-  others:
-    model.layers.61.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.enorm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
-    model.layers.61.hnorm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
-    model.layers.61.eh_proj.weight: {shape: [7168, 14336], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.shared_head.norm.weight: {shape: [7168], dtype: F32, layers: 1, parallel_strategy: replicated}
-    model.layers.61.shared_head.head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
 computation_rules:
-  recommended_capacity_factor: 1.25
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
   kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
   activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

@@ -93,17 +93,20 @@ def main():
         print(f"Config saved to: {output_config_path}")
         return
 
-    # Validate: gen-len is required when NOT using --find-max-seq-len
-    if not args.find_max_seq_len and args.gen_len is None:
-        parser.error("--gen-len is required when not using --find-max-seq-len")
+    # Validation logic for different scenarios:
+    # Scene 1: --find-max-seq-len=✗, --gen-len=✓, --prompt-len=✓ → normal estimation
+    # Scene 2: --find-max-seq-len=✗, --gen-len=✓, --prompt-len=✗ → error
+    # Scene 3: --find-max-seq-len=✗, --gen-len=✗, --prompt-len=✓ → error
+    # Scene 4: --find-max-seq-len=✗, --gen-len=✗, --prompt-len=✗ → error
+    # Scene 5: --find-max-seq-len=✓, --gen-len=✗, --prompt-len=✗ → search max gen_len, default prompt_len=4096
+    # Scene 6: --find-max-seq-len=✓, --gen-len=✗, --prompt-len=✓ → search max gen_len with user prompt_len
+    # Scene 7: --find-max-seq-len=✓, --gen-len=✓, --prompt-len=✗ → search max prompt_len with user gen_len
+    # Scene 8: --find-max-seq-len=✓, --gen-len=✓, --prompt-len=✓ → warn, treat as Scene 1
 
-    # Validate: prompt-len is required when NOT using --find-max-seq-len
-    if not args.find_max_seq_len and args.prompt_len is None:
-        parser.error("--prompt-len is required when not using --find-max-seq-len")
-
-    # Validate: --gen-len cannot be used with --find-max-seq-len
-    if args.find_max_seq_len and args.gen_len is not None:
-        parser.error("--gen-len cannot be used with --find-max-seq-len")
+    if not args.find_max_seq_len:
+        # Scenes 1-4: --find-max-seq-len is False
+        if args.gen_len is None or args.prompt_len is None:
+            parser.error("--prompt-len and --gen-len are required when not using --find-max-seq-len")
 
     # Get script directory
     script_dir = Path(__file__).parent.parent
@@ -161,11 +164,147 @@ def main():
             print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
             sys.exit(1)
 
-        # Use default prompt_len if not specified
+        # Get system_reserved_gb and gpu_util from computation_rules
+        computation_rules = config.computation_rules
+        system_reserved_gb = computation_rules.get('system_reserved_gb', 2.0)
+        gpu_util = computation_rules.get('gpu_util', 1.0)
+
+        # Validate gpu_util
+        if not isinstance(gpu_util, (int, float)) or gpu_util <= 0 or gpu_util > 1.0:
+            print(f"Error: gpu_util must be > 0 and <= 1.0, got {gpu_util}", file=sys.stderr)
+            sys.exit(1)
+
+        # Calculate actual available memory
+        actual_available_memory_gb = available_memory_gb * gpu_util
+
+        # Scene 7: --find-max-seq-len with --gen-len but without --prompt-len
+        # → search max prompt_len with user-specified gen_len
+        if args.gen_len is not None and args.prompt_len is None:
+            if args.prompt_len is not None and args.gen_len is not None:
+                print("Warning: Both --prompt-len and --gen-len specified with --find-max-seq-len, "
+                      "treating as normal estimation", file=sys.stderr)
+                # Fall through to normal estimation
+            else:
+                # Search max prompt_len
+                effective_gen_len = args.gen_len
+                max_prompt_len = estimator.find_max_prompt_len(
+                    available_memory_gb=actual_available_memory_gb,
+                    batch_size=args.batch_size,
+                    gen_len=effective_gen_len,
+                    kv_dtype=args.kv_dtype,
+                    activation_dtype=args.activation_dtype,
+                    tp=args.tp,
+                    pp=args.pp,
+                    cp=args.cp,
+                    ep=args.ep,
+                    system_reserved_gb=system_reserved_gb
+                )
+
+                # Generate report with max prompt length (Prefill scenario)
+                result = estimator.estimate_memory(
+                    batch_size=args.batch_size,
+                    prompt_len=max_prompt_len,
+                    gen_len=effective_gen_len,
+                    kv_dtype=args.kv_dtype,
+                    activation_dtype=args.activation_dtype,
+                    tp=args.tp,
+                    pp=args.pp,
+                    dp=args.dp,
+                    cp=args.cp,
+                    ep=args.ep,
+                    system_reserved_gb=system_reserved_gb,
+                    use_decode_factor=False  # Prefill: use has_prefill factor with total_seq_len
+                )
+
+                parallel_config = {
+                    'tp': args.tp,
+                    'pp': args.pp,
+                    'dp': args.dp,
+                    'cp': args.cp,
+                    'ep': args.ep
+                }
+
+                report = ReportGenerator.generate_report(
+                    config=config,
+                    result=result,
+                    batch_size=args.batch_size,
+                    parallel_config=parallel_config,
+                    prompt_len=max_prompt_len,
+                    gen_len=effective_gen_len,
+                    chip_info=chip_info
+                )
+
+                print(report)
+
+                # Print max prompt_len calculation explanation
+                print("\n## How to Calculate the Maximum Prompt Length")
+                print("")
+
+                # Calculate fixed memory
+                weights_memory, _ = estimator.calculate_weights_memory(
+                    tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep
+                )
+                fixed_memory = weights_memory + system_reserved_gb
+
+                # Activation memory (fixed, depends on gen_len)
+                act_memory = estimator.calculate_activation_memory(
+                    args.batch_size, effective_gen_len, args.activation_dtype, args.tp, args.cp,
+                    use_decode_factor=False
+                )
+
+                # Calculate memory breakdown for the max prompt_len
+                max_kv_memory = estimator.calculate_kv_cache_memory(
+                    args.batch_size, max_prompt_len, effective_gen_len, args.kv_dtype, args.tp, args.cp
+                )
+                max_act_memory = estimator.calculate_activation_memory(
+                    args.batch_size, max_prompt_len + effective_gen_len, args.activation_dtype, args.tp, args.cp,
+                    use_decode_factor=False
+                )
+
+                print("### Memory Breakdown")
+                print(f"- Model weights: {weights_memory:.2f} GB")
+                print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
+                print(f"- KV Cache (prompt_len={max_prompt_len:,} + gen_len={effective_gen_len:,}): {max_kv_memory:.2f} GB")
+                print(f"- Activation (total_seq_len={max_prompt_len + effective_gen_len:,}): {max_act_memory:.6f} GB")
+                print(f"- **Total: {weights_memory + system_reserved_gb + max_kv_memory + max_act_memory:.2f} GB**")
+
+                print(f"\n### Memory per Unit Prompt Token (Calculation Steps)")
+                # Calculate incremental cost for adding 1 more prompt token
+                kv_increment = estimator.calculate_kv_cache_memory(
+                    args.batch_size, max_prompt_len + 1, effective_gen_len, args.kv_dtype, args.tp, args.cp
+                ) - max_kv_memory
+                act_increment = estimator.calculate_activation_memory(
+                    args.batch_size, max_prompt_len + 1 + effective_gen_len, args.activation_dtype, args.tp, args.cp,
+                    use_decode_factor=False
+                ) - max_act_memory
+
+                print("```")
+                print(f"Prefill stage: total_seq_len = prompt_len + gen_len, factor = 1.25")
+                print(f"")
+                print(f"KV Cache (incremental):")
+                print(f"  = batch_size * seq_len * 1024 * 18 * dtype / (tp * cp)")
+                print(f"  = {args.batch_size} * 1 * 1024 * 18 * 2 / ({args.tp} * {args.cp})")
+                print(f"  = {kv_increment:.6f} GB")
+                print(f"")
+                print(f"Activation (incremental):")
+                print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
+                print(f"  = {args.batch_size} * 1 * 2880 * 4 * 1.25 * 2 / {args.cp}")
+                print(f"  = {act_increment:.6f} GB")
+                print(f"")
+                print(f"Total (per token) = {kv_increment:.6f} + {act_increment:.6f} = {kv_increment + act_increment:.6f} GB")
+                print("```")
+
+                print(f"\n### Result")
+                print(f"- **Maximum prompt length: {max_prompt_len:,}**")
+
+                return
+
+        # Scene 5/6: --find-max-seq-len without --gen-len
+        # → search max gen_len (use default prompt_len=4096 if not specified)
         effective_prompt_len = args.prompt_len if args.prompt_len is not None else 4096
 
         max_gen_len = estimator.find_max_sequence_length(
-            available_memory_gb=available_memory_gb,
+            available_memory_gb=actual_available_memory_gb,
             batch_size=args.batch_size,
             prompt_len=effective_prompt_len,
             kv_dtype=args.kv_dtype,
@@ -174,10 +313,11 @@ def main():
             pp=args.pp,
             cp=args.cp,
             ep=args.ep,
-            system_reserved_gb=args.system_reserved
+            system_reserved_gb=system_reserved_gb,
+            use_decode_factor=True  # Use decode factor for pure decode scenario
         )
 
-        # Generate report with max sequence length
+        # Generate report with max sequence length (Decode scenario)
         result = estimator.estimate_memory(
             batch_size=args.batch_size,
             prompt_len=effective_prompt_len,
@@ -189,7 +329,8 @@ def main():
             dp=args.dp,
             cp=args.cp,
             ep=args.ep,
-            system_reserved_gb=args.system_reserved
+            system_reserved_gb=system_reserved_gb,
+            use_decode_factor=True  # Decode: use decode factor with seq_len=1
         )
 
         parallel_config = {
@@ -220,7 +361,7 @@ def main():
         weights_memory, _ = estimator.calculate_weights_memory(
             tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep
         )
-        fixed_memory = weights_memory + args.system_reserved
+        fixed_memory = weights_memory + system_reserved_gb
 
         # KV for prompt (fixed)
         prompt_kv_memory = estimator.calculate_kv_cache_memory(
@@ -229,34 +370,49 @@ def main():
 
         print("### Fixed Memory")
         print(f"- Model weights (per device, after TP/EP sharding): {weights_memory:.2f} GB")
-        print(f"- System reserved: {args.system_reserved:.2f} GB")
+        print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
         print(f"- KV Cache for prompt ({effective_prompt_len:,}): {prompt_kv_memory:.2f} GB")
-        print(f"- **Total fixed memory: {fixed_memory + prompt_kv_memory:.2f} GB**")
+        # Activation is fixed in Decode stage (seq_len = 1)
+        act_decode = estimator.calculate_activation_memory(
+            args.batch_size, 1, args.activation_dtype, args.tp, args.cp,
+            use_decode_factor=True
+        )
+        act_str = f"{act_decode:.6f}" if act_decode < 0.01 else f"{act_decode:.2f}"
+        print(f"- Activation (fixed, seq_len=1): {act_str} GB")
+        print(f"- **Total fixed memory: {weights_memory + system_reserved_gb + prompt_kv_memory + act_decode:.2f} GB**")
 
-        available_dyn = available_memory_gb - fixed_memory - prompt_kv_memory
+        available_dyn = actual_available_memory_gb - system_reserved_gb - prompt_kv_memory - act_decode
 
         print(f"\n### Available Memory for Generation")
         print(f"- Total chip VRAM: {available_memory_gb} GB")
-        print(f"- Available for gen KV + Activation: {available_dyn:.2f} GB")
+        print(f"- GPU utilization: {gpu_util:.0%}")
+        print(f"- Available memory: {actual_available_memory_gb:.2f} GB")
+        print(f"- Available for gen KV (Activation is fixed): {available_dyn:.2f} GB")
 
-        # Calculate per-unit gen memory: prompt_len=0 to get incremental cost
-        # This gives the memory cost for a single token
+        # Calculate per-unit gen memory: only KV Cache increments
+        # In Decode stage, Activation is fixed (seq_len = 1), only KV Cache grows with gen_len
         kv_memory_per_gen = estimator.calculate_kv_cache_memory(
             args.batch_size, 0, 1, args.kv_dtype, args.tp, args.cp
         )
-        act_memory_per_gen = estimator.calculate_activation_memory(
-            args.batch_size, 1, args.activation_dtype, args.tp, args.cp
-        )
-        total_per_gen = kv_memory_per_gen + act_memory_per_gen
 
-        print(f"\n### Memory per Unit Generated Token")
-        print(f"- KV Cache (incremental): {kv_memory_per_gen:.6f} GB")
-        print(f"- Activation: {act_memory_per_gen:.6f} GB")
-        print(f"- **Total: {total_per_gen:.6f} GB**")
+        print(f"\n### Memory per Unit Generated Token (Calculation Steps)")
+        print("```")
+        print(f"Decode stage: Activation is FIXED (seq_len=1), only KV Cache grows")
+        print(f"")
+        print(f"KV Cache (incremental):")
+        print(f"  = batch_size * seq_len * 1024 * 18 * dtype / (tp * cp)")
+        print(f"  = {args.batch_size} * 1 * 1024 * 18 * 2 / ({args.tp} * {args.cp})")
+        print(f"  = {kv_memory_per_gen:.6f} GB")
+        print(f"")
+        print(f"Activation (fixed, not incremental):")
+        print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
+        print(f"  = {args.batch_size} * 1 * 2880 * 4 * 12.5 * 2 / {args.cp}")
+        print(f"  = {act_decode:.6f} GB")
+        print("```")
 
         print(f"\n### Calculation")
-        print(f"Max gen_len = Available memory / Memory per generated token")
-        print(f"= {available_dyn:.2f} / {total_per_gen:.6f}")
+        print(f"Max gen_len = Available memory / KV Cache per generated token")
+        print(f"= {available_dyn:.2f} GB / {kv_memory_per_gen:.6f} GB")
         print(f"= **{max_gen_len:,}**")
 
         print(f"\n### Result")
@@ -267,6 +423,16 @@ def main():
     # Estimate memory (use default values if not specified)
     effective_prompt_len = args.prompt_len if args.prompt_len is not None else 4096
     effective_gen_len = args.gen_len if args.gen_len is not None else 1024
+
+    # Get system_reserved_gb and gpu_util from computation_rules
+    computation_rules = config.computation_rules
+    system_reserved_gb = computation_rules.get('system_reserved_gb', 2.0)
+    gpu_util = computation_rules.get('gpu_util', 1.0)
+
+    # Validate gpu_util
+    if not isinstance(gpu_util, (int, float)) or gpu_util <= 0 or gpu_util > 1.0:
+        print(f"Error: gpu_util must be > 0 and <= 1.0, got {gpu_util}", file=sys.stderr)
+        sys.exit(1)
 
     result = estimator.estimate_memory(
         batch_size=args.batch_size,
@@ -279,7 +445,8 @@ def main():
         dp=args.dp,
         cp=args.cp,
         ep=args.ep,
-        system_reserved_gb=args.system_reserved
+        system_reserved_gb=system_reserved_gb,
+        use_decode_factor=True  # Default: treat as Decode scenario
     )
 
     # Generate report

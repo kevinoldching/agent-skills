@@ -335,7 +335,13 @@ class ConfigLoader:
         # computation_rules
         lines.append("computation_rules:")
         for key, value in config.computation_rules.items():
-            lines.append(f"  {key}: {value}")
+            if isinstance(value, dict):
+                # Handle nested dict (like recommended_capacity_factor)
+                lines.append(f"  {key}:")
+                for sub_key, sub_value in value.items():
+                    lines.append(f"    {sub_key}: {sub_value}")
+            else:
+                lines.append(f"  {key}: {value}")
 
         return "\n".join(lines)
 
@@ -352,8 +358,12 @@ class FormulaEvaluator:
         self.computation_rules = computation_rules or {}
         self.context = self._build_context()
 
-    def _build_context(self) -> Dict[str, Any]:
-        """Build evaluation context from architecture config"""
+    def _build_context(self, use_decode_factor: bool = False) -> Dict[str, Any]:
+        """Build evaluation context from architecture config
+
+        Args:
+            use_decode_factor: If True, use decode factor (12.5); otherwise use has_prefill factor (1.25)
+        """
         context = {
             'hidden_size': self.arch.hidden_size,
             'num_layers': self.arch.num_layers,
@@ -361,8 +371,18 @@ class FormulaEvaluator:
         }
 
         # Add recommended_capacity_factor from computation_rules if present
+        # Support both old format (single float) and new format (nested dict)
         if 'recommended_capacity_factor' in self.computation_rules:
-            context['recommended_capacity_factor'] = self.computation_rules['recommended_capacity_factor']
+            rcf = self.computation_rules['recommended_capacity_factor']
+            if isinstance(rcf, dict):
+                # New nested format: {has_prefill: X, decode: Y}
+                if use_decode_factor:
+                    context['recommended_capacity_factor'] = rcf.get('decode', 12.5)
+                else:
+                    context['recommended_capacity_factor'] = rcf.get('has_prefill', 1.25)
+            else:
+                # Old format: single float value
+                context['recommended_capacity_factor'] = rcf
 
         # Add optional fields if present
         if self.arch.num_attention_heads:
@@ -392,14 +412,22 @@ class FormulaEvaluator:
 
         return context
 
-    def evaluate(self, formula: str, **kwargs) -> float:
+    def evaluate(self, formula: str, use_decode_factor: bool = False, **kwargs) -> float:
         """Evaluate a formula string with given context
+
+        Args:
+            formula: The formula string to evaluate
+            use_decode_factor: If True, use decode factor (12.5); otherwise use has_prefill factor (1.25)
+            **kwargs: Additional variables to include in the evaluation context
 
         Supports common built-in functions: min, max, abs, round, pow, len
         Example formula: '(18 * seq_len + 18 * min(seq_len, 128)) * kv_dim * num_layers'
         """
+        # Build context with the appropriate factor
+        base_context = self._build_context(use_decode_factor=use_decode_factor)
+
         # Merge kwargs into context
-        eval_context = {**self.context, **kwargs}
+        eval_context = {**base_context, **kwargs}
 
         # Inject default values for parallel sizes if not provided
         if 'tp_size' not in eval_context:

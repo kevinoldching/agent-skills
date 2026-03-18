@@ -1,0 +1,69 @@
+model_identity:
+  name: GLM-5
+  total_params: 'unknown'
+  num_layers: 78
+architecture_config:
+  hidden_size: 6144
+  num_layers: 78
+  attention_type: mla
+  ffn_type: moe
+  norm_type: rmsnorm
+  vocab_size: 154880
+  head_dim: 64
+  num_attention_heads: 64
+  num_key_value_heads: 64
+  intermediate_size: 12288
+  num_experts_per_tok: 8
+  q_lora_rank: 2048
+  kv_lora_rank: 512
+  qk_rope_head_dim: 64
+  v_head_dim: 256
+  qk_nope_head_dim: 192
+modules:
+  ffn_moe:
+    mlp.experts.N.gate_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 78, parallel_strategy: EP}
+    mlp.experts.N.up_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 78, parallel_strategy: EP}
+    mlp.experts.N.down_proj.weight: {shape: [256, 6144, 2048], dtype: BF16, layers: 78, parallel_strategy: EP}
+    mlp.gate.e_score_correction_bias: {shape: [256], dtype: F32, layers: 76, parallel_strategy: replicated}
+    mlp.gate.weight: {shape: [256, 6144], dtype: BF16, layers: 76, parallel_strategy: replicated}
+  ffn_shared_expert:
+    mlp.shared_experts.down_proj.weight: {shape: [6144, 2048], dtype: BF16, layers: 76, parallel_strategy: replicated}
+    mlp.shared_experts.gate_proj.weight: {shape: [2048, 6144], dtype: BF16, layers: 76, parallel_strategy: replicated}
+    mlp.shared_experts.up_proj.weight: {shape: [2048, 6144], dtype: BF16, layers: 76, parallel_strategy: replicated}
+  norm:
+    post_attention_layernorm.weight: {shape: [6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    input_layernorm.weight: {shape: [6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    model.norm.weight: {shape: [6144], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  attention:
+    self_attn.indexer.k_norm.bias: {shape: [128], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.indexer.k_norm.weight: {shape: [128], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.indexer.weights_proj.weight: {shape: [32, 6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.indexer.wk.weight: {shape: [128, 6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.indexer.wq_b.weight: {shape: [4096, 2048], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.kv_b_proj.weight: {shape: [28672, 512], dtype: BF16, layers: 79, parallel_strategy: TP}
+    self_attn.o_proj.weight: {shape: [6144, 16384], dtype: BF16, layers: 79, parallel_strategy: TP}
+    self_attn.q_a_layernorm.weight: {shape: [2048], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.q_a_proj.weight: {shape: [2048, 6144], dtype: BF16, layers: 79, parallel_strategy: replicated}
+    self_attn.q_b_proj.weight: {shape: [16384, 2048], dtype: BF16, layers: 79, parallel_strategy: TP}
+  ffn_dense:
+    mlp.down_proj.weight: {shape: [6144, 12288], dtype: BF16, layers: 3, parallel_strategy: TP}
+    mlp.gate_proj.weight: {shape: [12288, 6144], dtype: BF16, layers: 3, parallel_strategy: TP}
+    mlp.up_proj.weight: {shape: [12288, 6144], dtype: BF16, layers: 3, parallel_strategy: TP}
+  others:
+    model.layers.78.eh_proj.weight: {shape: [6144, 12288], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.78.enorm.weight: {shape: [6144], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.78.hnorm.weight: {shape: [6144], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.78.shared_head.norm.weight: {shape: [6144], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  embedding:
+    lm_head.weight: {shape: [154880, 6144], dtype: BF16, layers: 1, parallel_strategy: TP}
+    model.embed_tokens.weight: {shape: [154880, 6144], dtype: BF16, layers: 1, parallel_strategy: TP}
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
+  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

@@ -1,6 +1,6 @@
 model_identity:
-  name: DeepSeek-V3
-  total_params: '684.53B'
+  name: DeepSeek-V3.1
+  total_params: 'unknown'
   num_layers: 61
   quantization: fp8
 architecture_config:
@@ -30,6 +30,10 @@ modules:
     mlp.experts.N.down_proj.weight: {shape: [256, 7168, 2048], dtype: F8_E4M3, layers: 61, parallel_strategy: EP}
     mlp.gate.weight: {shape: [256, 7168], dtype: BF16, layers: 59, parallel_strategy: replicated}
     mlp.gate.e_score_correction_bias: {shape: [256], dtype: F32, layers: 59, parallel_strategy: replicated}
+  norm:
+    input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 62, parallel_strategy: replicated}
+    post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 62, parallel_strategy: replicated}
+    model.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
   attention:
     self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: F8_E4M3, layers: 62, parallel_strategy: replicated}
     self_attn.q_a_proj.weight_scale_inv: {shape: [12, 56], dtype: F32, layers: 62, parallel_strategy: replicated}
@@ -50,20 +54,9 @@ modules:
     mlp.shared_experts.up_proj.weight_scale_inv: {shape: [16, 56], dtype: F32, layers: 59, parallel_strategy: replicated}
     mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: F8_E4M3, layers: 59, parallel_strategy: replicated}
     mlp.shared_experts.down_proj.weight_scale_inv: {shape: [56, 16], dtype: F32, layers: 59, parallel_strategy: replicated}
-  norm:
-    input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 62, parallel_strategy: replicated}
-    post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 62, parallel_strategy: replicated}
-    model.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-  others:
-    model.layers.61.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.enorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.hnorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.eh_proj.weight: {shape: [7168, 14336], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.shared_head.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    model.layers.61.shared_head.head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
   embedding:
-    model.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
     lm_head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    model.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
   ffn_dense:
     mlp.gate_proj.weight: {shape: [18432, 7168], dtype: F8_E4M3, layers: 3, parallel_strategy: TP}
     mlp.gate_proj.weight_scale_inv: {shape: [144, 56], dtype: F32, layers: 3, parallel_strategy: TP}
@@ -71,6 +64,13 @@ modules:
     mlp.up_proj.weight_scale_inv: {shape: [144, 56], dtype: F32, layers: 3, parallel_strategy: TP}
     mlp.down_proj.weight: {shape: [7168, 18432], dtype: F8_E4M3, layers: 3, parallel_strategy: TP}
     mlp.down_proj.weight_scale_inv: {shape: [56, 144], dtype: F32, layers: 3, parallel_strategy: TP}
+  others:
+    model.layers.61.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.enorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.hnorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.eh_proj.weight: {shape: [7168, 14336], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.shared_head.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.layers.61.shared_head.head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
 computation_rules:
   recommended_capacity_factor:
     has_prefill: 1.25

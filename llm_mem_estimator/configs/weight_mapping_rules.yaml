@@ -58,6 +58,9 @@ generic:
       k_proj.weight: TP
       v_proj.weight: TP
       o_proj.weight: TP
+      q_b_proj.weight: TP
+      kv_b_proj.weight: TP
+      o_proj.weight: TP
     ffn_moe:
       experts: EP
     ffn_dense: TP
@@ -67,7 +70,15 @@ generic:
 
   # 计算规则（按 attention_type 和 ffn_type 自动选择公式）
   computation_rules:
-    recommended_capacity_factor: 1.25
+    recommended_capacity_factor:
+      has_prefill: 1.25   # prefill（含混部）
+      decode: 12.5        # 纯 decode
+
+    # 系统预留显存（GB）
+    system_reserved_gb: 2.0
+
+    # GPU 利用率（0-1.0），可用显存 = 实际显存 * gpu_util
+    gpu_util: 0.9
 
     # 按 attention_type 的 KV Cache 公式
     kv_cache:

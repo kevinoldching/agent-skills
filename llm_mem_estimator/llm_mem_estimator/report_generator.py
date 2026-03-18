@@ -77,7 +77,7 @@ class ReportGenerator:
         # Add computation rules
         computation_rules = config.computation_rules
         if computation_rules:
-            lines.append("**计算公式说明：**")
+            lines.append("**Computation Formulas:**")
             lines.append("")
             if 'kv_cache' in computation_rules:
                 kv_formula = computation_rules['kv_cache']
@@ -85,6 +85,55 @@ class ReportGenerator:
             if 'activation' in computation_rules:
                 act_formula = computation_rules['activation']
                 lines.append(f"- Activation: `{act_formula}`")
+            lines.append("")
+
+            # Add calculation example with actual values
+            lines.append("**Calculation Example:**")
+            lines.append("")
+            lines.append("```")
+            tp = parallel_config.get('tp', 1)
+            cp = parallel_config.get('cp', 1)
+            total_seq_len = prompt_len + gen_len
+
+            arch = config.architecture_config
+            hidden_size = arch.hidden_size
+            num_experts_per_tok = arch.num_experts_per_tok or 1
+
+            if 'kv_cache' in computation_rules:
+                kv_formula = computation_rules['kv_cache']
+                lines.append(f"# KV Cache formula: {kv_formula}")
+                lines.append(f"# Substituting: batch_size={batch_size}, seq_len={total_seq_len}, tp_size={tp}, cp_size={cp}")
+                # Show simplified calculation for gpt-oss style formulas
+                if 'min' in kv_formula:
+                    min_part = min(batch_size * total_seq_len, 128)
+                    lines.append(f"# = (18 * {batch_size} * {total_seq_len} * 1024 + 18 * {min_part} * 1024) / ({tp} * {cp})")
+                    lines.append(f"# = {result.kv_cache_memory_gb:.4f} GB")
+                else:
+                    lines.append(f"# = {result.kv_cache_memory_gb:.4f} GB")
+                lines.append("")
+
+            if 'activation' in computation_rules:
+                act_formula = computation_rules['activation']
+                # Determine seq_len for activation based on the actual result
+                # If activation is very small, it's likely Decode (seq_len=1)
+                # Otherwise it's Prefill (seq_len=total_seq_len)
+                if result.activation_memory_gb < 0.001:
+                    act_seq_len = 1
+                    factor = 12.5
+                else:
+                    act_seq_len = total_seq_len
+                    # Calculate factor from result
+                    elements = batch_size * act_seq_len * hidden_size * num_experts_per_tok * 2 / cp
+                    if elements > 0:
+                        factor = result.activation_memory_gb * (1024**3) / elements
+                    else:
+                        factor = 1.25
+
+                lines.append(f"# Activation formula: {act_formula}")
+                lines.append(f"# Substituting: batch_size={batch_size}, seq_len={act_seq_len}, hidden_size={hidden_size}, num_experts_per_tok={num_experts_per_tok}, cp_size={cp}")
+                lines.append(f"# = {batch_size} * {act_seq_len} * {hidden_size} * {num_experts_per_tok} * {factor:.2f} * 2 / {cp}")
+                lines.append(f"# = {result.activation_memory_gb:.6f} GB")
+            lines.append("```")
             lines.append("")
 
         # Weights Breakdown - combined table with all details

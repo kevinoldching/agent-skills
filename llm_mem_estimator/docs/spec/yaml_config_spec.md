@@ -197,7 +197,7 @@ modules:
 
 | 字段 | 类型 | 是否必填 | 说明 |
 |------|------|---------|------|
-| recommended_capacity_factor | float | 否 | 激活值计算的容量因子，默认 1.25 |
+| recommended_capacity_factor | float 或 dict | 否 | 激活值计算的容量因子。<br>旧格式：单一浮点数，默认 1.25<br>新格式：字典 `{has_prefill: 1.25, decode: 12.5}`<br>- `has_prefill`: Prefill 阶段或混部场景使用（默认 1.25）<br>- `decode`: 纯 Decode 阶段使用（默认 12.5） |
 | kv_cache | string | 是 | KV Cache 显存计算公式 |
 | activation | string | 是 | 激活值显存计算公式 |
 
@@ -243,19 +243,41 @@ modules:
 - `num_key_value_heads`: KV 头数
 - `head_dim`: 头维度
 - `num_experts_per_tok`: MoE 每 token 激活的专家数
-- `recommended_capacity_factor`: 容量因子（默认 1.25）
+- `recommended_capacity_factor`: 容量因子（PD 分离时根据场景自动选择 has_prefill 或 decode）
 - `tp_size`: Tensor Parallel 大小
 - `cp_size`: Context Parallel 大小
 - `window_size`: 滑动窗口大小（用于 SWA）
 
 **默认值**：如果未指定 `tp_size` 或 `cp_size`，默认为 1
 
+**PD 分离场景支持**：
+
+`recommended_capacity_factor` 支持两种格式：
+
+1. **旧格式（单一浮点数）**：
+```yaml
+recommended_capacity_factor: 1.25
+```
+
+2. **新格式（嵌套字典）**：
+```yaml
+recommended_capacity_factor:
+  has_prefill: 1.25   # prefill（含混部）
+  decode: 12.5        # 纯 decode
+```
+
+当使用 `--find-max-seq-len` 时：
+- 搜索最大 gen_len（固定 prompt_len）：使用 `decode` factor
+- 搜索最大 prompt_len（固定 gen_len）：使用 `has_prefill` factor
+
 **示例**：
 
 1. **GQA 注意力 + MoE**：
 ```yaml
 computation_rules:
-  recommended_capacity_factor: 1.25
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
   # KV Cache: 按 attention 类型，TP 和 CP 分片
   kv_cache: "2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
   # Activation: 按 ffn 类型，CP 分片
@@ -265,7 +287,9 @@ computation_rules:
 2. **带峰值限制的公式**（用于 Prefill/Decode 分离部署）：
 ```yaml
 computation_rules:
-  recommended_capacity_factor: 1.25
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
   # KV Cache: 使用 min 限制序列长度峰值
   kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
   activation: "batch_size * seq_len * hidden_size * 4 * recommended_capacity_factor / cp_size"
@@ -274,7 +298,9 @@ computation_rules:
 3. **MLA 注意力**（DeepSeek 系列）：
 ```yaml
 computation_rules:
-  recommended_capacity_factor: 1.25
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
   # MLA 使用压缩 KV，只按 CP 分片
   kv_cache: "batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size"
   activation: "batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size"
