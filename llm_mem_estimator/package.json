@@ -1,0 +1,33 @@
+{
+  "name": "llm-mem-estimator",
+  "version": "1.0.0",
+  "description": "LLM GPU Memory Estimator - 估算大语言模型的 GPU 显存占用",
+  "bin": {
+    "llm-mem-estimator": "bin/cli.js"
+  },
+  "scripts": {
+    "postinstall": "pip install -r requirements.txt || echo 'Warning: Python dependencies installation skipped. Please install manually: pip install -r requirements.txt'"
+  },
+  "keywords": [
+    "llm",
+    "memory",
+    "gpu",
+    "estimator",
+    "vram",
+    "deeplearning"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinoldching/agent-skills.git",
+    "directory": "llm_mem_estimator"
+  },
+  "homepage": "https://github.com/kevinoldching/agent-skills/tree/main/llm_mem_estimator",
+  "bugs": {
+    "url": "https://github.com/kevinoldching/agent-skills/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
