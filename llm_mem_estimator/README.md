@@ -21,6 +21,8 @@ llm-mem-estimator -g
 llm-mem-estimator -r
 ```
 
+> 注意：全局安装 `npm install -g` 不会自动安装 Claude Code Skill，需要手动运行上述命令。
+
 安装后，Claude Code 会自动识别此 Skill，当你提到显存估算时会自动调用。
 
 > **注意**：`npx github:kevinoldching/agent-skills/llm_mem_estimator` 无法直接运行，因为 package.json 在子目录中。请使用下方的 npm 安装方式。
