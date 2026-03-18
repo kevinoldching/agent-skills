@@ -397,9 +397,12 @@ class ConfigGenerator:
         # Priority: model_name > model_type > generic
         computation_rules = model_rules.get('computation_rules', {})
 
-        # If not found in model_rules, generate from architecture
+        # Raise error if computation_rules not found
         if not computation_rules:
-            computation_rules = self._generate_computation_rules(architecture_config)
+            raise ValueError(
+                f"computation_rules not found for model '{model_name}' (model_type: '{model_type}'). "
+                f"Please add computation_rules to weight_mapping_rules.yaml for this model or its model_type."
+            )
 
         return ModelConfig(
             model_identity=model_identity,
@@ -573,43 +576,3 @@ class ConfigGenerator:
                 )
 
         return modules
-
-    def _generate_computation_rules(self, arch_config: ArchitectureConfig) -> Dict[str, Any]:
-        """Generate computation rules based on architecture"""
-        rules = {}
-
-        # Default capacity factor (used for activation calculation)
-        # recommended_capacity_factor: 1.25 (industrial standard)
-        # ideal: 1.0, worst_case: 8.0
-        recommended_capacity_factor = 1.25
-        rules['recommended_capacity_factor'] = recommended_capacity_factor
-
-        # KV Cache formula (with tp_size/cp_size, without dtype_bytes)
-        if arch_config.attention_type == "mla":
-            # MLA uses compressed KV cache
-            if arch_config.kv_lora_rank:
-                rules['kv_cache'] = f"batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size"
-        elif arch_config.attention_type == "swa" or arch_config.attention_type == "sliding_window":
-            # Sliding window attention
-            window_size = arch_config.window_size or 512
-            rules['kv_cache'] = f"2 * batch_size * min(seq_len, {window_size}) * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
-        elif arch_config.attention_type in ["mha", "gqa", "mqa"]:
-            # Standard KV cache
-            rules['kv_cache'] = f"2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
-
-        # Activation formula with capacity factor
-        # Formula includes tp_size/cp_size, but NOT dtype_bytes (handled externally)
-        if arch_config.ffn_type == "moe" and arch_config.num_experts_per_tok:
-            # MoE model: include num_experts_per_tok in formula
-            rules['activation'] = (
-                f"batch_size * seq_len * hidden_size * "
-                f"num_experts_per_tok * {recommended_capacity_factor} / cp_size"
-            )
-        else:
-            # Standard/Dense model
-            rules['activation'] = (
-                f"batch_size * seq_len * hidden_size * "
-                f"{recommended_capacity_factor} / cp_size"
-            )
-
-        return rules
