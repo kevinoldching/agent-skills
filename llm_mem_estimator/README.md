@@ -27,13 +27,27 @@ llm-mem-estimator -r
 
 ## 安装方式
 
-### 方式一：项目级安装
+### 方式一：本地克隆安装
+
+```bash
+# 克隆项目
+git clone https://github.com/kevinoldching/agent-skills.git
+cd agent-skills/llm_mem_estimator
+
+# 项目级安装
+npm install
+
+# 或全局安装
+npm install -g
+```
+
+### 方式二：项目级安装（通过 GitHub URL）
 
 ```bash
 npm install github:kevinoldching/agent-skills/llm_mem_estimator
 ```
 
-### 方式二：全局安装
+### 方式三：全局安装（通过 GitHub URL）
 
 ```bash
 # 全局安装
