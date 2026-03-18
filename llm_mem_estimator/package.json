@@ -6,7 +6,8 @@
     "llm-mem-estimator": "bin/cli.js"
   },
   "scripts": {
-    "postinstall": "pip install -r requirements.txt || echo 'Warning: Python dependencies installation skipped. Please install manually: pip install -r requirements.txt'"
+    "postinstall": "node scripts/postinstall.js",
+    "postinstall-global": "node scripts/postinstall.js"
   },
   "keywords": [
     "llm",

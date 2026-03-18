@@ -46,6 +46,14 @@ llm-mem-estimator --help
 
 ## 安装 Claude Code Skill
 
+全局安装时会自动复制到 `~/.claude/skills/`：
+
+```bash
+npm install -g github:kevinoldching/agent-skills/llm_mem_estimator
+```
+
+如需手动安装或卸载：
+
 ```bash
 # 安装到 ~/.claude/skills/llm_mem_estimator
 llm-mem-estimator -g
@@ -53,8 +61,6 @@ llm-mem-estimator -g
 # 卸载 Claude Code Skill
 llm-mem-estimator -r
 ```
-
-> 注意：全局安装 `npm install -g` 不会自动安装 Claude Code Skill，需要手动运行上述命令。
 
 安装后，Claude Code 会自动识别此 Skill，当你提到显存估算时会自动调用。
 
