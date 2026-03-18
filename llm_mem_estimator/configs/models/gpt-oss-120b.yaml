@@ -17,10 +17,6 @@ architecture_config:
   num_experts_per_tok: 4
   window_size: 128
 modules:
-  norm:
-    post_attention_layernorm.weight: {shape: [2880], dtype: BF16, layers: 36, parallel_strategy: replicated}
-    input_layernorm.weight: {shape: [2880], dtype: BF16, layers: 36, parallel_strategy: replicated}
-    model.norm.weight: {shape: [2880], dtype: BF16, layers: 1, parallel_strategy: replicated}
   ffn_moe:
     mlp.experts.down_proj_bias: {shape: [128, 2880], dtype: BF16, layers: 36, parallel_strategy: EP}
     mlp.experts.gate_up_proj_bias: {shape: [128, 5760], dtype: BF16, layers: 36, parallel_strategy: EP}
@@ -30,6 +26,10 @@ modules:
     mlp.experts.down_proj_scales: {shape: [128, 2880, 90], dtype: U8, layers: 36, parallel_strategy: EP}
     mlp.experts.gate_up_proj_blocks: {shape: [128, 5760, 90, 16], dtype: U8, layers: 36, parallel_strategy: EP}
     mlp.experts.gate_up_proj_scales: {shape: [128, 5760, 90], dtype: U8, layers: 36, parallel_strategy: EP}
+  norm:
+    post_attention_layernorm.weight: {shape: [2880], dtype: BF16, layers: 36, parallel_strategy: replicated}
+    input_layernorm.weight: {shape: [2880], dtype: BF16, layers: 36, parallel_strategy: replicated}
+    model.norm.weight: {shape: [2880], dtype: BF16, layers: 1, parallel_strategy: replicated}
   attention:
     self_attn.k_proj.bias: {shape: [512], dtype: BF16, layers: 36, parallel_strategy: replicated}
     self_attn.k_proj.weight: {shape: [512, 2880], dtype: BF16, layers: 36, parallel_strategy: TP}
