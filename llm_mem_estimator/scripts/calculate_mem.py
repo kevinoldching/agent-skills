@@ -36,7 +36,7 @@ def main():
 
     # Estimation parameters
     parser.add_argument('--batch-size', type=int, default=1, help="Batch size")
-    parser.add_argument('--prompt-len', type=int, required=True, help="Input prompt length")
+    parser.add_argument('--prompt-len', type=int, default=None, help="Input prompt length (required with --find-max-seq-len)")
     parser.add_argument('--gen-len', type=int, default=None, help="Generated output length (required without --find-max-seq-len)")
     parser.add_argument('--kv-dtype', type=str, default="fp16", help="KV cache dtype")
     parser.add_argument('--activation-dtype', type=str, default="fp16", help="Activation dtype")
@@ -65,6 +65,10 @@ def main():
     # Validate: gen-len is required when NOT using --find-max-seq-len
     if not args.find_max_seq_len and args.gen_len is None:
         parser.error("--gen-len is required when not using --find-max-seq-len")
+
+    # Validate: prompt-len is required when NOT using --find-max-seq-len
+    if not args.find_max_seq_len and args.prompt_len is None:
+        parser.error("--prompt-len is required when not using --find-max-seq-len")
 
     # Validate: --gen-len cannot be used with --find-max-seq-len
     if args.find_max_seq_len and args.gen_len is not None:
@@ -136,10 +140,13 @@ def main():
             print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
             sys.exit(1)
 
+        # Use default prompt_len if not specified
+        effective_prompt_len = args.prompt_len if args.prompt_len is not None else 4096
+
         max_gen_len = estimator.find_max_sequence_length(
             available_memory_gb=available_memory_gb,
             batch_size=args.batch_size,
-            prompt_len=args.prompt_len,
+            prompt_len=effective_prompt_len,
             kv_dtype=args.kv_dtype,
             activation_dtype=args.activation_dtype,
             tp=args.tp,
@@ -152,7 +159,7 @@ def main():
         # Generate report with max sequence length
         result = estimator.estimate_memory(
             batch_size=args.batch_size,
-            prompt_len=args.prompt_len,
+            prompt_len=effective_prompt_len,
             gen_len=max_gen_len,
             kv_dtype=args.kv_dtype,
             activation_dtype=args.activation_dtype,
@@ -177,7 +184,7 @@ def main():
             result=result,
             batch_size=args.batch_size,
             parallel_config=parallel_config,
-            prompt_len=args.prompt_len,
+            prompt_len=effective_prompt_len,
             gen_len=max_gen_len,
             chip_info=chip_info
         )
@@ -196,13 +203,13 @@ def main():
 
         # KV for prompt (fixed)
         prompt_kv_memory = estimator.calculate_kv_cache_memory(
-            args.batch_size, args.prompt_len, 0, args.kv_dtype, args.tp, args.cp
+            args.batch_size, effective_prompt_len, 0, args.kv_dtype, args.tp, args.cp
         )
 
         print("### Fixed Memory")
         print(f"- Model weights (per device, after TP/EP sharding): {weights_memory:.2f} GB")
         print(f"- System reserved: {args.system_reserved:.2f} GB")
-        print(f"- KV Cache for prompt ({args.prompt_len:,}): {prompt_kv_memory:.2f} GB")
+        print(f"- KV Cache for prompt ({effective_prompt_len:,}): {prompt_kv_memory:.2f} GB")
         print(f"- **Total fixed memory: {fixed_memory + prompt_kv_memory:.2f} GB**")
 
         available_dyn = available_memory_gb - fixed_memory - prompt_kv_memory
@@ -236,12 +243,13 @@ def main():
 
         return
 
-    # Estimate memory (use default gen_len if not specified)
+    # Estimate memory (use default values if not specified)
+    effective_prompt_len = args.prompt_len if args.prompt_len is not None else 4096
     effective_gen_len = args.gen_len if args.gen_len is not None else 1024
 
     result = estimator.estimate_memory(
         batch_size=args.batch_size,
-        prompt_len=args.prompt_len,
+        prompt_len=effective_prompt_len,
         gen_len=effective_gen_len,
         kv_dtype=args.kv_dtype,
         activation_dtype=args.activation_dtype,
@@ -267,7 +275,7 @@ def main():
         result=result,
         batch_size=args.batch_size,
         parallel_config=parallel_config,
-        prompt_len=args.prompt_len,
+        prompt_len=effective_prompt_len,
         gen_len=effective_gen_len,
         chip_info=chip_info
     )

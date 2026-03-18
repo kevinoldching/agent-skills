@@ -64,6 +64,7 @@ model_identity:
 | qk_rope_head_dim | int | 否 | RoPE 部分的 head 维度 | `64` |
 | v_head_dim | int | 否 | V 的 head 维度 | `128` |
 | qk_nope_head_dim | int | 否 | 非 RoPE 部分的 head 维度 | `128` |
+| window_size | int | 否 | 滑动窗口大小（SWA） | `512` |
 
 **注意**：
 - 不同的 `attention_type` 需要不同的参数字段（详见 plan.md）
@@ -231,17 +232,34 @@ modules:
 - 公式中的字符串必须用**双引号**包裹
 - **不要使用方括号 `[...]`**，YAML 会将其解析为列表
 - 函数调用语法与 Python 相同
+- 推荐使用 `seq_len` 变量（等于 prompt_len + gen_len），公式内部会自动处理并行因子
+
+**可用变量**：
+- `batch_size`: 批次大小
+- `seq_len`: 序列长度 (= prompt_len + gen_len)
+- `hidden_size`: 隐藏层维度
+- `num_layers`: 层数
+- `num_attention_heads`: 注意力头数
+- `num_key_value_heads`: KV 头数
+- `head_dim`: 头维度
+- `num_experts_per_tok`: MoE 每 token 激活的专家数
+- `recommended_capacity_factor`: 容量因子（默认 1.25）
+- `tp_size`: Tensor Parallel 大小
+- `cp_size`: Context Parallel 大小
+- `window_size`: 滑动窗口大小（用于 SWA）
+
+**默认值**：如果未指定 `tp_size` 或 `cp_size`，默认为 1
 
 **示例**：
 
-1. **基础公式**：
+1. **GQA 注意力 + MoE**：
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
-  # KV Cache: 存储完整上下文 (prompt + generated)
-  kv_cache: "2 * batch_size * (prompt_len + gen_len) * kv_dim * num_layers"
-  # Activation: 只考虑生成的 token
-  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
+  # KV Cache: 按 attention 类型，TP 和 CP 分片
+  kv_cache: "2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
+  # Activation: 按 ffn 类型，CP 分片
+  activation: "batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size"
 ```
 
 2. **带峰值限制的公式**（用于 Prefill/Decode 分离部署）：
@@ -249,18 +267,22 @@ computation_rules:
 computation_rules:
   recommended_capacity_factor: 1.25
   # KV Cache: 使用 min 限制序列长度峰值
-  kv_cache: "18 * (batch_size * (prompt_len + gen_len)) + 18 * min(batch_size * (prompt_len + gen_len), 128) * kv_dim * num_layers"
-  # Activation: 只使用 gen_len
-  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
+  kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
+  activation: "batch_size * seq_len * hidden_size * 4 * recommended_capacity_factor / cp_size"
 ```
 
-3. **GQA 注意力**：
+3. **MLA 注意力**（DeepSeek 系列）：
 ```yaml
 computation_rules:
   recommended_capacity_factor: 1.25
-  kv_cache: "2 * batch_size * (prompt_len + gen_len) * kv_heads * head_dim * num_layers"
-  activation: "batch_size * gen_len * hidden_size * 4 * 1.25"
+  # MLA 使用压缩 KV，只按 CP 分片
+  kv_cache: "batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size"
+  activation: "batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size"
 ```
+
+4. **使用 generic 默认规则**：
+   - `weight_mapping_rules.yaml` 中的 `generic.computation_rules` 提供了按 attention_type 和 ffn_type 的默认公式
+   - 模型配置可以 inherit generic 并只覆盖特定规则
 
 ---
 

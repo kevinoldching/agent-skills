@@ -61,6 +61,8 @@ class ArchitectureConfig:
     qk_rope_head_dim: Optional[int] = None
     v_head_dim: Optional[int] = None
     qk_nope_head_dim: Optional[int] = None
+    # Sliding window attention
+    window_size: Optional[int] = None
 
 
 @dataclass
@@ -332,8 +334,9 @@ class ConfigLoader:
 class FormulaEvaluator:
     """Evaluate computation formulas from configuration"""
 
-    def __init__(self, architecture_config: ArchitectureConfig):
+    def __init__(self, architecture_config: ArchitectureConfig, computation_rules: Dict[str, Any] = None):
         self.arch = architecture_config
+        self.computation_rules = computation_rules or {}
         self.context = self._build_context()
 
     def _build_context(self) -> Dict[str, Any]:
@@ -343,6 +346,10 @@ class FormulaEvaluator:
             'num_layers': self.arch.num_layers,
             'vocab_size': self.arch.vocab_size,
         }
+
+        # Add recommended_capacity_factor from computation_rules if present
+        if 'recommended_capacity_factor' in self.computation_rules:
+            context['recommended_capacity_factor'] = self.computation_rules['recommended_capacity_factor']
 
         # Add optional fields if present
         if self.arch.num_attention_heads:
@@ -367,6 +374,8 @@ class FormulaEvaluator:
             context['v_head_dim'] = self.arch.v_head_dim
         if self.arch.qk_nope_head_dim:
             context['qk_nope_head_dim'] = self.arch.qk_nope_head_dim
+        if self.arch.window_size:
+            context['window_size'] = self.arch.window_size
 
         return context
 
@@ -378,6 +387,12 @@ class FormulaEvaluator:
         """
         # Merge kwargs into context
         eval_context = {**self.context, **kwargs}
+
+        # Inject default values for parallel sizes if not provided
+        if 'tp_size' not in eval_context:
+            eval_context['tp_size'] = 1
+        if 'cp_size' not in eval_context:
+            eval_context['cp_size'] = 1
 
         # Add safe built-in functions
         safe_builtins = {

@@ -322,9 +322,10 @@ class ConfigGenerator:
         if not model_type:
             model_type = hf_config.get('model_type', 'unknown')
 
-        # Build model identity
+        # Build model identity (extract last part from path or HF name)
+        model_name = model_name_or_path.split('/')[-1] if '/' in model_name_or_path else model_name_or_path
         model_identity = ModelIdentity(
-            name=model_name_or_path.split('/')[-1] if '/' in model_name_or_path else model_name_or_path,
+            name=model_name,
             total_params=total_params,
             num_layers=hf_config.get('num_hidden_layers', 0),
             quantization=hf_config.get('quantization_config', {}).get('quant_method') if 'quantization_config' in hf_config else None
@@ -332,8 +333,16 @@ class ConfigGenerator:
 
         # Get weight mapping rules for architecture config mapping and expert detection
         weight_rules = self.classifier.rules
-        # Get model-specific rules or fall back to generic
-        model_rules = weight_rules.get(model_type, weight_rules.get('generic', {}))
+
+        # Get model-specific rules with priority:
+        # 1. Try model name (e.g., gpt-oss-120b) - highest priority
+        # 2. Try model_type (e.g., gpt_oss)
+        # 3. Fall back to generic
+        model_rules = (
+            weight_rules.get(model_name) or
+            weight_rules.get(model_type) or
+            weight_rules.get('generic', {})
+        )
 
         # Get architecture config field mappings
         arch_config_mapping = weight_rules.get('architecture_config', {}).get('field_mappings', {})
@@ -569,43 +578,32 @@ class ConfigGenerator:
         recommended_capacity_factor = 1.25
         rules['recommended_capacity_factor'] = recommended_capacity_factor
 
-        # KV Cache formula
+        # KV Cache formula (with tp_size/cp_size, without dtype_bytes)
         if arch_config.attention_type == "mla":
             # MLA uses compressed KV cache
             if arch_config.kv_lora_rank:
-                rules['kv_cache'] = f"2 * batch_size * seq_len * ({arch_config.kv_lora_rank} + {arch_config.qk_rope_head_dim}) * num_layers"
+                rules['kv_cache'] = f"batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size"
+        elif arch_config.attention_type == "swa" or arch_config.attention_type == "sliding_window":
+            # Sliding window attention
+            window_size = arch_config.window_size or 512
+            rules['kv_cache'] = f"2 * batch_size * min(seq_len, {window_size}) * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
         elif arch_config.attention_type in ["mha", "gqa", "mqa"]:
             # Standard KV cache
-            kv_heads = arch_config.num_key_value_heads or arch_config.num_attention_heads
-            if arch_config.head_dim:
-                head_dim = arch_config.head_dim
-            else:
-                head_dim = arch_config.hidden_size // arch_config.num_attention_heads if arch_config.num_attention_heads else 128
-            
-            kv_dim = kv_heads * head_dim if kv_heads else arch_config.hidden_size
-            rules['kv_cache'] = f"2 * batch_size * seq_len * {kv_dim} * num_layers"
+            rules['kv_cache'] = f"2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)"
 
         # Activation formula with capacity factor
-        # Formula: S * B * H * num_layers * topK * CF * dtype_bytes
-        # - S: sequence length
-        # - B: batch size
-        # - H: hidden size
-        # - num_layers: number of layers
-        # - topK: num_experts_per_tok (for MoE, otherwise 1)
-        # - CF: recommended_capacity_factor (1.25)
-        # - dtype_bytes: bytes per parameter
+        # Formula includes tp_size/cp_size, but NOT dtype_bytes (handled externally)
         if arch_config.ffn_type == "moe" and arch_config.num_experts_per_tok:
             # MoE model: include num_experts_per_tok in formula
             rules['activation'] = (
                 f"batch_size * seq_len * hidden_size * "
-                f"{arch_config.num_experts_per_tok} * {recommended_capacity_factor} * dtype_bytes"
+                f"num_experts_per_tok * {recommended_capacity_factor} / cp_size"
             )
         else:
             # Standard/Dense model
-            # Note: This is for inference (forward pass only). For training, multiply by num_layers.
             rules['activation'] = (
                 f"batch_size * seq_len * hidden_size * "
-                f"{recommended_capacity_factor} * dtype_bytes"
+                f"{recommended_capacity_factor} / cp_size"
             )
 
         return rules

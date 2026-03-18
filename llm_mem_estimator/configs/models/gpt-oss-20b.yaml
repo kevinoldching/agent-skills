@@ -44,5 +44,5 @@ modules:
     model.embed_tokens.weight: {shape: [201088, 2880], dtype: BF16, layers: 1, parallel_strategy: TP}
 computation_rules:
   recommended_capacity_factor: 1.25
-  kv_cache: 12 * (batch_size * (prompt_len + gen_len)) * 1024 + 12 * min((batch_size * (prompt_len + gen_len)), 128) * 1024
-  activation: batch_size * gen_len * hidden_size * 4 * 1.25
+  kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
+  activation: "batch_size * seq_len * hidden_size * 4 * recommended_capacity_factor / cp_size"

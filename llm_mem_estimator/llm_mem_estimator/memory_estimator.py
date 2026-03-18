@@ -13,7 +13,7 @@ class MemoryEstimator:
 
     def __init__(self, config: ModelConfig):
         self.config = config
-        self.evaluator = FormulaEvaluator(config.architecture_config)
+        self.evaluator = FormulaEvaluator(config.architecture_config, config.computation_rules)
 
     def calculate_weights_memory(self, tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1) -> Tuple[float, Dict[str, float]]:
         """Calculate total weights memory and breakdown by module type
@@ -60,20 +60,19 @@ class MemoryEstimator:
         # Total sequence length = prompt + generated
         total_seq_len = prompt_len + gen_len
 
-        # Evaluate formula
+        # Evaluate formula (includes tp_size/cp_size in the formula)
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
             prompt_len=prompt_len,
             gen_len=gen_len,
-            seq_len=total_seq_len
+            seq_len=total_seq_len,
+            tp_size=tp,
+            cp_size=cp
         )
 
         # Convert to GB
         memory_gb = (memory_elements * dtype_bytes) / (1024 ** 3)
-
-        # Apply parallel strategies: TP (num_kv_heads sharded), CP (sequence sharded)
-        memory_gb = memory_gb / tp / cp
 
         return memory_gb
 
@@ -94,18 +93,18 @@ class MemoryEstimator:
         formula = self.config.computation_rules['activation']
         dtype_bytes = get_dtype_bytes(dtype)
 
-        # Evaluate formula (returns element count)
+        # Evaluate formula (includes tp_size/cp_size in the formula)
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
-            gen_len=gen_len
+            gen_len=gen_len,
+            seq_len=gen_len,
+            tp_size=tp,
+            cp_size=cp
         )
 
-        # Convert to GB (multiply by dtype_bytes)
+        # Convert to GB
         memory_gb = (memory_elements * dtype_bytes) / (1024 ** 3)
-
-        # Apply parallel strategies (only CP, TP/EP don't affect per-device memory)
-        memory_gb = memory_gb / cp
 
         return memory_gb
 
