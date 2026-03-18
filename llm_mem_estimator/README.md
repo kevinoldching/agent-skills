@@ -23,6 +23,8 @@ llm-mem-estimator -r
 
 安装后，Claude Code 会自动识别此 Skill，当你提到显存估算时会自动调用。
 
+> **注意**：`npx github:kevinoldching/agent-skills/llm_mem_estimator` 无法直接运行，因为 package.json 在子目录中。请使用下方的 npm 安装方式。
+
 ## 安装方式
 
 ### 方式一：项目级安装
