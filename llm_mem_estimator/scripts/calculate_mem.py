@@ -62,6 +62,37 @@ def main():
 
     args = parser.parse_args()
 
+    # Skip validation for --generate-config (only generates config, no memory calculation needed)
+    if args.generate_config:
+        # Generate config and exit
+        script_dir = Path(__file__).parent.parent
+        rules_path = script_dir / "configs" / "weight_mapping_rules.yaml"
+        if not rules_path.exists():
+            print(f"Error: Weight mapping rules not found at {rules_path}", file=sys.stderr)
+            sys.exit(1)
+
+        rules = ConfigLoader.load_weight_mapping_rules(str(rules_path))
+        classifier = WeightClassifier(rules)
+        generator = ConfigGenerator(classifier)
+
+        if args.model:
+            print(f"Generating config from HuggingFace model: {args.model}")
+            config = generator.generate_config(args.model, is_local=False)
+            model_name = args.model.split('/')[-1]
+        elif args.local:
+            print(f"Generating config from local weights: {args.local}")
+            config = generator.generate_config(args.local, is_local=True)
+            model_name = Path(args.local).name
+        else:
+            print("Error: --model or --local required with --generate-config", file=sys.stderr)
+            sys.exit(1)
+
+        output_config_path = args.output_config or str(script_dir / "configs" / "models" / f"{model_name}.yaml")
+        Path(output_config_path).parent.mkdir(parents=True, exist_ok=True)
+        ConfigLoader.save_yaml_config(config, output_config_path)
+        print(f"Config saved to: {output_config_path}")
+        return
+
     # Validate: gen-len is required when NOT using --find-max-seq-len
     if not args.find_max_seq_len and args.gen_len is None:
         parser.error("--gen-len is required when not using --find-max-seq-len")
@@ -103,16 +134,6 @@ def main():
             print(f"Generating config from local weights: {args.local}")
             config = generator.generate_config(args.local, is_local=True)
             model_name = Path(args.local).name
-
-        # Save generated config if requested
-        if args.generate_config:
-            output_config_path = args.output_config or str(script_dir / "configs" / "models" / f"{model_name}.yaml")
-            Path(output_config_path).parent.mkdir(parents=True, exist_ok=True)
-            ConfigLoader.save_yaml_config(config, output_config_path)
-            print(f"Config saved to: {output_config_path}")
-
-            if not args.find_max_seq_len:
-                return
 
     # Create estimator
     estimator = MemoryEstimator(config)
