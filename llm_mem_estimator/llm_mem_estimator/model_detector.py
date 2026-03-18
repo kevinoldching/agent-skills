@@ -347,10 +347,15 @@ class ConfigGenerator:
 
         # Build model identity (extract last part from path or HF name)
         model_name = model_name_or_path.split('/')[-1] if '/' in model_name_or_path else model_name_or_path
+
+        # For multimodal models, get num_layers from text_config
+        text_config = hf_config.get('text_config', {})
+        num_layers = text_config.get('num_hidden_layers', 0) if text_config else hf_config.get('num_hidden_layers', 0)
+
         model_identity = ModelIdentity(
             name=model_name,
             total_params=total_params,
-            num_layers=hf_config.get('num_hidden_layers', 0),
+            num_layers=num_layers,
             quantization=hf_config.get('quantization_config', {}).get('quant_method') if 'quantization_config' in hf_config else None
         )
 
@@ -370,10 +375,23 @@ class ConfigGenerator:
         # Get architecture config field mappings
         arch_config_mapping = weight_rules.get('architecture_config', {}).get('field_mappings', {})
 
+        # For multimodal models, LLM config is in text_config
+        # If text_config exists, use it as the primary config source
+        text_config = hf_config.get('text_config', {})
+
         # Helper function to get config value using field mappings
         def get_config_value(field_name: str, default: Any = None) -> Any:
-            """Get config value using field mappings"""
+            """Get config value using field mappings
+
+            For multimodal models, prioritizes text_config over top-level config.
+            """
             mapping_keys = arch_config_mapping.get(field_name, [field_name])
+            # First check text_config (for multimodal models)
+            if text_config:
+                for key in mapping_keys:
+                    if key in text_config and text_config[key] is not None:
+                        return text_config[key]
+            # Then check top-level config
             for key in mapping_keys:
                 if key in hf_config and hf_config[key] is not None:
                     return hf_config[key]
@@ -388,13 +406,15 @@ class ConfigGenerator:
                 head_dim = hidden_size // num_attention_heads
 
         # Build architecture config using field mappings
+        # Use text_config for multimodal models
+        config_for_detection = text_config if text_config else hf_config
         architecture_config = ArchitectureConfig(
             hidden_size=get_config_value('hidden_size', 0),
             head_dim=head_dim or 0,
             num_layers=get_config_value('num_layers', 0),
-            attention_type=self._detect_attention_type(hf_config),
-            ffn_type=self._detect_ffn_type(hf_config, get_config_value('num_experts')),
-            norm_type=self._detect_norm_type(hf_config),
+            attention_type=self._detect_attention_type(config_for_detection),
+            ffn_type=self._detect_ffn_type(config_for_detection, get_config_value('num_experts')),
+            norm_type=self._detect_norm_type(config_for_detection),
             vocab_size=get_config_value('vocab_size', 0),
             num_attention_heads=get_config_value('num_attention_heads'),
             num_key_value_heads=get_config_value('num_key_value_heads'),
