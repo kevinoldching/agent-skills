@@ -261,7 +261,12 @@ def main():
                     use_decode_factor=False
                 )
 
-                print("### Memory Breakdown")
+                print("### Available Memory for Prompt")
+                print(f"- Total chip VRAM: {available_memory_gb} GB")
+                print(f"- GPU utilization: {gpu_util:.0%}")
+                print(f"- Available memory: {actual_available_memory_gb:.2f} GB")
+
+                print("\n### Memory Breakdown")
                 print(f"- Model weights: {weights_memory:.2f} GB")
                 print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
                 print(f"- KV Cache (prompt_len={max_prompt_len:,} + gen_len={effective_gen_len:,}): {max_kv_memory:.2f} GB")
@@ -277,6 +282,7 @@ def main():
                     args.batch_size, max_prompt_len + 1 + effective_gen_len, args.activation_dtype, args.tp, args.cp,
                     use_decode_factor=False
                 ) - max_act_memory
+                total_increment = kv_increment + act_increment
 
                 print("```")
                 print(f"Prefill stage: total_seq_len = prompt_len + gen_len, factor = 1.25")
@@ -291,8 +297,16 @@ def main():
                 print(f"  = {args.batch_size} * 1 * 2880 * 4 * 1.25 * 2 / {args.cp}")
                 print(f"  = {act_increment:.6f} GB")
                 print(f"")
-                print(f"Total (per token) = {kv_increment:.6f} + {act_increment:.6f} = {kv_increment + act_increment:.6f} GB")
+                print(f"Total (per token) = {kv_increment:.6f} + {act_increment:.6f} = {total_increment:.6f} GB")
                 print("```")
+
+                # Calculate available memory for prompt
+                available_for_prompt = actual_available_memory_gb - weights_memory - system_reserved_gb - act_memory
+
+                print(f"\n### Calculation")
+                print(f"Max prompt_len = Available memory / Total per token")
+                print(f"= {available_for_prompt:.2f} GB / {total_increment:.6f} GB")
+                print(f"= **{max_prompt_len:,}**")
 
                 print(f"\n### Result")
                 print(f"- **Maximum prompt length: {max_prompt_len:,}**")
@@ -381,7 +395,7 @@ def main():
         print(f"- Activation (fixed, seq_len=1): {act_str} GB")
         print(f"- **Total fixed memory: {weights_memory + system_reserved_gb + prompt_kv_memory + act_decode:.2f} GB**")
 
-        available_dyn = actual_available_memory_gb - system_reserved_gb - prompt_kv_memory - act_decode
+        available_dyn = actual_available_memory_gb - weights_memory - system_reserved_gb - prompt_kv_memory - act_decode
 
         print(f"\n### Available Memory for Generation")
         print(f"- Total chip VRAM: {available_memory_gb} GB")

@@ -128,6 +128,9 @@ python scripts/calculate_mem.py --model deepseek-ai/DeepSeek-V3 --generate-confi
 
 # 保存到自定义位置
 python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --output-config ./my_model.yaml
+
+# 从本地权重目录加载权重，生成 YAML 配置
+python scripts/calculate_mem.py --local /path/models/Qwen2.5-0.5B --generate-config
 ```
 
 ## 参数组合
@@ -158,28 +161,6 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 3. **PD 分离**：分析 Prefill/Decode 显存需求
 4. **模型对比**：比较不同模型的显存占用
 5. **配置生成**：为新模型创建 YAML 配置
-
-## 关键公式
-
-**总显存**：
-```
-Total = Weights + KV Cache + Activations + System Reserved
-```
-
-**KV Cache**（每 GPU）：
-```
-2 * batch_size * seq_len * num_kv_heads * head_dim * num_layers / (tp * cp)
-```
-
-**激活值**（Decode，seq_len=1）：
-```
-batch_size * seq_len * hidden_size * num_experts * decode_factor / cp
-```
-
-**激活值**（Prefill）：
-```
-batch_size * seq_len * hidden_size * num_experts * has_prefill_factor / cp
-```
 
 ## 工作流程
 
