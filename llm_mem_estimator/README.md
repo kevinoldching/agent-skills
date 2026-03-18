@@ -11,21 +11,6 @@ LLM 显存估算工具 - 计算大语言模型的 GPU 显存占用
 - 从 HuggingFace 及本地权重路径自动生成配置文件
 - 估算最大支持的序列长度和批大小
 
-## 安装 Claude Code Skill
-
-```bash
-# 安装到 ~/.claude/skills/llm_mem_estimator
-llm-mem-estimator -g
-
-# 卸载 Claude Code Skill
-llm-mem-estimator -r
-```
-
-> 注意：全局安装 `npm install -g` 不会自动安装 Claude Code Skill，需要手动运行上述命令。
-
-安装后，Claude Code 会自动识别此 Skill，当你提到显存估算时会自动调用。
-
-> **注意**：`npx github:kevinoldching/agent-skills/llm_mem_estimator` 无法直接运行，因为 package.json 在子目录中。请使用下方的 npm 安装方式。
 
 ## 安装方式
 
@@ -58,6 +43,22 @@ npm install -g github:kevinoldching/agent-skills/llm_mem_estimator
 # 运行
 llm-mem-estimator --help
 ```
+
+## 安装 Claude Code Skill
+
+```bash
+# 安装到 ~/.claude/skills/llm_mem_estimator
+llm-mem-estimator -g
+
+# 卸载 Claude Code Skill
+llm-mem-estimator -r
+```
+
+> 注意：全局安装 `npm install -g` 不会自动安装 Claude Code Skill，需要手动运行上述命令。
+
+安装后，Claude Code 会自动识别此 Skill，当你提到显存估算时会自动调用。
+
+> **注意**：`npx github:kevinoldching/agent-skills/llm_mem_estimator` 无法直接运行，因为 package.json 在子目录中。请使用下方的 npm 安装方式。
 
 ## 使用示例
 
