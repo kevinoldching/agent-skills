@@ -351,7 +351,7 @@ python scripts/calculate_mem.py --model openai/gpt-oss-120b --generate-config
 创建配置后，使用工具验证：
 
 ```bash
-python scripts/calculate_mem.py --config configs/models/your_model.yaml --seq-len 4096 --batch-size 1
+python scripts/calculate_mem.py --config configs/models/your_model.yaml --prompt-len 4096 --gen-len 4096 --batch-size 1
 ```
 
 ---
