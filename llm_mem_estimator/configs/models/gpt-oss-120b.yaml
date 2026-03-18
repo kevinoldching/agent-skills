@@ -43,4 +43,6 @@ modules:
     lm_head.weight: {shape: [201088, 2880], dtype: BF16, layers: 1, parallel_strategy: TP}
     model.embed_tokens.weight: {shape: [201088, 2880], dtype: BF16, layers: 1, parallel_strategy: TP}
 computation_rules:
+  recommended_capacity_factor: 1.25
   kv_cache: (18 * batch_size * seq_len * 1024 + 18 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)
+  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size

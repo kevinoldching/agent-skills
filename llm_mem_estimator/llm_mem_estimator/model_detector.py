@@ -41,7 +41,11 @@ class WeightClassifier:
                     # Override with current rules (excluding 'inherit' key)
                     for key, value in model_rules.items():
                         if key != 'inherit':
-                            merged_rules[key] = value
+                            # Deep merge for nested dicts (like computation_rules)
+                            if key in merged_rules and isinstance(merged_rules[key], dict) and isinstance(value, dict):
+                                merged_rules[key] = {**merged_rules[key], **value}
+                            else:
+                                merged_rules[key] = value
                     self.rules[model_type] = merged_rules
 
     def classify_weight(self, weight_name: str, model_type: Optional[str] = None) -> str:
@@ -395,14 +399,21 @@ class ConfigGenerator:
 
         # Get computation rules from weight_mapping_rules.yaml
         # Priority: model_name > model_type > generic
-        computation_rules = model_rules.get('computation_rules', {})
+        raw_computation_rules = model_rules.get('computation_rules', {})
 
         # Raise error if computation_rules not found
-        if not computation_rules:
+        if not raw_computation_rules:
             raise ValueError(
                 f"computation_rules not found for model '{model_name}' (model_type: '{model_type}'). "
                 f"Please add computation_rules to weight_mapping_rules.yaml for this model or its model_type."
             )
+
+        # Resolve computation_rules: if it's a dict (e.g., kv_cache/activation by type), select the right formula
+        computation_rules = self._resolve_computation_rules(
+            raw_computation_rules,
+            architecture_config.attention_type,
+            architecture_config.ffn_type
+        )
 
         return ModelConfig(
             model_identity=model_identity,
@@ -576,3 +587,38 @@ class ConfigGenerator:
                 )
 
         return modules
+
+    def _resolve_computation_rules(self, raw_rules: Dict[str, Any],
+                                     attention_type: str, ffn_type: str) -> Dict[str, Any]:
+        """Resolve computation rules by selecting the right formula based on attention/ffn type
+
+        Args:
+            raw_rules: Raw computation rules from weight_mapping_rules.yaml
+            attention_type: Model's attention type
+            ffn_type: Model's ffn type
+        """
+        resolved = {}
+
+        # recommended_capacity_factor - direct copy
+        if 'recommended_capacity_factor' in raw_rules:
+            resolved['recommended_capacity_factor'] = raw_rules['recommended_capacity_factor']
+
+        # kv_cache - can be a dict (by attention_type) or a string
+        if 'kv_cache' in raw_rules:
+            kv_cache = raw_rules['kv_cache']
+            if isinstance(kv_cache, dict):
+                # Select by attention_type
+                resolved['kv_cache'] = kv_cache.get(attention_type, kv_cache.get('default', ''))
+            else:
+                resolved['kv_cache'] = kv_cache
+
+        # activation - can be a dict (by ffn_type) or a string
+        if 'activation' in raw_rules:
+            activation = raw_rules['activation']
+            if isinstance(activation, dict):
+                # Select by ffn_type
+                resolved['activation'] = activation.get(ffn_type, activation.get('default', ''))
+            else:
+                resolved['activation'] = activation
+
+        return resolved
