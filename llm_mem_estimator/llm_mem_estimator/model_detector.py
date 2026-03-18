@@ -424,6 +424,10 @@ class ConfigGenerator:
 
     def _detect_attention_type(self, config: Dict[str, Any]) -> str:
         """Detect attention type from config"""
+        # Check for sliding window attention first
+        if config.get('sliding_window') is not None:
+            return "swa"
+
         if 'q_lora_rank' in config and 'kv_lora_rank' in config:
             return "mla"
         elif config.get('num_key_value_heads') == 1:

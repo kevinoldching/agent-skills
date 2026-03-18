@@ -213,7 +213,8 @@ class ConfigLoader:
             kv_lora_rank=arch_data.get('kv_lora_rank'),
             qk_rope_head_dim=arch_data.get('qk_rope_head_dim'),
             v_head_dim=arch_data.get('v_head_dim'),
-            qk_nope_head_dim=arch_data.get('qk_nope_head_dim')
+            qk_nope_head_dim=arch_data.get('qk_nope_head_dim'),
+            window_size=arch_data.get('window_size')
         )
 
         # Parse modules
@@ -306,6 +307,8 @@ class ConfigLoader:
             lines.append(f"  intermediate_size: {arch.intermediate_size}")
         if arch.num_experts_per_tok:
             lines.append(f"  num_experts_per_tok: {arch.num_experts_per_tok}")
+        if arch.window_size:
+            lines.append(f"  window_size: {arch.window_size}")
 
         # modules - using compact format
         lines.append("modules:")
