@@ -115,7 +115,8 @@ class MemoryEstimator:
                         kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                         tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                         system_reserved_gb: float = 2.0,
-                        use_decode_factor: bool = True) -> MemoryResult:
+                        use_decode_factor: bool = True,
+                        activation_peak_gb: float = None) -> MemoryResult:
         """Estimate total memory usage
 
         Args:
@@ -131,6 +132,7 @@ class MemoryEstimator:
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
             use_decode_factor: If True, use decode factor (12.5) with seq_len=1; otherwise use has_prefill factor (1.25) with seq_len=total_seq_len
+            activation_peak_gb: If specified, use this fixed activation peak value (GB) instead of calculating from formula
         """
         # Calculate weights memory (with parallel strategy sharding)
         weights_memory, weights_breakdown = self.calculate_weights_memory(
@@ -143,9 +145,10 @@ class MemoryEstimator:
         )
 
         # Calculate activation memory
-        # Decode: seq_len = 1 (single token), factor = 12.5
-        # Prefill: seq_len = total_seq_len, factor = 1.25
-        if use_decode_factor:
+        if activation_peak_gb is not None:
+            # Use user-specified fixed activation peak value
+            activation_memory = activation_peak_gb
+        elif use_decode_factor:
             # Decode scenario: seq_len = 1
             activation_memory = self.calculate_activation_memory(
                 batch_size, 1, activation_dtype, tp, cp,
@@ -177,7 +180,8 @@ class MemoryEstimator:
                                   kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                                   tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                                   system_reserved_gb: float = 2.0,
-                                  use_decode_factor: bool = True) -> int:
+                                  use_decode_factor: bool = True,
+                                  activation_peak_gb: float = None) -> int:
         """Binary search to find maximum generated length (gen_len)
 
         Args:
@@ -192,6 +196,7 @@ class MemoryEstimator:
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
             use_decode_factor: If True, use decode factor (12.5); otherwise use has_prefill factor (1.25)
+            activation_peak_gb: If specified, use this fixed activation peak value (GB)
         """
         # Calculate fixed memory (weights + system reserved)
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
@@ -223,14 +228,20 @@ class MemoryEstimator:
             mid = (left + right) // 2
 
             # KV grows with prompt + gen_len
-            # Activation: in Decode stage, seq_len = 1 (only 1 token at a time)
             kv_memory = self.calculate_kv_cache_memory(
                 batch_size, prompt_len, mid, kv_dtype, tp, cp
             )
-            act_memory = self.calculate_activation_memory(
-                batch_size, 1, activation_dtype, tp, cp,
-                use_decode_factor=use_decode_factor
-            )
+
+            # Activation: use fixed value if specified, otherwise calculate from formula
+            if activation_peak_gb is not None:
+                act_memory = activation_peak_gb
+            else:
+                # Decode stage: seq_len = 1 (only 1 token at a time)
+                act_memory = self.calculate_activation_memory(
+                    batch_size, 1, activation_dtype, tp, cp,
+                    use_decode_factor=use_decode_factor
+                )
+
             total_dynamic = kv_memory + act_memory
 
             if total_dynamic <= dynamic_memory:
@@ -245,7 +256,8 @@ class MemoryEstimator:
                             gen_len: int = 1,
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                             tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
-                            system_reserved_gb: float = 2.0) -> int:
+                            system_reserved_gb: float = 2.0,
+                            activation_peak_gb: float = None) -> int:
         """Binary search to find maximum prompt length (prompt_len) with fixed gen_len
 
         This is used for PD separation scenarios where we want to find the maximum
@@ -262,6 +274,7 @@ class MemoryEstimator:
             cp: Context Parallel degree
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
+            activation_peak_gb: If specified, use this fixed activation peak value (GB)
         """
         # Calculate fixed memory (weights + system reserved)
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
@@ -285,12 +298,15 @@ class MemoryEstimator:
                 batch_size, mid, gen_len, kv_dtype, tp, cp
             )
 
-            # Activation depends on total sequence length (Prefill stage)
-            # Use has_prefill factor (1.25) since this is prefill stage
-            act_memory = self.calculate_activation_memory(
-                batch_size, total_seq_len, activation_dtype, tp, cp,
-                use_decode_factor=False
-            )
+            # Activation: use fixed value if specified, otherwise calculate from formula
+            if activation_peak_gb is not None:
+                act_memory = activation_peak_gb
+            else:
+                # Prefill stage: use has_prefill factor
+                act_memory = self.calculate_activation_memory(
+                    batch_size, total_seq_len, activation_dtype, tp, cp,
+                    use_decode_factor=False
+                )
 
             total_memory = fixed_memory + kv_memory + act_memory
 
@@ -305,7 +321,8 @@ class MemoryEstimator:
     def find_max_batch_size(self, available_memory_gb: float, prompt_len: int, gen_len: int,
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                             tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
-                            system_reserved_gb: float = 2.0) -> int:
+                            system_reserved_gb: float = 2.0,
+                            activation_peak_gb: float = None) -> int:
         """Binary search to find maximum batch_size that fits in available memory
 
         This is used for Scene 8 scenarios where both prompt_len and gen_len are fixed,
@@ -322,6 +339,7 @@ class MemoryEstimator:
             cp: Context Parallel degree
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
+            activation_peak_gb: If specified, use this fixed activation peak value (GB)
         """
         # Calculate fixed memory (weights + system reserved)
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
@@ -342,12 +360,15 @@ class MemoryEstimator:
                 mid, prompt_len, gen_len, kv_dtype, tp, cp
             )
 
-            # Activation memory (Prefill stage with has_prefill factor)
-            # Total seq_len = prompt_len + gen_len
-            act_memory = self.calculate_activation_memory(
-                mid, prompt_len + gen_len, activation_dtype, tp, cp,
-                use_decode_factor=False
-            )
+            # Activation: use fixed value if specified, otherwise calculate from formula
+            if activation_peak_gb is not None:
+                act_memory = activation_peak_gb
+            else:
+                # Prefill stage: has_prefill factor
+                act_memory = self.calculate_activation_memory(
+                    mid, prompt_len + gen_len, activation_dtype, tp, cp,
+                    use_decode_factor=False
+                )
 
             total_memory = fixed_memory + kv_memory + act_memory
 

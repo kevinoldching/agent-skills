@@ -40,6 +40,8 @@ def main():
     parser.add_argument('--gen-len', type=int, default=None, help="Generated output length (required without --find-max-seq-len)")
     parser.add_argument('--kv-dtype', type=str, default="fp16", help="KV cache dtype")
     parser.add_argument('--activation-dtype', type=str, default="fp16", help="Activation dtype")
+    parser.add_argument('--activation-peak', type=float, default=None,
+                       help="Fixed activation peak value in GB (overrides formula calculation)")
 
     # Parallel configuration
     parser.add_argument('--tp', type=int, default=1, help="Tensor parallel size")
@@ -200,7 +202,8 @@ def main():
                     cp=args.cp,
                     ep=args.ep,
                     system_reserved_gb=system_reserved_gb,
-                    use_decode_factor=False
+                    use_decode_factor=False,
+                    activation_peak_gb=args.activation_peak
                 )
 
                 parallel_config = {
@@ -248,7 +251,8 @@ def main():
                 pp=args.pp,
                 cp=args.cp,
                 ep=args.ep,
-                system_reserved_gb=system_reserved_gb
+                system_reserved_gb=system_reserved_gb,
+                activation_peak_gb=args.activation_peak
             )
 
             # Generate report with max batch size
@@ -264,7 +268,8 @@ def main():
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
-                use_decode_factor=False
+                use_decode_factor=False,
+                activation_peak_gb=args.activation_peak
             )
 
             parallel_config = {
@@ -314,7 +319,8 @@ def main():
                 pp=args.pp,
                 cp=args.cp,
                 ep=args.ep,
-                system_reserved_gb=system_reserved_gb
+                system_reserved_gb=system_reserved_gb,
+                activation_peak_gb=args.activation_peak
             )
 
             # Generate report with max prompt length (Prefill scenario)
@@ -330,7 +336,8 @@ def main():
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
-                use_decode_factor=False  # Prefill: use has_prefill factor with total_seq_len
+                use_decode_factor=False,
+                activation_peak_gb=args.activation_peak
             )
 
             parallel_config = {
@@ -445,7 +452,8 @@ def main():
             cp=args.cp,
             ep=args.ep,
             system_reserved_gb=system_reserved_gb,
-            use_decode_factor=True  # Use decode factor for pure decode scenario
+            use_decode_factor=True,
+            activation_peak_gb=args.activation_peak
         )
 
         # Generate report with max sequence length (Decode scenario)
@@ -461,7 +469,8 @@ def main():
             cp=args.cp,
             ep=args.ep,
             system_reserved_gb=system_reserved_gb,
-            use_decode_factor=True  # Decode: use decode factor with seq_len=1
+            use_decode_factor=True,
+            activation_peak_gb=args.activation_peak
         )
 
         parallel_config = {
@@ -577,7 +586,8 @@ def main():
         cp=args.cp,
         ep=args.ep,
         system_reserved_gb=system_reserved_gb,
-        use_decode_factor=False  # Use Prefill factor when both prompt_len and gen_len are specified
+        use_decode_factor=False,
+        activation_peak_gb=args.activation_peak
     )
 
     # Generate report

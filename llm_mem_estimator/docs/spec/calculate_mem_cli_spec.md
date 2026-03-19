@@ -42,14 +42,13 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 | `--gen-len` | 生成输出长度 | 1024 |
 | `--kv-dtype` | KV Cache 数据类型 | fp16 |
 | `--activation-dtype` | 激活值数据类型 | fp16 |
+| `--activation-peak` | 固定 activation 峰值 (GB)，覆盖公式计算 | None |
 
-> **注意**：对于 Prefill/Decode 分离部署场景：
-> - `--prompt-len` 表示输入的 prompt 长度（固定）
-> - `--gen-len` 表示生成的 token 长度
-> - KV Cache 使用 `(prompt_len + gen_len)` 计算
-> - Activation 根据场景使用不同因子：
+> **注意**：
+> - 对于 Prefill/Decode 分离部署场景：Activation 根据场景使用不同因子：
 >   - **Decode 阶段**（固定 seq_len=1）：使用 decode 因子 (12.5)
 >   - **Prefill 阶段**（seq_len = prompt_len + gen_len）：使用 has_prefill 因子 (1.25)
+> - 使用 `--activation-peak` 时：用户直接指定 activation 峰值，搜索函数用剩余显存计算
 
 ### 场景说明
 
@@ -242,6 +241,20 @@ python scripts/calculate_mem.py \
 # 输出: Maximum batch size: 210
 ```
 
+### 示例 8：使用固定 activation 峰值
+
+```bash
+# 指定 activation 峰值固定为 10GB，用剩余显存搜索最大 batch_size
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 1 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --activation-peak 10 \
+    --find-max-seq-len
+```
+
 ## 完整选项列表
 
 ```
@@ -249,6 +262,7 @@ usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
                        [--generate-config] [--output-config OUTPUT_CONFIG]
                        [--batch-size BATCH_SIZE] [--prompt-len PROMPT_LEN] [--gen-len GEN_LEN]
                        [--kv-dtype KV_DTYPE] [--activation-dtype ACTIVATION_DTYPE]
+                       [--activation-peak ACTIVATION_PEAK]
                        [--tp TP] [--pp PP] [--dp DP] [--cp CP] [--ep EP]
                        [--chip CHIP] [--find-max-seq-len]
                        [--system-reserved SYSTEM_RESERVED]
