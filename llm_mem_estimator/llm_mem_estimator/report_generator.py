@@ -218,9 +218,9 @@ class ReportGenerator:
             cp = parallel_config.get('cp', 1)
             ep = parallel_config.get('ep', 1)
 
-            # Collect and merge weights by simplified name, dtype, parallel_strategy
-            # Key: (module_type, simplified_name, dtype, parallel_strategy)
-            # Value: {(shape_tuple): {'count': N, 'memory': total_memory}}
+            # Collect and merge weights by simplified name, shape, dtype, parallel_strategy
+            # Key: (module_type, simplified_name, shape_str, dtype, parallel_strategy)
+            # Value: {'layers': total_layers, 'memory': total_memory}
             merged_weights = {}
 
             for module_type in module_order:
@@ -234,59 +234,48 @@ class ReportGenerator:
                 for weight_name, weight_info in module_weights.items():
                     # Simplify weight name for display (e.g., blocks.0. -> blocks.N.)
                     display_name = simplify_weight_name(weight_name)
+                    shape_str = str(weight_info.shape).replace(" ", "")
                     parallel_strategy = weight_info.parallel_strategy or "N/A"
                     dtype = weight_info.dtype
 
                     # Calculate memory with parallel strategy
                     weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
 
-                    # Create key for merging (without shape)
-                    key = (module_type, display_name, dtype, parallel_strategy)
-                    shape_tuple = tuple(weight_info.shape)
+                    # Create key for merging
+                    key = (module_type, display_name, shape_str, dtype, parallel_strategy)
 
                     if key not in merged_weights:
-                        merged_weights[key] = {}
-
-                    if shape_tuple not in merged_weights[key]:
-                        merged_weights[key][shape_tuple] = {
-                            'count': 0,
+                        merged_weights[key] = {
+                            'layers': 0,
                             'memory': 0.0,
                         }
 
-                    merged_weights[key][shape_tuple]['count'] += 1
-                    merged_weights[key][shape_tuple]['memory'] += weight_memory
+                    merged_weights[key]['layers'] += weight_info.layers
+                    merged_weights[key]['memory'] += weight_memory
 
             # Print merged rows
-            for (module_type, display_name, dtype, parallel_strategy), shape_data in merged_weights.items():
-                for shape_tuple, data in shape_data.items():
-                    count = data['count']
-                    weight_memory = data['memory']
+            for (module_type, display_name, shape_str, dtype, parallel_strategy), data in merged_weights.items():
+                weight_memory = data['memory']
+                total_layers = data['layers']
 
-                    # Insert count into shape if count > 1 (like MoE expert count)
-                    if count > 1:
-                        display_shape = [count] + list(shape_tuple)
-                    else:
-                        display_shape = list(shape_tuple)
-                    shape_str = str(display_shape).replace(" ", "")
+                # Calculate percentage relative to total weights memory
+                pct = weight_memory / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
 
-                    # Calculate percentage relative to total weights memory
-                    pct = weight_memory / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
+                # Calculate actual world size based on parallel strategy and CLI params
+                if parallel_strategy.upper() == "TP":
+                    world_size = tp
+                elif parallel_strategy.upper() == "EP":
+                    world_size = ep
+                elif parallel_strategy.upper() == "PP":
+                    world_size = pp
+                elif parallel_strategy.upper() == "DP":
+                    world_size = dp
+                elif parallel_strategy.upper() == "CP":
+                    world_size = cp
+                else:
+                    world_size = 1  # replicated
 
-                    # Calculate actual world size based on parallel strategy and CLI params
-                    if parallel_strategy.upper() == "TP":
-                        world_size = tp
-                    elif parallel_strategy.upper() == "EP":
-                        world_size = ep
-                    elif parallel_strategy.upper() == "PP":
-                        world_size = pp
-                    elif parallel_strategy.upper() == "DP":
-                        world_size = dp
-                    elif parallel_strategy.upper() == "CP":
-                        world_size = cp
-                    else:
-                        world_size = 1  # replicated
-
-                    lines.append(f"| {module_type} | {display_name} | {shape_str} | {count} | {weight_memory:.5f} | {pct:.2f}% | {dtype} | {parallel_strategy} | {world_size} |")
+                lines.append(f"| {module_type} | {display_name} | {shape_str} | {total_layers} | {weight_memory:.5f} | {pct:.2f}% | {dtype} | {parallel_strategy} | {world_size} |")
 
             # Print Total row
             lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.5f}** | **100.00%** | - | - | - |")
