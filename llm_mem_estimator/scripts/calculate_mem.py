@@ -373,19 +373,17 @@ def main():
             # Activation: use user-specified peak or calculate with formula
             if args.activation_peak is not None:
                 act_memory = args.activation_peak
-                act_display = f"{act_memory:.2f} (user specified)"
+                act_display = f"{act_memory:.2f} (user specified, fixed)"
                 # When activation is fixed, it doesn't grow with seq_len
                 max_act_memory = act_memory
             else:
-                act_memory = estimator.calculate_activation_memory(
-                    args.batch_size, effective_gen_len, args.activation_dtype, args.tp, args.cp,
-                    use_decode_factor=False
-                )
-                act_display = f"{act_memory:.6f}"
+                # Calculate activation at max_prompt_len + gen_len
                 max_act_memory = estimator.calculate_activation_memory(
                     args.batch_size, max_prompt_len + effective_gen_len, args.activation_dtype, args.tp, args.cp,
                     use_decode_factor=False
                 )
+                act_memory = max_act_memory
+                act_display = f"{act_memory:.2f}"
 
             # Calculate memory breakdown for the max prompt_len
             max_kv_memory = estimator.calculate_kv_cache_memory(
@@ -401,7 +399,7 @@ def main():
             print(f"- Model weights: {weights_memory:.2f} GB")
             print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
             print(f"- KV Cache (prompt_len={max_prompt_len:,} + gen_len={effective_gen_len:,}): {max_kv_memory:.2f} GB")
-            print(f"- Activation (fixed): {act_display} GB")
+            print(f"- Activation (total_seq_len={max_prompt_len + effective_gen_len:,}): {act_display} GB")
             print(f"- **Total: {weights_memory + system_reserved_gb + max_kv_memory + act_memory:.2f} GB**")
 
             print(f"\n### Memory per Unit Prompt Token (Calculation Steps)")
