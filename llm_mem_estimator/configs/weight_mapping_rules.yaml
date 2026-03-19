@@ -31,7 +31,7 @@ generic:
   ffn_shared_expert:
     patterns:
       - "^mlp\\.shared_experts\\..*"
-      - ".*\\.mlp\\.shared_experts\\..*"
+      - ".*\\.mlp\\.shared_expert\\s*\\..*"
 
   ffn_dense:
     patterns:
@@ -171,7 +171,7 @@ gpt-oss-20b:
     kv_cache: "(12 * batch_size * seq_len * 1024 + 12 * min(batch_size * seq_len, 128) * 1024) / (tp_size * cp_size)"
 
 # Qwen 系列
-qwen:
+qwen3_next:
   inherit: generic
 
   attention:
@@ -179,6 +179,7 @@ qwen:
       - "^self_attn\\..*"
       - ".*\\.c_attn\\..*"
       - ".*\\.c_proj\\..*"
+      - ".*\\.linear_attn\\..*"
 
 # MiniMax 系列
 minimax_m2:

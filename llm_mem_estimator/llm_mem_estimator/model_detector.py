@@ -50,12 +50,26 @@ class WeightClassifier:
                                 merged_rules[key] = value
                     self.rules[model_type] = merged_rules
 
-    def classify_weight(self, weight_name: str, model_type: Optional[str] = None) -> str:
-        """Classify a weight name to a module type"""
-        # Try model-specific rules first
+    def classify_weight(self, weight_name: str, model_name: Optional[str] = None,
+                       model_type: Optional[str] = None) -> str:
+        """Classify a weight name to a module type
+
+        Args:
+            weight_name: The weight name to classify
+            model_name: Model name (e.g., 'Qwen3-Coder-Next') - highest priority
+            model_type: HuggingFace model_type (e.g., 'qwen3') - second priority
+        """
+        # Priority: model_name > model_type > generic
+        if model_name and model_name in self.rules:
+            model_rules = self.rules[model_name]
+            if isinstance(model_rules, dict):
+                result = self._match_rules(weight_name, model_rules)
+                if result:
+                    return result
+
         if model_type and model_type in self.rules:
             model_rules = self.rules[model_type]
-            if isinstance(model_rules, dict) and 'inherit' not in model_rules:
+            if isinstance(model_rules, dict):
                 result = self._match_rules(weight_name, model_rules)
                 if result:
                     return result
@@ -487,9 +501,9 @@ class ConfigGenerator:
         # Get ffn_moe patterns for expert detection
         ffn_moe_patterns = model_rules.get('ffn_moe', {}).get('patterns', [])
 
-        # Classify weights (pass ffn_moe patterns for expert detection)
-        # Use model_name instead of model_type to match rules in weight_mapping_rules.yaml
-        modules = self._classify_weights(weights_metadata, model_name, architecture_config, ffn_moe_patterns)
+        # Classify weights (pass model_name and model_type for rule matching)
+        # Priority: model_name > model_type > generic
+        modules = self._classify_weights(weights_metadata, model_name, model_type, architecture_config, ffn_moe_patterns)
 
         # Get computation rules from weight_mapping_rules.yaml
         # Priority: model_name > model_type > generic
@@ -556,13 +570,14 @@ class ConfigGenerator:
             return "layernorm"
 
     def _classify_weights(self, weights_metadata: Dict[str, Dict[str, Any]],
-                         model_type: str, arch_config: ArchitectureConfig,
+                         model_name: str, model_type: str, arch_config: ArchitectureConfig,
                          ffn_moe_patterns: List[str] = None) -> Dict[str, Dict[str, WeightInfo]]:
         """Classify weights into module types
 
         Args:
             weights_metadata: Dictionary of weight names to metadata
-            model_type: Model type identifier
+            model_name: Model name (e.g., 'Qwen3-Coder-Next')
+            model_type: HuggingFace model_type (e.g., 'qwen3')
             arch_config: Architecture configuration
             ffn_moe_patterns: List of patterns for matching MoE expert weights
         """
@@ -648,7 +663,8 @@ class ConfigGenerator:
             layer_idx = int(layer_match.group(1)) if layer_match else 0
 
             # Classify weight to determine module type for layer tracking
-            module_type_for_layer = self.classifier.classify_weight(weight_name, model_type)
+            # Priority: model_name > model_type > generic
+            module_type_for_layer = self.classifier.classify_weight(weight_name, model_name, model_type)
 
             # For MoE models, also remove expert numbers to consolidate
             # Match patterns like: .experts.0. or .experts0. or .block_sparse_moe.experts.0.
@@ -673,7 +689,8 @@ class ConfigGenerator:
             first_weight_name, first_metadata = weight_list[0]
 
             # Classify the base pattern
-            module_type = self.classifier.classify_weight(first_weight_name, model_type)
+            # Priority: model_name > model_type > generic
+            module_type = self.classifier.classify_weight(first_weight_name, model_name, model_type)
 
             if module_type not in modules:
                 modules[module_type] = {}
