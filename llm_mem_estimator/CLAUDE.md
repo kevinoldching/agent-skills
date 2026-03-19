@@ -19,6 +19,19 @@ After completing code modifications, always check and update:
 1. **Documentation**: Update relevant docs (e.g., `docs/spec/*.md`) if behavior changed
 2. **Tests**: Update test cases if they exist
 
+### Debugging and Verification
+
+When verifying code logic involving HuggingFace model weights:
+
+- **Cache Location**: `~/.cache/llm_mem_estimator/metadata_cache/`
+- **Cache Format**: JSON files named `{org}--{model}_weights.json`
+- **Usage**: Use cached weight data to debug and verify code logic without network access
+
+Example to inspect cached weights:
+```bash
+cat ~/.cache/llm_mem_estimator/metadata_cache/deepseek-ai--DeepSeek-V3_weights.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(list(d.keys())[:5])"
+```
+
 ## Architecture
 
 - **Modular Design**: Attention、FFN、Norm 模块独立实现
