@@ -1,0 +1,394 @@
+model_identity:
+  name: Qwen3-VL-8B-Instruct
+  total_params: '8.77B'
+  num_layers: 36
+architecture_config:
+  hidden_size: 4096
+  num_layers: 36
+  attention_type: gqa
+  ffn_type: standard
+  norm_type: rmsnorm
+  vocab_size: 151936
+  head_dim: 128
+  num_attention_heads: 32
+  num_key_value_heads: 8
+  intermediate_size: 12288
+modules:
+  others:
+    model.language_model.embed_tokens.weight: {shape: [151936, 4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.language_model.norm.weight: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.0.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.1.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.10.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.11.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.12.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.13.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.14.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.15.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.16.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.17.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.18.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.19.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.2.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.20.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.21.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.22.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.23.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.24.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.25.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.26.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.3.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.4.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.5.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.6.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.7.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.8.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.attn.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.attn.proj.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.attn.qkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.attn.qkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.mlp.linear_fc1.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.mlp.linear_fc1.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.mlp.linear_fc2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.mlp.linear_fc2.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.norm2.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.blocks.9.norm2.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.linear_fc1.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.linear_fc1.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.linear_fc2.bias: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.linear_fc2.weight: {shape: [4096, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.norm.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.0.norm.weight: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.linear_fc1.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.linear_fc1.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.linear_fc2.bias: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.linear_fc2.weight: {shape: [4096, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.norm.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.1.norm.weight: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.linear_fc1.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.linear_fc1.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.linear_fc2.bias: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.linear_fc2.weight: {shape: [4096, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.norm.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.deepstack_merger_list.2.norm.weight: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.linear_fc1.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.linear_fc1.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.linear_fc2.bias: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.linear_fc2.weight: {shape: [4096, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.norm.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.merger.norm.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.patch_embed.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.patch_embed.proj.weight: {shape: [1152, 3, 2, 16, 16], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    model.visual.pos_embed.weight: {shape: [2304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  norm:
+    model.language_input_layernorm.weight: {shape: [4096], dtype: BF16, layers: 36, parallel_strategy: replicated}
+    model.language_post_attention_layernorm.weight: {shape: [4096], dtype: BF16, layers: 36, parallel_strategy: replicated}
+  ffn_dense:
+    model.language_mlp.down_proj.weight: {shape: [4096, 12288], dtype: BF16, layers: 36, parallel_strategy: TP}
+    model.language_mlp.gate_proj.weight: {shape: [12288, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+    model.language_mlp.up_proj.weight: {shape: [12288, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+  attention:
+    model.language_self_attn.k_norm.weight: {shape: [128], dtype: BF16, layers: 36, parallel_strategy: replicated}
+    model.language_self_attn.k_proj.weight: {shape: [1024, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+    model.language_self_attn.o_proj.weight: {shape: [4096, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+    model.language_self_attn.q_norm.weight: {shape: [128], dtype: BF16, layers: 36, parallel_strategy: replicated}
+    model.language_self_attn.q_proj.weight: {shape: [4096, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+    model.language_self_attn.v_proj.weight: {shape: [1024, 4096], dtype: BF16, layers: 36, parallel_strategy: TP}
+  embedding:
+    lm_head.weight: {shape: [151936, 4096], dtype: BF16, layers: 1, parallel_strategy: TP}
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: 2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)
+  activation: 
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

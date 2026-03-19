@@ -32,6 +32,13 @@ modules:
     mlp.shared_expert.up_proj.weight: {shape: [512, 2048], dtype: BF16, layers: 48, parallel_strategy: replicated}
   others:
     mlp.shared_expert_gate.weight: {shape: [1, 2048], dtype: BF16, layers: 48, parallel_strategy: replicated}
+  attention:
+    self_attn.k_norm.weight: {shape: [256], dtype: BF16, layers: 48, parallel_strategy: replicated}
+    self_attn.k_proj.weight: {shape: [512, 2048], dtype: BF16, layers: 48, parallel_strategy: TP}
+    self_attn.o_proj.weight: {shape: [2048, 4096], dtype: BF16, layers: 48, parallel_strategy: TP}
+    self_attn.q_norm.weight: {shape: [256], dtype: BF16, layers: 48, parallel_strategy: replicated}
+    self_attn.q_proj.weight: {shape: [8192, 2048], dtype: BF16, layers: 48, parallel_strategy: TP}
+    self_attn.v_proj.weight: {shape: [512, 2048], dtype: BF16, layers: 48, parallel_strategy: TP}
     linear_attn.A_log: {shape: [32], dtype: BF16, layers: 48, parallel_strategy: replicated}
     linear_attn.conv1d.weight: {shape: [8192, 1, 4], dtype: BF16, layers: 48, parallel_strategy: replicated}
     linear_attn.dt_bias: {shape: [32], dtype: BF16, layers: 48, parallel_strategy: replicated}
@@ -39,13 +46,6 @@ modules:
     linear_attn.in_proj_qkvz.weight: {shape: [12288, 2048], dtype: BF16, layers: 48, parallel_strategy: replicated}
     linear_attn.norm.weight: {shape: [128], dtype: BF16, layers: 48, parallel_strategy: replicated}
     linear_attn.out_proj.weight: {shape: [2048, 4096], dtype: BF16, layers: 48, parallel_strategy: replicated}
-  attention:
-    self_attn.k_norm.weight: {shape: [256], dtype: BF16, layers: 12, parallel_strategy: replicated}
-    self_attn.k_proj.weight: {shape: [512, 2048], dtype: BF16, layers: 12, parallel_strategy: TP}
-    self_attn.o_proj.weight: {shape: [2048, 4096], dtype: BF16, layers: 12, parallel_strategy: TP}
-    self_attn.q_norm.weight: {shape: [256], dtype: BF16, layers: 12, parallel_strategy: replicated}
-    self_attn.q_proj.weight: {shape: [8192, 2048], dtype: BF16, layers: 12, parallel_strategy: TP}
-    self_attn.v_proj.weight: {shape: [512, 2048], dtype: BF16, layers: 12, parallel_strategy: TP}
   embedding:
     lm_head.weight: {shape: [151936, 2048], dtype: BF16, layers: 1, parallel_strategy: TP}
     model.embed_tokens.weight: {shape: [151936, 2048], dtype: BF16, layers: 1, parallel_strategy: TP}
