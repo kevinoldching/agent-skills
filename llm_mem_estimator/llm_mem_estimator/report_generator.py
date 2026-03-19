@@ -211,7 +211,18 @@ class ReportGenerator:
             # Define module order
             module_order = ['embedding', 'attention', 'ffn_moe', 'ffn_shared_expert', 'ffn_dense', 'norm', 'others']
 
-            # Print rows grouped by module type (in defined order)
+            # Get parallel config
+            tp = parallel_config.get('tp', 1)
+            pp = parallel_config.get('pp', 1)
+            dp = parallel_config.get('dp', 1)
+            cp = parallel_config.get('cp', 1)
+            ep = parallel_config.get('ep', 1)
+
+            # Collect and merge weights by simplified name, shape, dtype, parallel_strategy
+            # Key: (module_type, simplified_name, shape_str, dtype, parallel_strategy)
+            # Value: {'layers': total_layers, 'memory': total_memory}
+            merged_weights = {}
+
             for module_type in module_order:
                 if module_type not in config.modules:
                     continue
@@ -221,39 +232,50 @@ class ReportGenerator:
                     continue
 
                 for weight_name, weight_info in module_weights.items():
-                    # Calculate memory with parallel strategy
-                    tp = parallel_config.get('tp', 1)
-                    pp = parallel_config.get('pp', 1)
-                    dp = parallel_config.get('dp', 1)
-                    cp = parallel_config.get('cp', 1)
-                    ep = parallel_config.get('ep', 1)
-                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
-
-                    # Calculate percentage relative to total weights memory
-                    pct = weight_memory / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
-
-                    # Format shape
-                    shape_str = str(weight_info.shape).replace(" ", "")
-
-                    # Format parallel strategy
-                    parallel_strategy = weight_info.parallel_strategy or "N/A"
-                    # Calculate actual world size based on parallel strategy and CLI params
-                    if parallel_strategy.upper() == "TP":
-                        world_size = tp
-                    elif parallel_strategy.upper() == "EP":
-                        world_size = ep
-                    elif parallel_strategy.upper() == "PP":
-                        world_size = pp
-                    elif parallel_strategy.upper() == "DP":
-                        world_size = dp
-                    elif parallel_strategy.upper() == "CP":
-                        world_size = cp
-                    else:
-                        world_size = 1  # replicated
-
                     # Simplify weight name for display (e.g., blocks.0. -> blocks.N.)
                     display_name = simplify_weight_name(weight_name)
-                    lines.append(f"| {module_type} | {display_name} | {shape_str} | {weight_info.layers} | {weight_memory:.5f} | {pct:.2f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
+                    shape_str = str(weight_info.shape).replace(" ", "")
+                    parallel_strategy = weight_info.parallel_strategy or "N/A"
+                    dtype = weight_info.dtype
+
+                    # Calculate memory with parallel strategy
+                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
+
+                    # Create key for merging
+                    key = (module_type, display_name, shape_str, dtype, parallel_strategy)
+
+                    if key not in merged_weights:
+                        merged_weights[key] = {
+                            'layers': 0,
+                            'memory': 0.0,
+                        }
+
+                    merged_weights[key]['layers'] += weight_info.layers
+                    merged_weights[key]['memory'] += weight_memory
+
+            # Print merged rows
+            for (module_type, display_name, shape_str, dtype, parallel_strategy), data in merged_weights.items():
+                weight_memory = data['memory']
+                total_layers = data['layers']
+
+                # Calculate percentage relative to total weights memory
+                pct = weight_memory / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
+
+                # Calculate actual world size based on parallel strategy and CLI params
+                if parallel_strategy.upper() == "TP":
+                    world_size = tp
+                elif parallel_strategy.upper() == "EP":
+                    world_size = ep
+                elif parallel_strategy.upper() == "PP":
+                    world_size = pp
+                elif parallel_strategy.upper() == "DP":
+                    world_size = dp
+                elif parallel_strategy.upper() == "CP":
+                    world_size = cp
+                else:
+                    world_size = 1  # replicated
+
+                lines.append(f"| {module_type} | {display_name} | {shape_str} | {total_layers} | {weight_memory:.5f} | {pct:.2f}% | {dtype} | {parallel_strategy} | {world_size} |")
 
             # Print Total row
             lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.5f}** | **100.00%** | - | - | - |")
