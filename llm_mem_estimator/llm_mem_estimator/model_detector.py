@@ -8,6 +8,8 @@ This module combines:
 - WeightClassifier: Classify HuggingFace weights to standard module types
 """
 
+import os
+import time
 import json
 import re
 from pathlib import Path
@@ -231,21 +233,68 @@ class ModelDetector:
 
     @staticmethod
     def _get_huggingface_weights_metadata(model_name: str) -> Dict[str, Dict[str, Any]]:
-        """Get weights metadata from HuggingFace using HTTP Range Requests (no download)"""
+        """
+        使用 HTTP Range Requests 获取权重元数据，并集成以下功能：
+        1. 本地 JSON 缓存：避免重复请求和断网困扰。
+        2. 自动重试机制：应对 [Errno 104] Connection reset。
+        3. 镜像源支持：自动切换到国内高速节点。
+        """
+        # --- 配置参数 ---
+        MAX_RETRIES = 5
+        # 如果你在国内，建议开启镜像源
+        if not os.environ.get('HF_ENDPOINT'):
+            os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
+
+        # 1. 准备本地缓存路径（使用项目根目录下的绝对路径）
+        cache_dir = Path(__file__).parent.parent / ".metadata_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # 将 "org/model" 转换为 "org--model.json"
+        safe_name = model_name.replace("/", "--")
+        cache_path = cache_dir / f"{safe_name}_weights.json"
+
+        # 2. 检查并读取本地缓存
+        if cache_path.exists():
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cached_data = json.load(f)
+                    # 简单校验数据有效性
+                    if isinstance(cached_data, dict) and len(cached_data) > 0:
+                        print(f"加载本地元数据缓存: {cache_path}")
+                        return cached_data
+            except Exception:
+                pass  # 缓存损坏则重新请求
+
+        # 3. 如果无缓存，执行带重试的网络请求
         try:
             from huggingface_hub import get_safetensors_metadata
-            import os
 
-            # Set HF_TOKEN from environment variable if available
-            hf_token = os.environ.get('HF_TOKEN')
-            if hf_token:
-                os.environ['HF_HUB_TOKEN'] = hf_token
+            metadata = None
+            last_error = None
 
-            # 核心：只抓取元数据
-            metadata = get_safetensors_metadata(model_name)
+            for attempt in range(MAX_RETRIES):
+                try:
+                    # 核心请求：只读 Header
+                    metadata = get_safetensors_metadata(model_name)
+                    if metadata:
+                        break
+                except Exception as e:
+                    last_error = e
+                    # 针对网络重置进行等待重试
+                    if "104" in str(e) or "reset" in str(e).lower() or "timeout" in str(e).lower():
+                        wait = 2 ** attempt
+                        print(f"网络波动 ({e})，正在进行第 {attempt + 1}/{MAX_RETRIES} 次重试，等待 {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        raise  # 其他错误直接抛出
+
+            if not metadata:
+                raise RuntimeError(
+                    f"在 {MAX_RETRIES} 次重试后仍无法获取元数据: {last_error}"
+                )
+
+            # 4. 转换结构
             all_tensors = {}
-
-            # 遍历所有文件和其中的张量
             for file_name, file_info in metadata.files_metadata.items():
                 for tensor_name, tensor_info in file_info.tensors.items():
                     all_tensors[tensor_name] = {
@@ -253,11 +302,16 @@ class ModelDetector:
                         'dtype': str(tensor_info.dtype)
                     }
 
+            # 5. 写入本地缓存以备后用
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(all_tensors, f, indent=4)
+
             return all_tensors
 
+        except ImportError:
+            raise RuntimeError("请先安装依赖: pip install huggingface_hub")
         except Exception as e:
-            # 常见错误：Repo 不含 safetensors，或者网络连不通 HF
-            raise RuntimeError(f"无法获取元数据 (请检查是否包含 safetensors): {e}")
+            raise RuntimeError(f"无法获取元数据: {e}")
 
     @staticmethod
     def _get_local_weights_metadata(weights_path: str) -> Dict[str, Dict[str, Any]]:

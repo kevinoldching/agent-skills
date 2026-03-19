@@ -25,6 +25,16 @@ models:
     path: deepseek-ai/DeepSeek-V3
     description: DeepSeek V3 大模型，使用 MLA 和 MoE 架构
 
+  - name: DeepSeek-V3.1
+    type: huggingface
+    path: deepseek-ai/DeepSeek-V3.1
+    description: DeepSeek V3.1 大模型，使用 MLA 和 MoE 架构
+
+  - name: DeepSeek-V3.2
+    type: huggingface
+    path: deepseek-ai/DeepSeek-V3.2
+    description: DeepSeek V3.2 大模型，使用 MLA 和 MoE 架构
+
   - name: Kimi-K2.5
     type: huggingface
     path: moonshotai/Kimi-K2.5

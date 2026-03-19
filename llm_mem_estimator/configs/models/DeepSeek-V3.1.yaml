@@ -1,6 +1,6 @@
 model_identity:
   name: DeepSeek-V3.1
-  total_params: 'unknown'
+  total_params: '684.53B'
   num_layers: 61
   quantization: fp8
 architecture_config:
@@ -22,12 +22,12 @@ architecture_config:
   qk_nope_head_dim: 128
 modules:
   ffn_moe:
-    mlp.experts.N.down_proj.weight_scale_inv: {shape: [256, 56, 16], dtype: F32, layers: 61, parallel_strategy: EP}
-    mlp.experts.N.gate_proj.weight: {shape: [256, 2048, 7168], dtype: F8_E4M3, layers: 61, parallel_strategy: EP}
-    mlp.experts.N.gate_proj.weight_scale_inv: {shape: [256, 16, 56], dtype: F32, layers: 61, parallel_strategy: EP}
-    mlp.experts.N.up_proj.weight: {shape: [256, 2048, 7168], dtype: F8_E4M3, layers: 61, parallel_strategy: EP}
-    mlp.experts.N.up_proj.weight_scale_inv: {shape: [256, 16, 56], dtype: F32, layers: 61, parallel_strategy: EP}
-    mlp.experts.N.down_proj.weight: {shape: [256, 7168, 2048], dtype: F8_E4M3, layers: 61, parallel_strategy: EP}
+    mlp.experts.N.up_proj.weight_scale_inv: {shape: [256, 16, 56], dtype: F32, layers: 59, parallel_strategy: EP}
+    mlp.experts.N.down_proj.weight: {shape: [256, 7168, 2048], dtype: F8_E4M3, layers: 59, parallel_strategy: EP}
+    mlp.experts.N.down_proj.weight_scale_inv: {shape: [256, 56, 16], dtype: F32, layers: 59, parallel_strategy: EP}
+    mlp.experts.N.gate_proj.weight: {shape: [256, 2048, 7168], dtype: F8_E4M3, layers: 59, parallel_strategy: EP}
+    mlp.experts.N.gate_proj.weight_scale_inv: {shape: [256, 16, 56], dtype: F32, layers: 59, parallel_strategy: EP}
+    mlp.experts.N.up_proj.weight: {shape: [256, 2048, 7168], dtype: F8_E4M3, layers: 59, parallel_strategy: EP}
     mlp.gate.weight: {shape: [256, 7168], dtype: BF16, layers: 59, parallel_strategy: replicated}
     mlp.gate.e_score_correction_bias: {shape: [256], dtype: F32, layers: 59, parallel_strategy: replicated}
   norm:
@@ -38,12 +38,12 @@ modules:
     self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: F8_E4M3, layers: 62, parallel_strategy: replicated}
     self_attn.q_a_proj.weight_scale_inv: {shape: [12, 56], dtype: F32, layers: 62, parallel_strategy: replicated}
     self_attn.q_a_layernorm.weight: {shape: [1536], dtype: BF16, layers: 62, parallel_strategy: replicated}
-    self_attn.q_b_proj.weight: {shape: [24576, 1536], dtype: F8_E4M3, layers: 62, parallel_strategy: replicated}
+    self_attn.q_b_proj.weight: {shape: [24576, 1536], dtype: F8_E4M3, layers: 62, parallel_strategy: TP}
     self_attn.q_b_proj.weight_scale_inv: {shape: [192, 12], dtype: F32, layers: 62, parallel_strategy: replicated}
     self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: F8_E4M3, layers: 62, parallel_strategy: replicated}
     self_attn.kv_a_proj_with_mqa.weight_scale_inv: {shape: [5, 56], dtype: F32, layers: 62, parallel_strategy: replicated}
     self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 62, parallel_strategy: replicated}
-    self_attn.kv_b_proj.weight: {shape: [32768, 512], dtype: F8_E4M3, layers: 62, parallel_strategy: replicated}
+    self_attn.kv_b_proj.weight: {shape: [32768, 512], dtype: F8_E4M3, layers: 62, parallel_strategy: TP}
     self_attn.kv_b_proj.weight_scale_inv: {shape: [256, 4], dtype: F32, layers: 62, parallel_strategy: replicated}
     self_attn.o_proj.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 62, parallel_strategy: TP}
     self_attn.o_proj.weight_scale_inv: {shape: [56, 128], dtype: F32, layers: 62, parallel_strategy: replicated}
@@ -55,8 +55,8 @@ modules:
     mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: F8_E4M3, layers: 59, parallel_strategy: replicated}
     mlp.shared_experts.down_proj.weight_scale_inv: {shape: [56, 16], dtype: F32, layers: 59, parallel_strategy: replicated}
   embedding:
-    lm_head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
     model.embed_tokens.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    lm_head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
   ffn_dense:
     mlp.gate_proj.weight: {shape: [18432, 7168], dtype: F8_E4M3, layers: 3, parallel_strategy: TP}
     mlp.gate_proj.weight_scale_inv: {shape: [144, 56], dtype: F32, layers: 3, parallel_strategy: TP}
