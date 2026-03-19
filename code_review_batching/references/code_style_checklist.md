@@ -9,11 +9,14 @@
 # Copyright (c) 2025 Huawei Technologies Co., Ltd. All Rights Reserved.
 ```
 
-*注* 
+*注*
 - 示例中2025年，根据当前实际的年份可能不同
-- 源码文件中添加，其它文件，如ymal/json配置文件不要求
+- 源码文件中添加，其它文件，如 ymal/json 配置文件不要求
+- **新增文件必须有此头部**
 
 ### 导入顺序
+
+**标准分组**（仅供参考，不同项目可能有合理变体）：
 
 ```python
 # 1. 标准库 (Standard library)
@@ -30,9 +33,20 @@ from omni_npu.vllm_patches.core import VLLMPatch
 from omni_npu.attention import ops
 ```
 
+**重要：以下情况不报告**
+
+- import 顺序略有不同
+- 导入项之间有空行分隔（即使分组不完美）
+- 第三方库内部顺序（如 `torch` 和 `torch_npu` 的内部顺序）
+- 同一个模块内的多个 import 分散在不同位置
+- **只有当 import 分组明显混乱、严重影响可读性时才报告**
+
+**验证要求**：报告 import 问题前，必须读取当前文件完整内容，确认分组确实混乱
+
 ## 2) 命名规范
 
 ### 文件名
+
 文件名要尽量规范，拼写正确，能够准确地表达文件的功能
 
 ### 类
@@ -207,8 +221,7 @@ class MyClass:
 
 ## 8) 行长度
 
-- 最大行宽：100 个字符
-- 较长的函数调用应拆分为多行
+- 最大行宽：100 个字符（**仅在严重影响可读性时报告**）
 
 ```python
 result = some_function(
