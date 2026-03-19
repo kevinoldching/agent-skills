@@ -178,17 +178,82 @@ def main():
         actual_available_memory_gb = available_memory_gb * gpu_util
 
         # Scene 8: --find-max-seq-len with both --gen-len and --prompt-len
-        # → treat as normal estimation (don't search)
+        # → search max batch_size if batch_size=1, otherwise normal estimation
         if args.gen_len is not None and args.prompt_len is not None:
-            print("Note: Both --prompt-len and --gen-len specified with --find-max-seq-len, "
-                  "treating as normal estimation", file=sys.stderr)
-            # Jump to Scene 1 (normal estimation)
             effective_prompt_len = args.prompt_len
             effective_gen_len = args.gen_len
-            # Skip Scene 5/6 and go directly to Scene 1
-            # Jump to line 441 (Scene 1 estimation)
+            effective_batch_size = args.batch_size
+
+            if args.batch_size != 1:
+                # batch_size != 1: do normal estimation and show fit/exceeds
+                print("Note: Both --prompt-len and --gen-len specified with --find-max-seq-len, "
+                      "treating as normal estimation", file=sys.stderr)
+                result = estimator.estimate_memory(
+                    batch_size=effective_batch_size,
+                    prompt_len=effective_prompt_len,
+                    gen_len=effective_gen_len,
+                    kv_dtype=args.kv_dtype,
+                    activation_dtype=args.activation_dtype,
+                    tp=args.tp,
+                    pp=args.pp,
+                    dp=args.dp,
+                    cp=args.cp,
+                    ep=args.ep,
+                    system_reserved_gb=system_reserved_gb,
+                    use_decode_factor=False
+                )
+
+                parallel_config = {
+                    'tp': args.tp,
+                    'pp': args.pp,
+                    'dp': args.dp,
+                    'cp': args.cp,
+                    'ep': args.ep
+                }
+
+                report = ReportGenerator.generate_report(
+                    config=config,
+                    result=result,
+                    batch_size=effective_batch_size,
+                    parallel_config=parallel_config,
+                    prompt_len=effective_prompt_len,
+                    gen_len=effective_gen_len,
+                    chip_info=chip_info
+                )
+
+                print(report)
+
+                # Add memory fit conclusion if chip_info is available
+                if chip_info and available_memory_gb:
+                    total_memory = result.weights_memory_gb + result.kv_cache_memory_gb + result.activation_memory_gb + system_reserved_gb
+                    available_with_util = available_memory_gb * gpu_util
+                    remaining = available_with_util - total_memory
+                    fit_status = "✅ Fits" if remaining >= 0 else "❌ Exceeds"
+                    print(f"\n## Result")
+                    print(f"")
+                    print(f"- VRAM * gpu_util - Total = {available_memory_gb} * {gpu_util:.0%} - {total_memory:.2f} = {available_with_util:.2f} - {total_memory:.2f} = {remaining:.2f} GB")
+                    print(f"- Status: {fit_status}")
+                return
+
+            # batch_size == 1: search for max batch_size
+            print("Note: --batch-size=1 with --find-max-seq-len, --prompt-len and --gen-len, "
+                  "searching for maximum batch_size...", file=sys.stderr)
+            max_batch_size = estimator.find_max_batch_size(
+                available_memory_gb=actual_available_memory_gb,
+                prompt_len=effective_prompt_len,
+                gen_len=effective_gen_len,
+                kv_dtype=args.kv_dtype,
+                activation_dtype=args.activation_dtype,
+                tp=args.tp,
+                pp=args.pp,
+                cp=args.cp,
+                ep=args.ep,
+                system_reserved_gb=system_reserved_gb
+            )
+
+            # Generate report with max batch size
             result = estimator.estimate_memory(
-                batch_size=args.batch_size,
+                batch_size=max_batch_size,
                 prompt_len=effective_prompt_len,
                 gen_len=effective_gen_len,
                 kv_dtype=args.kv_dtype,
@@ -199,7 +264,7 @@ def main():
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
-                use_decode_factor=False  # Use Prefill factor since both prompt and gen are specified
+                use_decode_factor=False
             )
 
             parallel_config = {
@@ -213,7 +278,7 @@ def main():
             report = ReportGenerator.generate_report(
                 config=config,
                 result=result,
-                batch_size=args.batch_size,
+                batch_size=max_batch_size,
                 parallel_config=parallel_config,
                 prompt_len=effective_prompt_len,
                 gen_len=effective_gen_len,
@@ -221,6 +286,17 @@ def main():
             )
 
             print(report)
+
+            # Add memory fit conclusion
+            if chip_info and available_memory_gb:
+                total_memory = result.weights_memory_gb + result.kv_cache_memory_gb + result.activation_memory_gb + system_reserved_gb
+                available_with_util = available_memory_gb * gpu_util
+                remaining = available_with_util - total_memory
+                fit_status = "✅ Fits" if remaining >= 0 else "❌ Exceeds"
+                print(f"\n## Result")
+                print(f"- **Maximum batch size: {max_batch_size:,}**")
+                print(f"- VRAM * gpu_util - Total = {available_memory_gb} * {gpu_util:.0%} - {total_memory:.2f} = {available_with_util:.2f} - {total_memory:.2f} = {remaining:.2f} GB")
+                print(f"- Status: {fit_status}")
             return
 
         # Scene 7: --find-max-seq-len with --gen-len but without --prompt-len

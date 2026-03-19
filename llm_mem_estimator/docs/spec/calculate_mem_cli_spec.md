@@ -55,14 +55,14 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 
 | 场景 | `--find-max-seq-len` | `--gen-len` | `--prompt-len` | 处理逻辑 |
 |-----|:---:|:---:|:---:|---------|
-| 1 | ✗ | ✓ | ✓ | 正常估算，使用 **decode** factor (12.5) |
+| 1 | ✗ | ✓ | ✓ | 正常估算，使用 **has_prefill** factor (1.25) |
 | 2 | ✗ | ✓ | ✗ | **报错**: `--prompt-len is required` |
 | 3 | ✗ | ✗ | ✓ | **报错**: `--gen-len is required` |
 | 4 | ✗ | ✗ | ✗ | **报错**: `--prompt-len and --gen-len are required` |
 | 5 | ✓ | ✗ | ✗ | prompt_len=默认值(4096)，搜索 max gen_len，使用 **decode** factor |
 | 6 | ✓ | ✗ | ✓ | prompt_len=用户指定，搜索 max gen_len，使用 **decode** factor |
 | 7 | ✓ | ✓ | ✗ | gen_len=用户指定，搜索 max prompt_len，使用 **has_prefill** factor |
-| 8 | ✓ | ✓ | ✓ | 警告: 两者都指定，按场景1处理 |
+| 8 | ✓ | ✓ | ✓ | batch_size≠1: 正常估算 + 显示 Fits/Exceeds; batch_size=1: **搜索 max batch_size** |
 
 支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`
 
@@ -210,6 +210,36 @@ python scripts/calculate_mem.py \
     --config configs/models/gpt-oss-120b.yaml \
     --kv-dtype fp8 \
     --activation-dtype fp8
+```
+
+### 示例 6：Scene 8 - batch_size ≠ 1 (直接估算)
+
+```bash
+# 指定 batch_size=2，直接估算并显示是否满足显存
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 2 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --find-max-seq-len
+
+# 输出: Status: ✅ Fits 或 ❌ Exceeds
+```
+
+### 示例 7：Scene 8 - batch_size = 1 (搜索最大 batch_size)
+
+```bash
+# 指定 batch_size=1，搜索最大支持的 batch_size
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 1 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --find-max-seq-len
+
+# 输出: Maximum batch size: 210
 ```
 
 ## 完整选项列表

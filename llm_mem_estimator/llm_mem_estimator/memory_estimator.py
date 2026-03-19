@@ -301,3 +301,60 @@ class MemoryEstimator:
                 right = mid - 1
 
         return max_prompt_len
+
+    def find_max_batch_size(self, available_memory_gb: float, prompt_len: int, gen_len: int,
+                            kv_dtype: str = "fp16", activation_dtype: str = "fp16",
+                            tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
+                            system_reserved_gb: float = 2.0) -> int:
+        """Binary search to find maximum batch_size that fits in available memory
+
+        This is used for Scene 8 scenarios where both prompt_len and gen_len are fixed,
+        and we want to find the maximum batch size that can fit in memory.
+
+        Args:
+            available_memory_gb: Available GPU memory in GB
+            prompt_len: Input prompt length (fixed)
+            gen_len: Generated output length (fixed)
+            kv_dtype: KV cache data type
+            activation_dtype: Activation data type
+            tp: Tensor Parallel degree
+            pp: Pipeline Parallel degree
+            cp: Context Parallel degree
+            ep: Expert Parallel degree
+            system_reserved_gb: System reserved memory in GB
+        """
+        # Calculate fixed memory (weights + system reserved)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
+        fixed_memory = weights_memory + system_reserved_gb
+
+        # Use a large upper bound for binary search
+        upper_bound = 10000
+
+        # Binary search for max batch size
+        left, right = 1, upper_bound
+        max_batch_size = 0
+
+        while left <= right:
+            mid = (left + right) // 2
+
+            # KV memory scales with batch_size
+            kv_memory = self.calculate_kv_cache_memory(
+                mid, prompt_len, gen_len, kv_dtype, tp, cp
+            )
+
+            # Activation memory (Prefill stage with has_prefill factor)
+            # Total seq_len = prompt_len + gen_len
+            act_memory = self.calculate_activation_memory(
+                mid, prompt_len + gen_len, activation_dtype, tp, cp,
+                use_decode_factor=False
+            )
+
+            total_memory = fixed_memory + kv_memory + act_memory
+
+            if total_memory <= available_memory_gb:
+                max_batch_size = mid
+                left = mid + 1
+            else:
+                right = mid - 1
+
+        return max_batch_size
