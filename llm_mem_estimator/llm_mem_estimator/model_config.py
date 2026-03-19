@@ -317,8 +317,12 @@ class ConfigLoader:
             lines.append(f"  num_key_value_heads: {arch.num_key_value_heads}")
         if arch.intermediate_size:
             lines.append(f"  intermediate_size: {arch.intermediate_size}")
+        if arch.num_experts:
+            lines.append(f"  num_experts: {arch.num_experts}")
         if arch.num_experts_per_tok:
             lines.append(f"  num_experts_per_tok: {arch.num_experts_per_tok}")
+        if arch.moe_intermediate_size:
+            lines.append(f"  moe_intermediate_size: {arch.moe_intermediate_size}")
         if arch.window_size:
             lines.append(f"  window_size: {arch.window_size}")
         if arch.q_lora_rank:

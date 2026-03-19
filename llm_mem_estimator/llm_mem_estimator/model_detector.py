@@ -661,7 +661,7 @@ class ConfigGenerator:
             module_layer_indices[module_type_for_layer].add(layer_idx)
 
         # Update architecture config if MoE detected
-        if is_moe and not arch_config.num_experts:
+        if is_moe:
             arch_config.num_experts = num_experts
             arch_config.ffn_type = "moe"
 
