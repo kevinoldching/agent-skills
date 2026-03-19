@@ -546,11 +546,22 @@ class ConfigGenerator:
         # Step 1: Group weights by their base pattern
         # If MoE detected, also remove expert numbers during grouping
         pattern_groups = defaultdict(list)
+        # Track layer indices for each module type
+        module_layer_indices = defaultdict(set)
 
         for weight_name, metadata in weights_metadata.items():
             # Only remove layer numbers first
             base_pattern = re.sub(r'\.layers?\.\d+\.', '.layers.N.', weight_name)
             base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
+
+            # Extract layer index before pattern normalization
+            layer_match = re.search(r'\.layers\.(\d+)\.', weight_name)
+            if not layer_match:
+                layer_match = re.search(r'model\.layers\.(\d+)', weight_name)
+            layer_idx = int(layer_match.group(1)) if layer_match else 0
+
+            # Classify weight to determine module type for layer tracking
+            module_type_for_layer = self.classifier.classify_weight(weight_name, model_type)
 
             # For MoE models, also remove expert numbers to consolidate
             # Match patterns like: .experts.0. or .experts0. or .block_sparse_moe.experts.0.
@@ -559,6 +570,8 @@ class ConfigGenerator:
                 base_pattern = re.sub(r'(\.experts?\d*)\.\d+(\.)', r'\1.N\2', base_pattern)
 
             pattern_groups[base_pattern].append((weight_name, metadata))
+            # Track layer indices for this module type
+            module_layer_indices[module_type_for_layer].add(layer_idx)
 
         # Update architecture config if MoE detected
         if is_moe and not arch_config.num_experts:
@@ -585,11 +598,9 @@ class ConfigGenerator:
             has_experts_in_pattern = is_moe and '.experts.N.' in base_pattern
 
             if is_per_layer and len(weight_list) > 1:
-                # For MoE: layers_count = num_layers (not total weight count)
-                if has_experts_in_pattern and num_experts > 0:
-                    layers_count = arch_config.num_layers or len(weight_list)
-                else:
-                    layers_count = len(weight_list)
+                # Use actual layer count from weight names, not arch_config.num_layers
+                # This correctly handles cases where not all layers have MoE (e.g., DeepSeek-V3 has MoE only in layers 3-61)
+                layers_count = len(module_layer_indices.get(module_type, set())) or len(weight_list)
 
                 # Use a simplified name (remove model.layers.N prefix if present)
                 simplified_name = base_pattern.replace('model.layers.N.', '')
