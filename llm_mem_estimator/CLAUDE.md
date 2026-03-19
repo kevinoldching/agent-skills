@@ -13,6 +13,12 @@ When a user raises a requirement or problem fix, always provide:
 
 Do NOT implement changes without providing implementation details first.
 
+### After Code Changes
+
+After completing code modifications, always check and update:
+1. **Documentation**: Update relevant docs (e.g., `docs/spec/*.md`) if behavior changed
+2. **Tests**: Update test cases if they exist
+
 ## Architecture
 
 - **Modular Design**: Attention、FFN、Norm 模块独立实现
