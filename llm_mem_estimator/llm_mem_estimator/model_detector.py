@@ -434,7 +434,8 @@ class ConfigGenerator:
         ffn_moe_patterns = model_rules.get('ffn_moe', {}).get('patterns', [])
 
         # Classify weights (pass ffn_moe patterns for expert detection)
-        modules = self._classify_weights(weights_metadata, model_type, architecture_config, ffn_moe_patterns)
+        # Use model_name instead of model_type to match rules in weight_mapping_rules.yaml
+        modules = self._classify_weights(weights_metadata, model_name, architecture_config, ffn_moe_patterns)
 
         # Get computation rules from weight_mapping_rules.yaml
         # Priority: model_name > model_type > generic
