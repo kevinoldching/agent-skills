@@ -2,7 +2,6 @@ model_identity:
   name: Kimi-K2.5
   total_params: '170.74B'
   num_layers: 61
-  quantization: compressed-tensors
 architecture_config:
   hidden_size: 7168
   num_layers: 61
@@ -15,35 +14,387 @@ architecture_config:
   num_key_value_heads: 64
   intermediate_size: 18432
   num_experts_per_tok: 8
-  moe_intermediate_size: 2048
   q_lora_rank: 1536
   kv_lora_rank: 512
   qk_rope_head_dim: 64
-  qk_nope_head_dim: 128
   v_head_dim: 128
+  qk_nope_head_dim: 128
 modules:
   norm:
-    language_model.model.norm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-  ffn_moe:
-    language_model.mlp.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+  ffn_dense:
+    language_model.model.layers.0.mlp.down_proj.weight: {shape: [7168, 18432], dtype: BF16, layers: 1, parallel_strategy: TP}
+    language_model.model.layers.0.mlp.gate_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    language_model.model.layers.0.mlp.up_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
   attention:
-    language_model.layers.0.self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.self_attn.q_a_layernorm.weight: {shape: [1536], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.self_attn.q_b_proj.weight: {shape: [12288, 1536], dtype: BF16, layers: 61, parallel_strategy: TP}
-    language_model.layers.0.self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.layers.0.self_attn.kv_b_proj.weight: {shape: [16384, 512], dtype: BF16, layers: 61, parallel_strategy: TP}
-    language_model.layers.0.self_attn.o_proj.weight: {shape: [7168, 8192], dtype: BF16, layers: 61, parallel_strategy: TP}
-  embedding:
+    language_model.self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.kv_b_proj.weight: {shape: [16384, 512], dtype: BF16, layers: 61, parallel_strategy: TP}
+    language_model.self_attn.o_proj.weight: {shape: [7168, 8192], dtype: BF16, layers: 61, parallel_strategy: TP}
+    language_model.self_attn.q_a_layernorm.weight: {shape: [1536], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.q_b_proj.weight: {shape: [12288, 1536], dtype: BF16, layers: 61, parallel_strategy: TP}
+  others:
+    mm_projector.pre_norm.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.pre_norm.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.0.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.0.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.2.bias: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.2.weight: {shape: [7168, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.0.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.1.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.10.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.11.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.12.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.13.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.14.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.15.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.16.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.17.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.18.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.19.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.2.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.20.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.21.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.22.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.23.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.24.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.25.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.26.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.3.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.4.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.5.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.6.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.7.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.8.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.mlp.fc1.weight: {shape: [1152, 4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.norm0.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.norm0.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.norm1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.norm1.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.wo.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.wo.weight: {shape: [1152, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.wqkv.bias: {shape: [3456], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.blocks.9.wqkv.weight: {shape: [3456, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.final_layernorm.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.encoder.final_layernorm.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.patch_embed.pos_emb.weight: {shape: [64, 64, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.patch_embed.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    vision_tower.patch_embed.proj.weight: {shape: [1152, 3, 14, 14], dtype: BF16, layers: 1, parallel_strategy: replicated}
     language_model.lm_head.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
     language_model.model.embed_tokens.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    language_model.model.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  ffn_moe:
+    language_model.mlp.gate.e_score_correction_bias: {shape: [384], dtype: F32, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.experts.N.down_proj.weight_packed: {shape: [384, 7168, 256], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.down_proj.weight_shape: {shape: [2], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.gate_proj.weight_packed: {shape: [384, 2048, 896], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.gate_proj.weight_shape: {shape: [2], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.up_proj.weight_packed: {shape: [384, 2048, 896], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.up_proj.weight_shape: {shape: [2], dtype: I32, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.down_proj.weight_scale: {shape: [384, 7168, 64], dtype: BF16, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.gate_proj.weight_scale: {shape: [384, 2048, 224], dtype: BF16, layers: 61, parallel_strategy: EP}
+    language_model.mlp.experts.N.up_proj.weight_scale: {shape: [384, 2048, 224], dtype: BF16, layers: 61, parallel_strategy: EP}
+    language_model.mlp.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+  ffn_shared_expert:
+    language_model.mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.shared_experts.gate_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.shared_experts.up_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
 computation_rules:
   recommended_capacity_factor:
     has_prefill: 1.25
     decode: 12.5
+  kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
+  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
   system_reserved_gb: 2.0
   gpu_util: 0.9
-  kv_cache: 2 * batch_size * seq_len * kv_lora_rank * num_layers / (tp_size * cp_size)
-  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size

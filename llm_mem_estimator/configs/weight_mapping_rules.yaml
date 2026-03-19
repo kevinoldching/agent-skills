@@ -192,6 +192,12 @@ minimax_m2:
       - ".*\\.block_sparse_moe\\.experts\\.\\d+.*"
       - ".*\\.block_sparse_moe\\.gate.*"
 
+Kimi-K2.5:
+  inherit: generic
+
+  parallel_defaults:
+    ffn_shared_expert: TP
+
 # ============================================================================
 # Architecture Config 字段映射
 # 将不同模型的 config.json 字段映射到标准字段名
