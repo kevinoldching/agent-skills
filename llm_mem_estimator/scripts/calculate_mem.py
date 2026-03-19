@@ -370,19 +370,26 @@ def main():
             )
             fixed_memory = weights_memory + system_reserved_gb
 
-            # Activation memory (fixed, depends on gen_len)
-            act_memory = estimator.calculate_activation_memory(
-                args.batch_size, effective_gen_len, args.activation_dtype, args.tp, args.cp,
-                use_decode_factor=False
-            )
+            # Activation: use user-specified peak or calculate with formula
+            if args.activation_peak is not None:
+                act_memory = args.activation_peak
+                act_display = f"{act_memory:.2f} (user specified)"
+                # When activation is fixed, it doesn't grow with seq_len
+                max_act_memory = act_memory
+            else:
+                act_memory = estimator.calculate_activation_memory(
+                    args.batch_size, effective_gen_len, args.activation_dtype, args.tp, args.cp,
+                    use_decode_factor=False
+                )
+                act_display = f"{act_memory:.6f}"
+                max_act_memory = estimator.calculate_activation_memory(
+                    args.batch_size, max_prompt_len + effective_gen_len, args.activation_dtype, args.tp, args.cp,
+                    use_decode_factor=False
+                )
 
             # Calculate memory breakdown for the max prompt_len
             max_kv_memory = estimator.calculate_kv_cache_memory(
                 args.batch_size, max_prompt_len, effective_gen_len, args.kv_dtype, args.tp, args.cp
-            )
-            max_act_memory = estimator.calculate_activation_memory(
-                args.batch_size, max_prompt_len + effective_gen_len, args.activation_dtype, args.tp, args.cp,
-                use_decode_factor=False
             )
 
             print("### Available Memory for Prompt")
@@ -394,8 +401,8 @@ def main():
             print(f"- Model weights: {weights_memory:.2f} GB")
             print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
             print(f"- KV Cache (prompt_len={max_prompt_len:,} + gen_len={effective_gen_len:,}): {max_kv_memory:.2f} GB")
-            print(f"- Activation (total_seq_len={max_prompt_len + effective_gen_len:,}): {max_act_memory:.6f} GB")
-            print(f"- **Total: {weights_memory + system_reserved_gb + max_kv_memory + max_act_memory:.2f} GB**")
+            print(f"- Activation (fixed): {act_display} GB")
+            print(f"- **Total: {weights_memory + system_reserved_gb + max_kv_memory + act_memory:.2f} GB**")
 
             print(f"\n### Memory per Unit Prompt Token (Calculation Steps)")
             # Calculate incremental cost for adding 1 more prompt token
@@ -412,14 +419,19 @@ def main():
             print(f"Prefill stage: total_seq_len = prompt_len + gen_len, factor = 1.25")
             print(f"")
             print(f"KV Cache (incremental):")
-            print(f"  = batch_size * seq_len * 1024 * 18 * dtype / (tp * cp)")
-            print(f"  = {args.batch_size} * 1 * 1024 * 18 * 2 / ({args.tp} * {args.cp})")
+            print(f"  = batch_size * seq_len * kv_dim * num_layers * dtype / (tp * cp)")
+            print(f"  = {args.batch_size} * 1 * kv_dim * {config.architecture_config.num_layers} * 2 / ({args.tp} * {args.cp})")
             print(f"  = {kv_increment:.6f} GB")
             print(f"")
             print(f"Activation (incremental):")
-            print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
-            print(f"  = {args.batch_size} * 1 * 2880 * 4 * 1.25 * 2 / {args.cp}")
-            print(f"  = {act_increment:.6f} GB")
+            if args.activation_peak is not None:
+                print(f"  = 0 GB (fixed, user specified)")
+                act_increment = 0
+            else:
+                print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
+                print(f"  = {args.batch_size} * 1 * 2880 * 4 * 1.25 * 2 / {args.cp}")
+                print(f"  = {act_increment:.6f} GB")
+            total_increment = kv_increment + act_increment
             print(f"")
             print(f"Total (per token) = {kv_increment:.6f} + {act_increment:.6f} = {total_increment:.6f} GB")
             print("```")
