@@ -183,7 +183,19 @@ def main():
     # Find max sequence length if requested
     if args.find_max_seq_len:
         if not available_memory_gb:
-            print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
+            # Load chips config to show supported chips
+            chips_path = script_dir / "configs" / "chips.json"
+            if chips_path.exists():
+                chips_config = ConfigLoader.load_chips_config(str(chips_path))
+                vendor_groups = []
+                for vendor, vendor_chips in chips_config.items():
+                    chip_names = list(vendor_chips.keys())
+                    vendor_groups.append(f"  {vendor}: {', '.join(f'{c}' for c in chip_names)}")
+                supported_chips = '\n'.join(vendor_groups)
+                print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
+                print(f"Supported chips:\n{supported_chips}", file=sys.stderr)
+            else:
+                print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
             sys.exit(1)
 
         # Get system_reserved_gb and gpu_util from computation_rules
