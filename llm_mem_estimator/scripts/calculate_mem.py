@@ -531,6 +531,17 @@ def main():
     else:
         print(report)
 
+    # Add memory fit conclusion if chip_info is available
+    if chip_info and available_memory_gb:
+        total_memory = result.weights_memory_gb + result.kv_cache_memory_gb + result.activation_memory_gb + system_reserved_gb
+        available_with_util = available_memory_gb * gpu_util
+        remaining = available_with_util - total_memory
+        fit_status = "✅ Fits" if remaining >= 0 else "❌ Exceeds"
+        print(f"\n## Result")
+        print(f"")
+        print(f"- VRAM * gpu_util - Total = {available_memory_gb} * {gpu_util:.0%} - {total_memory:.2f} = {available_with_util:.2f} - {total_memory:.2f} = {remaining:.2f} GB")
+        print(f"- Status: {fit_status}")
+
 
 if __name__ == "__main__":
     main()
