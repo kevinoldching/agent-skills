@@ -113,6 +113,27 @@ class TestMemoryEstimatorFromOutputs:
         # 大模型（如 DeepSeek-V3 600B+）可能权重本身超过 200GB
         assert max_seq_len >= 0
 
+    @pytest.mark.parametrize("config_path", get_outputs_configs(), ids=lambda p: p.stem.replace("_config", ""))
+    def test_find_max_batch_size(self, config_path):
+        """测试估算最大 batch_size"""
+        config = ConfigLoader.load_yaml_config(str(config_path))
+        estimator = MemoryEstimator(config)
+
+        max_batch_size = estimator.find_max_batch_size(
+            available_memory_gb=64,
+            prompt_len=2048,
+            gen_len=2048,
+            kv_dtype="fp16",
+            activation_dtype="fp16",
+            tp=1,
+            pp=1,
+            cp=1,
+            system_reserved_gb=2.0
+        )
+
+        # 大模型可能权重本身超过 64GB
+        assert max_batch_size >= 0
+
 
 
 class TestGetDtypeBytes:
