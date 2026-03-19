@@ -600,15 +600,35 @@ class ConfigGenerator:
                 num_experts = max(expert_indices) + 1
                 is_moe = num_experts > 0
 
-            # Validate: if MoE weights matched but expert_pattern_regex not found, raise error
+            # Validate: if MoE weights matched but expert_pattern_regex not found, try to infer from weight shape
             if matched_moe_weights and expert_pattern_regex is None:
-                raise ValueError(
-                    f"Failed to extract expert indices from MoE weights. "
-                    f"Matched {len(matched_moe_weights)} weights but could not find expert index pattern. "
-                    f"Example weight: '{matched_moe_weights[0]}'. "
-                    f"Please ensure the weight_mapping_rules.yaml 'ffn_moe' patterns correctly match expert indices, "
-                    f"or add an 'expert_pattern_regex' to help extract indices."
-                )
+                # Try to infer num_experts from weight shape (first dimension)
+                # For models like gpt-oss where expert count is in shape [num_experts, ...]
+                inferred_num_experts = None
+                for weight_name in matched_moe_weights[:10]:  # Check first 10 weights
+                    if weight_name in weights_metadata:
+                        shape = weights_metadata[weight_name].get('shape', [])
+                        if shape and len(shape) >= 1:
+                            # First dimension could be num_experts
+                            potential_expert_count = shape[0]
+                            if potential_expert_count > 1:
+                                inferred_num_experts = potential_expert_count
+                                break
+
+                if inferred_num_experts:
+                    num_experts = inferred_num_experts
+                    is_moe = True
+                    # For gpt-oss style, expert indices are embedded in shape, not weight name
+                    # Use a placeholder that won't match any expert pattern
+                    expert_pattern_regex = ".placeholder.{}"
+                else:
+                    raise ValueError(
+                        f"Failed to extract expert indices from MoE weights. "
+                        f"Matched {len(matched_moe_weights)} weights but could not find expert index pattern. "
+                        f"Example weight: '{matched_moe_weights[0]}'. "
+                        f"Please ensure the weight_mapping_rules.yaml 'ffn_moe' patterns correctly match expert indices, "
+                        f"or add an 'expert_pattern_regex' to help extract indices."
+                    )
 
         # Step 1: Group weights by their base pattern
         # If MoE detected, also remove expert numbers during grouping
