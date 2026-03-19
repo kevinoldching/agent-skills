@@ -150,13 +150,25 @@ def main():
         chips_path = script_dir / "configs" / "chips.json"
         if chips_path.exists():
             chips_config = ConfigLoader.load_chips_config(str(chips_path))
-            # Search in nested vendor structure
-            for vendor, chips in chips_config.items():
-                if args.chip in chips:
-                    chip_info = chips[args.chip].copy()
-                    chip_info['name'] = f"{vendor}/{args.chip}"
+            # Parse chip name - support both "Vendor/ChipName" and "ChipName" formats
+            chip_name = args.chip
+            if '/' in args.chip:
+                parts = args.chip.split('/', 1)
+                vendor = parts[0]
+                chip_name = parts[1]
+                # Look up in specific vendor
+                if vendor in chips_config and chip_name in chips_config[vendor]:
+                    chip_info = chips_config[vendor][chip_name].copy()
+                    chip_info['name'] = f"{vendor}/{chip_name}"
                     available_memory_gb = chip_info.get('vram_gb')
-                    break
+            else:
+                # Short name format - search in all vendors
+                for vendor, chips in chips_config.items():
+                    if chip_name in chips:
+                        chip_info = chips[chip_name].copy()
+                        chip_info['name'] = f"{vendor}/{chip_name}"
+                        available_memory_gb = chip_info.get('vram_gb')
+                        break
             if not chip_info:
                 # Build supported chips list grouped by vendor
                 vendor_groups = []
