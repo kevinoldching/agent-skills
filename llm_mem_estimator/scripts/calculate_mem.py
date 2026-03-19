@@ -19,6 +19,15 @@ from llm_mem_estimator import (
 )
 
 
+def format_supported_chips(chips_config):
+    """Format supported chips list grouped by vendor for error messages"""
+    vendor_groups = []
+    for vendor, vendor_chips in chips_config.items():
+        chip_names = list(vendor_chips.keys())
+        vendor_groups.append(f"  {vendor}: {', '.join(chip_names)}")
+    return '\n'.join(vendor_groups)
+
+
 def main():
     parser = argparse.ArgumentParser(description="LLM Memory Estimator")
 
@@ -170,12 +179,7 @@ def main():
                         available_memory_gb = chip_info.get('vram_gb')
                         break
             if not chip_info:
-                # Build supported chips list grouped by vendor
-                vendor_groups = []
-                for vendor, vendor_chips in chips_config.items():
-                    chip_names = list(vendor_chips.keys())
-                    vendor_groups.append(f"  {vendor}: {', '.join(f'{c}' for c in chip_names)}")
-                supported_chips = '\n'.join(vendor_groups)
+                supported_chips = format_supported_chips(chips_config)
                 print(f"Error: Chip '{args.chip}' not found.", file=sys.stderr)
                 print(f"Supported chips:\n{supported_chips}\n(Use 'Vendor/ChipName' format, e.g., 'nvidia/H100-80GB' or short name like 'H100-80GB')", file=sys.stderr)
                 sys.exit(1)
@@ -187,11 +191,7 @@ def main():
             chips_path = script_dir / "configs" / "chips.json"
             if chips_path.exists():
                 chips_config = ConfigLoader.load_chips_config(str(chips_path))
-                vendor_groups = []
-                for vendor, vendor_chips in chips_config.items():
-                    chip_names = list(vendor_chips.keys())
-                    vendor_groups.append(f"  {vendor}: {', '.join(f'{c}' for c in chip_names)}")
-                supported_chips = '\n'.join(vendor_groups)
+                supported_chips = format_supported_chips(chips_config)
                 print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
                 print(f"Supported chips:\n{supported_chips}", file=sys.stderr)
             else:
