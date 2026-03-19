@@ -245,8 +245,8 @@ class ModelDetector:
         if not os.environ.get('HF_ENDPOINT'):
             os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
 
-        # 1. 准备本地缓存路径（使用项目根目录下的绝对路径）
-        cache_dir = Path(__file__).parent.parent / ".metadata_cache"
+        # 1. 准备本地缓存路径（使用用户 home 目录下的标准缓存位置）
+        cache_dir = Path.home() / ".cache" / "llm_mem_estimator" / "metadata_cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # 将 "org/model" 转换为 "org--model.json"
