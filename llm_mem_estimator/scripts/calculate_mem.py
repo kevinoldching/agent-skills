@@ -508,16 +508,21 @@ def main():
             args.batch_size, effective_prompt_len, 0, args.kv_dtype, args.tp, args.cp
         )
 
+        # Activation: use user-specified peak or calculate with decode factor
+        if args.activation_peak is not None:
+            act_decode = args.activation_peak
+            act_str = f"{act_decode:.2f} (user specified)"
+        else:
+            act_decode = estimator.calculate_activation_memory(
+                args.batch_size, 1, args.activation_dtype, args.tp, args.cp,
+                use_decode_factor=True
+            )
+            act_str = f"{act_decode:.6f}" if act_decode < 0.01 else f"{act_decode:.2f}"
+
         print("### Fixed Memory")
         print(f"- Model weights (per device, after TP/EP sharding): {weights_memory:.2f} GB")
         print(f"- System reserved (from config): {system_reserved_gb:.2f} GB")
         print(f"- KV Cache for prompt ({effective_prompt_len:,}): {prompt_kv_memory:.2f} GB")
-        # Activation is fixed in Decode stage (seq_len = 1)
-        act_decode = estimator.calculate_activation_memory(
-            args.batch_size, 1, args.activation_dtype, args.tp, args.cp,
-            use_decode_factor=True
-        )
-        act_str = f"{act_decode:.6f}" if act_decode < 0.01 else f"{act_decode:.2f}"
         print(f"- Activation (fixed, seq_len=1): {act_str} GB")
         print(f"- **Total fixed memory: {weights_memory + system_reserved_gb + prompt_kv_memory + act_decode:.2f} GB**")
 

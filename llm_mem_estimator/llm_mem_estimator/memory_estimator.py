@@ -207,13 +207,24 @@ class MemoryEstimator:
             batch_size, prompt_len, 0, kv_dtype, tp, cp
         )
 
-        # Total fixed memory including prompt KV
-        total_fixed = fixed_memory + prompt_kv_memory
+        # Activation is always fixed in Decode scenario (seq_len=1, not incremental per token)
+        # Use user-specified value if provided, otherwise calculate with decode factor
+        if activation_peak_gb is not None:
+            activation_fixed = activation_peak_gb
+        else:
+            # Decode stage: seq_len = 1, use decode factor
+            activation_fixed = self.calculate_activation_memory(
+                batch_size, 1, activation_dtype, tp, cp,
+                use_decode_factor=True
+            )
+
+        # Total fixed memory including prompt KV and activation
+        total_fixed = fixed_memory + prompt_kv_memory + activation_fixed
 
         if total_fixed >= available_memory_gb:
             return 0
 
-        # Available memory for generated KV + activation
+        # Available memory for generated KV only (activation is fixed)
         dynamic_memory = available_memory_gb - total_fixed
 
         # Use a fixed large upper bound for binary search
@@ -232,15 +243,9 @@ class MemoryEstimator:
                 batch_size, prompt_len, mid, kv_dtype, tp, cp
             )
 
-            # Activation: use fixed value if specified, otherwise calculate from formula
-            if activation_peak_gb is not None:
-                act_memory = activation_peak_gb
-            else:
-                # Decode stage: seq_len = 1 (only 1 token at a time)
-                act_memory = self.calculate_activation_memory(
-                    batch_size, 1, activation_dtype, tp, cp,
-                    use_decode_factor=use_decode_factor
-                )
+            # Activation is already accounted in total_fixed (either user-specified or calculated with seq_len=1)
+            # In Decode stage, activation does NOT grow with gen_len
+            act_memory = 0
 
             total_dynamic = kv_memory + act_memory
 
@@ -280,6 +285,9 @@ class MemoryEstimator:
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
         fixed_memory = weights_memory + system_reserved_gb
 
+        # Activation peak is fixed when specified (not incremental per token)
+        activation_fixed = activation_peak_gb if activation_peak_gb is not None else 0
+
         # Use a fixed large upper bound for binary search
         upper_bound = 100_000_000  # 100 million
 
@@ -298,9 +306,10 @@ class MemoryEstimator:
                 batch_size, mid, gen_len, kv_dtype, tp, cp
             )
 
-            # Activation: use fixed value if specified, otherwise calculate from formula
+            # Activation: 0 if activation_peak_gb is specified (already in fixed_memory)
+            # Otherwise calculate from formula (incremental based on total_seq_len)
             if activation_peak_gb is not None:
-                act_memory = activation_peak_gb
+                act_memory = 0  # Already accounted in fixed_memory
             else:
                 # Prefill stage: use has_prefill factor
                 act_memory = self.calculate_activation_memory(
@@ -308,7 +317,7 @@ class MemoryEstimator:
                     use_decode_factor=False
                 )
 
-            total_memory = fixed_memory + kv_memory + act_memory
+            total_memory = fixed_memory + activation_fixed + kv_memory + act_memory
 
             if total_memory <= available_memory_gb:
                 max_prompt_len = mid
@@ -345,6 +354,9 @@ class MemoryEstimator:
         weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
         fixed_memory = weights_memory + system_reserved_gb
 
+        # Activation peak is fixed when specified (not incremental per token)
+        activation_fixed = activation_peak_gb if activation_peak_gb is not None else 0
+
         # Use a large upper bound for binary search
         upper_bound = 10000
 
@@ -360,9 +372,10 @@ class MemoryEstimator:
                 mid, prompt_len, gen_len, kv_dtype, tp, cp
             )
 
-            # Activation: use fixed value if specified, otherwise calculate from formula
+            # Activation: 0 if activation_peak_gb is specified (already in fixed_memory)
+            # Otherwise calculate from formula (scales with batch_size)
             if activation_peak_gb is not None:
-                act_memory = activation_peak_gb
+                act_memory = 0  # Already accounted in fixed_memory
             else:
                 # Prefill stage: has_prefill factor
                 act_memory = self.calculate_activation_memory(
@@ -370,7 +383,7 @@ class MemoryEstimator:
                     use_decode_factor=False
                 )
 
-            total_memory = fixed_memory + kv_memory + act_memory
+            total_memory = fixed_memory + activation_fixed + kv_memory + act_memory
 
             if total_memory <= available_memory_gb:
                 max_batch_size = mid
