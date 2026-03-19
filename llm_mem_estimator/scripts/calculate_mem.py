@@ -460,7 +460,7 @@ def main():
         cp=args.cp,
         ep=args.ep,
         system_reserved_gb=system_reserved_gb,
-        use_decode_factor=True  # Default: treat as Decode scenario
+        use_decode_factor=False  # Use Prefill factor when both prompt_len and gen_len are specified
     )
 
     # Generate report
