@@ -158,7 +158,15 @@ def main():
                     available_memory_gb = chip_info.get('vram_gb')
                     break
             if not chip_info:
-                print(f"Warning: Chip '{args.chip}' not found in chips.json", file=sys.stderr)
+                # Build supported chips list grouped by vendor
+                vendor_groups = []
+                for vendor, vendor_chips in chips_config.items():
+                    chip_names = list(vendor_chips.keys())
+                    vendor_groups.append(f"  {vendor}: {', '.join(f'{c}' for c in chip_names)}")
+                supported_chips = '\n'.join(vendor_groups)
+                print(f"Error: Chip '{args.chip}' not found.", file=sys.stderr)
+                print(f"Supported chips:\n{supported_chips}\n(Use 'Vendor/ChipName' format, e.g., 'nvidia/H100-80GB' or short name like 'H100-80GB')", file=sys.stderr)
+                sys.exit(1)
 
     # Find max sequence length if requested
     if args.find_max_seq_len:
