@@ -1,6 +1,6 @@
 model_identity:
   name: GLM-5
-  total_params: 'unknown'
+  total_params: '753.86B'
   num_layers: 78
 architecture_config:
   hidden_size: 6144
@@ -21,9 +21,9 @@ architecture_config:
   qk_nope_head_dim: 192
 modules:
   ffn_moe:
-    mlp.experts.N.gate_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 78, parallel_strategy: EP}
-    mlp.experts.N.up_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 78, parallel_strategy: EP}
-    mlp.experts.N.down_proj.weight: {shape: [256, 6144, 2048], dtype: BF16, layers: 78, parallel_strategy: EP}
+    mlp.experts.N.down_proj.weight: {shape: [256, 6144, 2048], dtype: BF16, layers: 76, parallel_strategy: EP}
+    mlp.experts.N.gate_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 76, parallel_strategy: EP}
+    mlp.experts.N.up_proj.weight: {shape: [256, 2048, 6144], dtype: BF16, layers: 76, parallel_strategy: EP}
     mlp.gate.e_score_correction_bias: {shape: [256], dtype: F32, layers: 76, parallel_strategy: replicated}
     mlp.gate.weight: {shape: [256, 6144], dtype: BF16, layers: 76, parallel_strategy: replicated}
   ffn_shared_expert:
