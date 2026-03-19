@@ -545,14 +545,17 @@ def main():
         print(f"Decode stage: Activation is FIXED (seq_len=1), only KV Cache grows")
         print(f"")
         print(f"KV Cache (incremental):")
-        print(f"  = batch_size * seq_len * 1024 * 18 * dtype / (tp * cp)")
-        print(f"  = {args.batch_size} * 1 * 1024 * 18 * 2 / ({args.tp} * {args.cp})")
+        print(f"  = batch_size * seq_len * kv_dim * num_layers * dtype / (tp * cp)")
+        print(f"  = {args.batch_size} * 1 * kv_dim * {config.architecture_config.num_layers} * 2 / ({args.tp} * {args.cp})")
         print(f"  = {kv_memory_per_gen:.6f} GB")
         print(f"")
         print(f"Activation (fixed, not incremental):")
-        print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
-        print(f"  = {args.batch_size} * 1 * 2880 * 4 * 12.5 * 2 / {args.cp}")
-        print(f"  = {act_decode:.6f} GB")
+        if args.activation_peak is not None:
+            print(f"  = {act_decode:.2f} GB (user specified)")
+        else:
+            print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
+            print(f"  = {args.batch_size} * 1 * 2880 * 4 * 12.5 * 2 / {args.cp}")
+            print(f"  = {act_decode:.6f} GB")
         print("```")
 
         print(f"\n### Calculation")
