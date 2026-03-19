@@ -147,6 +147,48 @@ class ReportGenerator:
         if result.breakdown and config.modules:
             lines.append("## Weights Breakdown by Module")
             lines.append("")
+
+            # Calculate memory by module type
+            module_order = ['embedding', 'attention', 'ffn_moe', 'ffn_shared_expert', 'ffn_dense', 'norm', 'others']
+            module_totals = {}
+
+            for module_type in module_order:
+                if module_type not in config.modules:
+                    continue
+                module_weights = config.modules[module_type]
+                if not module_weights:
+                    continue
+
+                tp = parallel_config.get('tp', 1)
+                pp = parallel_config.get('pp', 1)
+                dp = parallel_config.get('dp', 1)
+                cp = parallel_config.get('cp', 1)
+                ep = parallel_config.get('ep', 1)
+
+                module_memory = 0.0
+                for weight_name, weight_info in module_weights.items():
+                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
+                    module_memory += weight_memory
+
+                if module_memory > 0:
+                    module_totals[module_type] = module_memory
+
+            # Print module type summary
+            if module_totals:
+                lines.append("**By Module Type:**")
+                lines.append("")
+                lines.append("| Module Type | Memory (GB) | Percentage |")
+                lines.append("|-------------|-------------|------------|")
+                for module_type in module_order:
+                    if module_type in module_totals:
+                        mem = module_totals[module_type]
+                        pct = mem / result.weights_memory_gb * 100 if result.weights_memory_gb > 0 else 0
+                        lines.append(f"| {module_type} | {mem:.2f} | {pct:.1f}% |")
+                lines.append("")
+
+            # Detailed breakdown table
+            lines.append("**Detailed Breakdown:**")
+            lines.append("")
             lines.append("| Module Type | Weight Name | Shape | Layers | Memory (GB) | Percentage | Data Type | Parallel Strategy | World Size |")
             lines.append("|-------------|-------------|-------|--------|-------------|------------|-----------|-------------------|------------|")
 
