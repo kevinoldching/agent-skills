@@ -240,7 +240,7 @@ class ModelDetector:
         3. 镜像源支持：自动切换到国内高速节点。
         """
         # --- 配置参数 ---
-        MAX_RETRIES = 5
+        MAX_RETRIES = 3
         # 如果你在国内，建议开启镜像源
         if not os.environ.get('HF_ENDPOINT'):
             os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
