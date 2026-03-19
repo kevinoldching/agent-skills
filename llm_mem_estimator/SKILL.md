@@ -4,11 +4,12 @@ description: |
   LLM GPU 显存估算工具 - 估算大语言模型的 GPU 显存占用。
   当用户想要以下操作时使用此 Skill：
   - 估算 LLM 模型权重、KV Cache、激活值的 GPU 显存占用
-  - 查找特定硬件（如 H100-80GB）支持的最大序列长度
+  - 查找特定硬件（如 H100-80GB、Ascend-910B-64GB）支持的最大序列长度或最大 batch_size
   - 分析不同并行策略（TP、PP、DP、CP、EP）的显存分布
   - 处理 Prefill/Decode (PD) 分离场景
-  - 从 HuggingFace 模型生成 YAML 配置
+  - 从 HuggingFace 模型生成 YAML 配置文件
   - 比较不同芯片、模型或并行配置的显存占用
+  - 固定 activation 峰值（--activation-peak）进行估算
 
   此 Skill 仅用于 LLM 推理显存估算，不适用于训练。
 ---
@@ -24,17 +25,20 @@ llm_mem_estimator/
 ├── scripts/
 │   └── calculate_mem.py      # 主 CLI 工具
 ├── configs/
-│   ├── models/               # 模型 YAML 配置
+│   ├── models/                # 模型 YAML 配置
 │   │   ├── gpt-oss-120b.yaml
 │   │   ├── DeepSeek-V3.yaml
+│   │   ├── Kimi-K2.5.yaml
 │   │   └── ...
 │   ├── weight_mapping_rules.yaml
-│   └── chips.json            # 硬件规格
+│   └── chips.json             # 硬件规格
 ├── llm_mem_estimator/
-│   ├── memory_estimator.py   # 核心估算逻辑
-│   ├── model_config.py       # 配置处理
-│   ├── model_detector.py     # HuggingFace 模型检测
+│   ├── memory_estimator.py    # 核心估算逻辑
+│   ├── model_config.py        # 配置处理
+│   ├── model_detector.py      # HuggingFace 模型检测
 │   └── report_generator.py   # 报告生成
+├── tests/
+│   └── test_models.yaml       # 测试模型列表
 └── docs/spec/
     ├── calculate_mem_cli_spec.md
     ├── yaml_config_spec.md
@@ -46,9 +50,9 @@ llm_mem_estimator/
 ### 1. 显存估算
 
 计算总 GPU 显存占用：
-- **模型权重**：基于模型参数量和数据类型
-- **KV Cache**：注意力机制的 key-value 存储
-- **激活值**：临时计算内存
+- **模型权重**：基于模型参数量和数据类型，支持 TP/PP/DP/EP 并行切分
+- **KV Cache**：注意力机制的 key-value 存储，支持 MLA/MQA/GQA/SWA 等架构
+- **激活值**：临时计算内存，使用 has_prefill(1.25) 或 decode(12.5) 系数
 - **系统预留**：固定开销（默认 2GB）
 
 ### 2. 并行策略支持
@@ -71,10 +75,12 @@ llm_mem_estimator/
 - 使用 `decode` 系数（12.5）
 - 激活值固定（seq_len=1）
 
+**固定 activation 峰值**：使用 `--activation-peak` 直接指定激活值
+
 ### 4. 硬件支持
 
 `configs/chips.json` 支持的芯片：
-- NVIDIA: H100-80GB, H100-141GB, A100-80GB, RTX-4090
+- NVIDIA: H100-80GB, H100-141GB, A100-80GB, A100-40GB, RTX-4090, RTX-3090
 - 华为: Ascend-910B-64GB, Ascend-910B-32GB
 - AMD: MI300X, MI350X
 - Intel: Gaudi2, Gaudi3
@@ -100,10 +106,10 @@ python scripts/calculate_mem.py \
     --gen-len 1024
 ```
 
-### 查找最大序列长度
+### 查找最大序列长度 / 最大 batch_size
 
 ```bash
-# 查找最大 gen_len（Decode 场景，固定 prompt_len）
+# Scene 5: 搜索最大 gen_len（Decode 场景，固定 prompt_len）
 python scripts/calculate_mem.py \
     --config configs/models/gpt-oss-120b.yaml \
     --chip H100-80GB \
@@ -111,13 +117,39 @@ python scripts/calculate_mem.py \
     --prompt-len 4096 \
     --tp 8
 
-# 查找最大 prompt_len（Prefill 场景，固定 gen_len）
+# Scene 6: 指定 prompt_len，搜索最大 gen_len
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip H100-80GB \
+    --find-max-seq-len \
+    --prompt-len 4096 \
+    --tp 8
+
+# Scene 7: 指定 gen_len，搜索最大 prompt_len（Prefill 场景）
 python scripts/calculate_mem.py \
     --config configs/models/gpt-oss-120b.yaml \
     --chip H100-80GB \
     --find-max-seq-len \
     --gen-len 1 \
     --tp 8
+
+# Scene 8: batch_size≠1 时直接估算显示 Fits/Exceeds
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 2 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --find-max-seq-len
+
+# Scene 8: batch_size=1 时搜索最大 batch_size
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 1 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --find-max-seq-len
 ```
 
 ### 生成模型配置
@@ -133,18 +165,32 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 python scripts/calculate_mem.py --local /path/models/Qwen2.5-0.5B --generate-config
 ```
 
-## 参数组合
+### 使用固定 activation 峰值
 
-| 场景 | `--find-max-seq-len` | `--gen-len` | `--prompt-len` | 行为 |
-|------|:---:|:---:|:---:|------|
-| 1 | ✗ | ✓ | ✓ | 使用 decode 系数进行常规估算 |
-| 2 | ✗ | ✓ | ✗ | 错误：需要 `--prompt-len` |
-| 3 | ✗ | ✗ | ✓ | 错误：需要 `--gen-len` |
-| 4 | ✗ | ✗ | ✗ | 错误：两者都需要 |
-| 5 | ✓ | ✗ | ✗ | 搜索最大 gen_len（默认 prompt_len=4096） |
-| 6 | ✓ | ✗ | ✓ | 搜索指定 prompt_len 下的最大 gen_len |
-| 7 | ✓ | ✓ | ✗ | 搜索指定 gen_len 下的最大 prompt_len |
-| 8 | ✓ | ✓ | ✓ | 警告，按场景 1 处理 |
+```bash
+# 指定 activation 峰值固定为 10GB，用剩余显存搜索最大 batch_size
+python scripts/calculate_mem.py \
+    --config configs/models/gpt-oss-120b.yaml \
+    --chip Ascend-910B-64GB \
+    --batch-size 1 \
+    --prompt-len 2048 \
+    --gen-len 2048 \
+    --activation-peak 10 \
+    --find-max-seq-len
+```
+
+## 场景说明
+
+| 场景 | `--find-max-seq-len` | `--gen-len` | `--prompt-len` | 处理逻辑 |
+|-----|:---:|:---:|:---:|---------|
+| 1 | ✗ | ✓ | ✓ | 正常估算，使用 **has_prefill** factor (1.25) |
+| 2 | ✗ | ✓ | ✗ | **报错**: `--prompt-len is required` |
+| 3 | ✗ | ✗ | ✓ | **报错**: `--gen-len is required` |
+| 4 | ✗ | ✗ | ✗ | **报错**: `--prompt-len and --gen-len are required` |
+| 5 | ✓ | ✗ | ✗ | prompt_len=默认值(4096)，搜索 max gen_len，使用 **decode** factor |
+| 6 | ✓ | ✗ | ✓ | prompt_len=用户指定，搜索 max gen_len，使用 **decode** factor |
+| 7 | ✓ | ✓ | ✗ | gen_len=用户指定，搜索 max prompt_len，使用 **has_prefill** factor |
+| 8 | ✓ | ✓ | ✓ | batch_size≠1: 正常估算 + 显示 Fits/Exceeds; batch_size=1: **搜索 max batch_size** |
 
 ## 支持的数据类型
 
@@ -173,6 +219,7 @@ python scripts/calculate_mem.py --local /path/models/Qwen2.5-0.5B --generate-con
    - 固定序列长度 → 同时提供 `--prompt-len` 和 `--gen-len`
    - 查找最大 gen_len（Decode）→ 使用 `--find-max-seq-len` 配合 `--prompt-len`
    - 查找最大 prompt_len（Prefill）→ 使用 `--find-max-seq-len` 配合 `--gen-len`
+   - 查找最大 batch_size → 使用 `--find-max-seq-len` 配合 `--prompt-len` 和 `--gen-len`，batch_size=1
 
 3. **指定硬件**（用于最大序列搜索）：
    - 使用 `--chip` 指定芯片名称（如 `H100-80GB` 或 `nvidia/H100-80GB`）
@@ -180,9 +227,35 @@ python scripts/calculate_mem.py --local /path/models/Qwen2.5-0.5B --generate-con
 4. **设置并行策略**：
    - 根据需要调整 `--tp`、`--pp`、`--dp`、`--cp`、`--ep`
 
-5. **运行和分析**：
+5. **可选：固定 activation 峰值**：
+   - 使用 `--activation-peak` 直接指定激活值（单位：GB）
+
+6. **运行和分析**：
    - 查看报告中的显存分布
-   - 检查计算步骤以验证结果
+   - 检查是否 Fits/Exceeds
+
+## 支持的模型
+
+通过 `--generate-config` 支持从 HuggingFace 自动生成配置：
+- Qwen 系列（Qwen2.5-0.5B, Qwen2.5-1.5B 等）
+- DeepSeek 系列（DeepSeek-V3, DeepSeek-V3.1, DeepSeek-V3.2）
+- Kimi 系列（Kimi-K2.5）
+- MiniMax 系列（MiniMax-M2.5）
+- GLM 系列（GLM-5）
+- GPT-OSS 系列（gpt-oss-120b, gpt-oss-20b）
+
+支持的注意力架构：MHA, MQA, GQA, SWA, MLA (DeepSeek), DSA, GDN
+
+支持的 FFN 类型：Standard FFN, SwiGLU, MoE (支持 EP)
+
+## 调试信息
+
+权重元数据缓存位置：`~/.cache/llm_mem_estimator/metadata_cache/`
+
+查看缓存的权重数据：
+```bash
+cat ~/.cache/llm_mem_estimator/metadata_cache/deepseek-ai--DeepSeek-V3_weights.json | python3 -c "import json,sys; d=json.load(sys.stdin); print(list(d.keys())[:5])"
+```
 
 ## 参考文档
 
