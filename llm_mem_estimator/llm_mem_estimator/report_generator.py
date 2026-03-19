@@ -85,6 +85,13 @@ class ReportGenerator:
             if 'activation' in computation_rules:
                 act_formula = computation_rules['activation']
                 lines.append(f"- Activation: `{act_formula}`")
+            # Show recommended_capacity_factor values if present
+            if 'recommended_capacity_factor' in computation_rules:
+                rcf = computation_rules['recommended_capacity_factor']
+                if isinstance(rcf, dict):
+                    lines.append(f"- recommended_capacity_factor: has_prefill={rcf.get('has_prefill', 1.25)}, decode={rcf.get('decode', 12.5)}")
+                else:
+                    lines.append(f"- recommended_capacity_factor: {rcf}")
             lines.append("")
 
             # Add calculation example with actual values
