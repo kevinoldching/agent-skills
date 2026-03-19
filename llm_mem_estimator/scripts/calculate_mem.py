@@ -416,24 +416,29 @@ def main():
             total_increment = kv_increment + act_increment
 
             print("```")
-            print(f"Prefill stage: total_seq_len = prompt_len + gen_len, factor = 1.25")
+            if args.activation_peak is not None:
+                print(f"Prefill stage: Activation is FIXED (user specified), only KV Cache grows")
+            else:
+                print(f"Prefill stage: total_seq_len = prompt_len + gen_len, factor = 1.25")
             print(f"")
             print(f"KV Cache (incremental):")
             print(f"  = batch_size * seq_len * kv_dim * num_layers * dtype / (tp * cp)")
             print(f"  = {args.batch_size} * 1 * kv_dim * {config.architecture_config.num_layers} * 2 / ({args.tp} * {args.cp})")
             print(f"  = {kv_increment:.6f} GB")
             print(f"")
-            print(f"Activation (incremental):")
             if args.activation_peak is not None:
-                print(f"  = 0 GB (fixed, user specified)")
+                print(f"Activation (fixed, not incremental):")
+                print(f"  = {args.activation_peak:.2f} GB (user specified)")
                 act_increment = 0
+                total_increment = kv_increment
             else:
+                print(f"Activation (incremental):")
                 print(f"  = batch_size * seq_len * hidden_size * num_experts * factor * dtype / cp")
                 print(f"  = {args.batch_size} * 1 * 2880 * 4 * 1.25 * 2 / {args.cp}")
                 print(f"  = {act_increment:.6f} GB")
-            total_increment = kv_increment + act_increment
+                total_increment = kv_increment + act_increment
             print(f"")
-            print(f"Total (per token) = {kv_increment:.6f} + {act_increment:.6f} = {total_increment:.6f} GB")
+            print(f"Total (per token) = {total_increment:.6f} GB")
             print("```")
 
             # Calculate available memory for prompt
