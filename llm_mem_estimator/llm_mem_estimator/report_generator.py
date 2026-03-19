@@ -3,9 +3,25 @@
 Report generator for LLM Memory Estimator
 """
 
+import re
 from typing import Dict, Optional, Any
 
 from .model_config import ModelConfig, MemoryResult, get_dtype_bytes, calculate_weight_memory
+
+
+def simplify_weight_name(weight_name: str) -> str:
+    """Simplify weight name by replacing numeric indices with N
+
+    Replaces patterns like:
+    - .layers.0. -> .layers.N.
+    - .blocks.0. -> .blocks.N.
+    - .h.0. -> .h.N.
+    - .transformer.blocks.0. -> .transformer.blocks.N.
+    """
+    # Replace .word.digit. with .word.N.
+    # Pattern: dot followed by word characters, then dot, then digits, then dot
+    simplified = re.sub(r'(\.\w+)\.\d+(\.)', r'\1.N\2', weight_name)
+    return simplified
 
 
 class ReportGenerator:
@@ -235,7 +251,9 @@ class ReportGenerator:
                     else:
                         world_size = 1  # replicated
 
-                    lines.append(f"| {module_type} | {weight_name} | {shape_str} | {weight_info.layers} | {weight_memory:.5f} | {pct:.2f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
+                    # Simplify weight name for display (e.g., blocks.0. -> blocks.N.)
+                    display_name = simplify_weight_name(weight_name)
+                    lines.append(f"| {module_type} | {display_name} | {shape_str} | {weight_info.layers} | {weight_memory:.5f} | {pct:.2f}% | {weight_info.dtype} | {parallel_strategy} | {world_size} |")
 
             # Print Total row
             lines.append(f"| **Total** | - | - | - | **{result.weights_memory_gb:.5f}** | **100.00%** | - | - | - |")
