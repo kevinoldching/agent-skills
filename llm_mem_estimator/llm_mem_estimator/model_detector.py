@@ -519,12 +519,14 @@ class ConfigGenerator:
         expert_pattern_regex = None
         is_moe = False
         num_experts = 0
+        matched_moe_weights = []  # Track weights that matched ffn_moe patterns
 
         if ffn_moe_patterns:
             for weight_name in all_weight_names:
                 for pattern in ffn_moe_patterns:
                     # Try to match the pattern
                     if re.match(pattern, weight_name):
+                        matched_moe_weights.append(weight_name)
                         # Match found, extract numeric indices from weight name
                         # Use all numeric indices, then take the max as expert count
                         indices = re.findall(r'\.(\d+)\.', weight_name)
@@ -533,7 +535,8 @@ class ConfigGenerator:
                         # Build regex pattern for replacement if first match
                         if expert_pattern_regex is None:
                             # Try to find the expert index pattern in the weight name
-                            match = re.search(r'(\.experts?\d*\.)\d+(\.)', weight_name)
+                            # Supports: .experts.0., .experts0., expert_id_0., etc.
+                            match = re.search(r'(\.experts?\d*\.|\w+_id_)\d+(\.)', weight_name)
                             if match:
                                 expert_pattern_regex = match.group(1) + '{}' + match.group(2)
                         break
@@ -542,6 +545,16 @@ class ConfigGenerator:
             if expert_indices:
                 num_experts = max(expert_indices) + 1
                 is_moe = num_experts > 0
+
+            # Validate: if MoE weights matched but expert_pattern_regex not found, raise error
+            if matched_moe_weights and expert_pattern_regex is None:
+                raise ValueError(
+                    f"Failed to extract expert indices from MoE weights. "
+                    f"Matched {len(matched_moe_weights)} weights but could not find expert index pattern. "
+                    f"Example weight: '{matched_moe_weights[0]}'. "
+                    f"Please ensure the weight_mapping_rules.yaml 'ffn_moe' patterns correctly match expert indices, "
+                    f"or add an 'expert_pattern_regex' to help extract indices."
+                )
 
         # Step 1: Group weights by their base pattern
         # If MoE detected, also remove expert numbers during grouping
