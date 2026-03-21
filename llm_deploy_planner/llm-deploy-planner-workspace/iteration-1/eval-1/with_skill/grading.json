@@ -1,0 +1,44 @@
+{
+  "eval_id": "eval-1",
+  "run_type": "with_skill",
+  "total_score": 5,
+  "max_score": 5,
+  "criteria": [
+    {
+      "id": 1,
+      "description": "由于高输入方差（std 2000），建议了PD分离策略",
+      "score": 1,
+      "max_score": 1,
+      "evidence": "Lines 51-58 explicitly recommend PD Separation (xPyD) with rationale: 'Input length std (2000) is 195% of mean (1024) - this is extremely high variance'"
+    },
+    {
+      "id": 2,
+      "description": "包含Prefill阶段的并行策略（TP/EP/DP）",
+      "score": 1,
+      "max_score": 1,
+      "evidence": "Lines 72-88: Prefill stage uses TP=8, EP=8, DP=1, with 2 instances on 16 cards total"
+    },
+    {
+      "id": 3,
+      "description": "包含Decode阶段的并行策略（TP/EP/DP）",
+      "score": 1,
+      "max_score": 1,
+      "evidence": "Lines 90-107: Decode stage uses TP=1, EP=1, DP=16, with 1 instance on 16 cards total"
+    },
+    {
+      "id": 4,
+      "description": "包含xPyD格式的实例数量说明",
+      "score": 1,
+      "max_score": 1,
+      "evidence": "Line 62 explicitly states: '2P1D (2 Prefill Instances, 1 Decode Instance)'"
+    },
+    {
+      "id": 5,
+      "description": "提到总卡数需求",
+      "score": 1,
+      "max_score": 1,
+      "evidence": "Line 70 shows total cards: 'Total: 32', also confirmed in Section 1 hardware table (32 cards)"
+    }
+  ],
+  "notes": "All 5 criteria met. The output provides a comprehensive PD deployment plan with correct xPyD format (2P1D), appropriate parallel strategies for both Prefill (TP=8/EP=8/DP=1) and Decode (TP=1/EP=1/DP=16) stages, explicitly addresses the high input variance (std=2000) as rationale for PD separation, and mentions total card requirement of 32."
+}

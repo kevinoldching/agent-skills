@@ -1,0 +1,27 @@
+{
+  "eval_id": 2,
+  "eval_name": "Qwen-7B-A100-concurrency",
+  "prompt": "我想知道用8张A100-80GB卡部署Qwen-7B模型，最大能支持多少并发batch？输入平均长度512，输出128，应该用PD混合还是分离策略？",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "包含Qwen-7B的内存估算",
+      "type": "contains"
+    },
+    {
+      "id": 2,
+      "text": "给出了最大并发batch建议",
+      "type": "contains"
+    },
+    {
+      "id": 3,
+      "text": "明确建议了PD策略（混合或分离）",
+      "type": "contains"
+    },
+    {
+      "id": 4,
+      "text": "包含并行策略配置（TP/EP/DP）",
+      "type": "contains"
+    }
+  ]
+}

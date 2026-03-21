@@ -1,0 +1,43 @@
+{
+  "skill_name": "llm-deploy-planner",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我规划一下LLM推理部署：\n- 模型：Qwen-72B\n- 硬件：H100-80GB，8卡单机，共64卡\n- 平均输入长度：2048 tokens，平均输出长度：512 tokens\n- 峰值batch size：32\n- 场景：在线推理，对延迟敏感\n- 目标吞吐量：50000 tokens/s",
+      "expected_output": "应输出完整的PD部署规划，包括：1) 内存分析 2) PD策略建议（混合或分离）3) 详细的并行策略配置（TP/EP/DP）4) xPyD实例数量",
+      "files": [],
+      "assertions": [
+        {"id": 1, "text": "输出包含内存分析（模型权重、KV cache）", "type": "contains"},
+        {"id": 2, "text": "明确建议了PD策略（混合或分离）", "type": "contains"},
+        {"id": 3, "text": "包含TP/EP/DP并行策略配置", "type": "contains"},
+        {"id": 4, "text": "提到总卡数需求", "type": "contains"},
+        {"id": 5, "text": "包含吞吐量估算", "type": "contains"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我需要部署Llama2-70B做离线批处理：\n- 硬件：Ascend-910B-64GB，4卡单机，共32卡\n- 输入长度分布：平均1024，std 2000（高方差）\n- 输出长度：平均256 tokens\n- 目标吞吐量：20000 tokens/s\n- 场景：离线batch processing",
+      "expected_output": "应输出完整的PD部署规划，包含Prefill和Decode各自的并行策略配置",
+      "files": [],
+      "assertions": [
+        {"id": 1, "text": "由于高输入方差（std 2000），建议了PD分离策略", "type": "contains"},
+        {"id": 2, "text": "包含Prefill阶段的并行策略（TP/EP/DP）", "type": "contains"},
+        {"id": 3, "text": "包含Decode阶段的并行策略（TP/EP/DP）", "type": "contains"},
+        {"id": 4, "text": "包含xPyD格式的实例数量说明", "type": "contains"},
+        {"id": 5, "text": "提到总卡数需求", "type": "contains"}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "我想知道用8张A100-80GB卡部署Qwen-7B模型，最大能支持多少并发batch？输入平均长度512，输出128，应该用PD混合还是分离策略？",
+      "expected_output": "应提供：1) 内存估算 2) 最大batch建议 3) PD策略建议 4) 并行策略配置",
+      "files": [],
+      "assertions": [
+        {"id": 1, "text": "包含Qwen-7B的内存估算", "type": "contains"},
+        {"id": 2, "text": "给出了最大并发batch建议", "type": "contains"},
+        {"id": 3, "text": "明确建议了PD策略（混合或分离）", "type": "contains"},
+        {"id": 4, "text": "包含并行策略配置（TP/EP/DP）", "type": "contains"}
+      ]
+    }
+  ]
+}

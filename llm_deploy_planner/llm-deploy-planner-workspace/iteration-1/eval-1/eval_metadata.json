@@ -1,0 +1,32 @@
+{
+  "eval_id": 1,
+  "eval_name": "Llama2-70B-offline-batch",
+  "prompt": "我需要部署Llama2-70B做离线批处理：\n- 硬件：Ascend-910B-64GB，4卡单机，共32卡\n- 输入长度分布：平均1024，std 2000（高方差）\n- 输出长度：平均256 tokens\n- 目标吞吐量：20000 tokens/s\n- 场景：离线batch processing",
+  "assertions": [
+    {
+      "id": 1,
+      "text": "由于高输入方差（std 2000），建议了PD分离策略",
+      "type": "contains"
+    },
+    {
+      "id": 2,
+      "text": "包含Prefill阶段的并行策略（TP/EP/DP）",
+      "type": "contains"
+    },
+    {
+      "id": 3,
+      "text": "包含Decode阶段的并行策略（TP/EP/DP）",
+      "type": "contains"
+    },
+    {
+      "id": 4,
+      "text": "包含xPyD格式的实例数量说明",
+      "type": "contains"
+    },
+    {
+      "id": 5,
+      "text": "提到总卡数需求",
+      "type": "contains"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "eval_id": "eval-2",
+  "run_type": "with_skill",
+  "criteria": {
+    "1_包含Qwen-7B的内存估算": {
+      "score": "pass",
+      "evidence": [
+        "Model Weights (FP16): 7B params * 2 bytes = 14 GB",
+        "KV Cache Per Token: 2 * 4096 * 32 * 2 bytes = 0.5 MB/token",
+        "Per-card memory budget: 14 GB weights + ~42 GB activations + ~4 GB overhead = ~60 GB used, ~20 GB available for KV cache",
+        "KV cache per sample: 640 tokens * 0.5 MB = 320 KB per sample"
+      ]
+    },
+    "2_给出了最大并发batch建议": {
+      "score": "pass",
+      "evidence": [
+        "Max Concurrent Batch: 64-96 sequences",
+        "Recommended Max Batch: 64",
+        "Conservative Upper Bound: 96",
+        "Practical Operating Batch: 48 (for headroom)",
+        "Memory-verified calculation at B=64 showing ~25 GB per card < 80 GB limit"
+      ]
+    },
+    "3_明确建议了PD策略_混合或分离": {
+      "score": "pass",
+      "evidence": [
+        "PD Strategy Recommendation: PD Mixed",
+        "Rationale provided: short input (512), short output (128), low variance, mixed strategy handles 32-64 concurrent requests efficiently",
+        "Alternative PD Separation analyzed but NOT recommended"
+      ]
+    },
+    "4_包含并行策略配置_TP_EP_DP": {
+      "score": "partial_pass",
+      "evidence": [
+        "Parallel Strategy: TP1 + EP8 + DP1 (or TP1 + DP8) - inconsistent notation",
+        "Table shows: TP=1, EP=1, DP=8 for mixed strategy",
+        "YAML config: tp: 1, dp: 8 (EP not shown but implied as 1 for dense model)",
+        "Alternative separation config incorrectly shows EP=8 for both stages despite Qwen-7B being a dense model (not MoE)"
+      ],
+      "notes": "TP and DP values are correct, but EP notation is inconsistent and potentially misleading for separation analysis"
+    }
+  },
+  "summary": {
+    "total_score": 3.5,
+    "max_score": 4,
+    "all_criteria_met": false,
+    "criteria_passed": 3,
+    "criteria_partial": 1
+  },
+  "output_file": "/home/omni/code_repos/agent-skills/llm_deploy_planner/llm-deploy-planner-workspace/iteration-1/eval-2/with_skill/outputs/pd_deployment_plan.md",
+  "timing": {
+    "total_tokens": 24324,
+    "duration_ms": 98900
+  }
+}
