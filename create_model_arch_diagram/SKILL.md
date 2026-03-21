@@ -256,7 +256,7 @@ graph TB
     subgraph Block_1[Block 1]
         direction TB
         N1[RMSNorm<br/>4096]
-        A1[Attention<br/>4096→4096<br/>h=32 kv=32]
+        A1[Attention<br/>4096→4096<br/>h=32]
         F1[FFN<br/>4096→14336→4096]
         N1 --> A1
         A1 --> F1
@@ -265,7 +265,7 @@ graph TB
     subgraph Block_2[Block 2]
         direction TB
         N2[RMSNorm<br/>4096]
-        A2[Attention<br/>4096→4096<br/>h=32 kv=32]
+        A2[Attention<br/>4096→4096<br/>h=32]
         F2[FFN<br/>4096→14336→4096]
         N2 --> A2
         A2 --> F2
