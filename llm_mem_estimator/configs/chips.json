@@ -42,29 +42,5 @@
       "bandwidth_gb_s": 1200,
       "compute_capability": "910B"
     }
-  },
-  "amd": {
-    "MI300X": {
-      "vram_gb": 192,
-      "bandwidth_gb_s": 5300,
-      "compute_capability": "MI300X"
-    },
-    "MI350X": {
-      "vram_gb": 288,
-      "bandwidth_gb_s": 8000,
-      "compute_capability": "MI350X"
-    }
-  },
-  "intel": {
-    "Gaudi2": {
-      "vram_gb": 96,
-      "bandwidth_gb_s": 2450,
-      "compute_capability": "Gaudi2"
-    },
-    "Gaudi3": {
-      "vram_gb": 128,
-      "bandwidth_gb_s": 3670,
-      "compute_capability": "Gaudi3"
-    }
   }
 }

@@ -65,7 +65,60 @@ llm_mem_estimator/
 | CP | Context Parallel（序列切分） | `--cp` |
 | EP | Expert Parallel（MoE 专家切分） | `--ep` |
 
-### 3. PD 分离场景
+### 3. 并行策略约束
+
+使用并行策略时必须满足以下约束：
+
+#### 约束公式
+```
+TP × DP = EP = 总卡数
+```
+
+#### 约束规则
+| 规则 | 说明 |
+|------|------|
+| TP × DP = 总卡数 | Tensor Parallel 乘以 Data Parallel 等于总卡数 |
+| EP = 总卡数 | Expert Parallel 必须等于总卡数 |
+| EP = TP × DP | EP 与 TP×DP 必须相等 |
+| EP ≤ MoE experts | Expert Parallel 不能超过 MoE 专家数量 |
+| TP ≤ 单机卡数 | Tensor Parallel 不能超过单机 GPU 数量（如果已知） |
+
+#### 示例
+| 配置 | 有效？ | 说明 |
+|------|--------|------|
+| TP=8, DP=1, EP=8 | ✓ | 8×1=8, EP=8 |
+| TP=8, DP=2, EP=16 | ✓ | 8×2=16, EP=16 |
+| TP=8, DP=1, EP=16 | ✗ | 8×1=8 ≠ 16 |
+| TP=4, DP=4, EP=16 | ✓ | 4×4=16, EP=16 |
+
+#### 典型配置示例
+```
+# 单机 8 卡配置（TP=8）
+TP=8, DP=1, EP=8
+
+# 16 卡配置（TP=8 × DP=2）
+TP=8, DP=2, EP=16
+
+# 128 卡配置（TP=8 × DP=16）
+TP=8, DP=16, EP=128
+```
+
+#### Skill 工作流程
+
+当用户指定并行策略时，skill 应该：
+
+1. **验证约束**：检查 `TP × DP` 是否等于 `EP`
+2. **修正建议**：如果不满足，给出修正建议
+3. **计算总卡数**：使用 `TP × DP` 或 `EP`（两者应相等）作为总卡数
+4. **分配验证**：检查芯片数量是否足够支持总卡数
+
+#### 报告中的显示
+
+在显存估算报告中，应明确显示：
+- 总卡数：`Total GPUs = TP × DP = EP = 8 × 2 = 16`
+- 每张卡的显存：`Memory per GPU = Total Memory / Total GPUs`
+
+### 4. PD 分离场景
 
 **Prefill 阶段**：处理输入 prompt
 - 使用 `has_prefill` 系数（1.25）
@@ -77,13 +130,11 @@ llm_mem_estimator/
 
 **固定 activation 峰值**：使用 `--activation-peak` 直接指定激活值
 
-### 4. 硬件支持
+### 5. 硬件支持
 
 `configs/chips.json` 支持的芯片：
 - NVIDIA: H100-80GB, H100-141GB, A100-80GB, A100-40GB, RTX-4090, RTX-3090
 - 华为: Ascend-910B-64GB, Ascend-910B-32GB
-- AMD: MI300X, MI350X
-- Intel: Gaudi2, Gaudi3
 
 ## CLI 使用方法
 

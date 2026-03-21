@@ -100,8 +100,6 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 2
 - `A100-80GB` / `A100-40GB` (nvidia)
 - `RTX-4090` / `RTX-3090` (nvidia)
 - `Ascend-910B-64GB` / `Ascend-910B-32GB` (huawei)
-- `MI300X` / `MI350X` (amd)
-- `Gaudi2` / `Gaudi3` (intel)
 
 支持两种命名格式：
 - 简短格式：`H100-80GB`（推荐）
