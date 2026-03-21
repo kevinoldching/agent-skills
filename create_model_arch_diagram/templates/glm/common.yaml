@@ -1,0 +1,25 @@
+model_type: glm
+family: glm
+
+block:
+  - type: attention
+    components:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+  - type: ffn
+    components:
+      - gate_proj
+      - up_proj
+      - down_proj
+
+stack:
+  num_layers_key: num_hidden_layers
+  pattern: [block] × N
+
+residual: post-norm
+norm: layernorm
+activation: gelu
+input: embed_tokens
+output: lm_head
