@@ -16,7 +16,7 @@ block:
 
 stack:
   num_layers_key: num_hidden_layers
-  pattern: [block] × N
+  pattern: "[block] × N"
 
 residual: pre-norm
 norm: rmsnorm
