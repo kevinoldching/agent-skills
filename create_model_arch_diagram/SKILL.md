@@ -77,7 +77,7 @@ blocks:
     layers: 12
     hidden_size: 768
     intermediate_size: 3072
-    num_heads: 12
+    num_attention_heads: 12
 
   - name: decoder
     type: transformer_block
@@ -99,7 +99,8 @@ model_name: my-custom-model
 hidden_size: 768
 num_layers: 24
 intermediate_size: 3072
-num_heads: 12
+num_attention_heads: 12
+num_key_value_heads: 32
 activation: silu
 norm: rmsnorm
 ```
@@ -175,7 +176,7 @@ When config.json provides partial information, AI auto-fills missing details bas
 | hidden_size | config.json direct read | Required |
 | num_layers | config.json direct read | Required |
 | intermediate_size | config.json direct read | 4 × hidden_size |
-| num_heads | config.json or calculation | hidden_size / head_dim |
+| num_attention_heads | config.json or calculation | hidden_size / head_dim |
 | num_key_value_heads | config.json | num_attention_heads (no GQA) |
 | Norm type | Model type knowledge | RMSNorm |
 | Activation function | config.json or model type | SiLU for LLaMA, GELU for GPT |
@@ -205,10 +206,10 @@ When config.json provides partial information, AI auto-fills missing details bas
 ### Attention Weights
 
 ```
-q_proj: [hidden_size, hidden_size]       # or [hidden_size, num_heads × head_dim]
+q_proj: [hidden_size, hidden_size]       # or [hidden_size, num_attention_heads × head_dim]
 k_proj: [hidden_size, num_key_value_heads × head_dim]
 v_proj: [hidden_size, num_key_value_heads × head_dim]
-o_proj: [num_heads × head_dim, hidden_size]
+o_proj: [num_attention_heads × head_dim, hidden_size]
 ```
 
 ### FFN Weights
@@ -222,7 +223,7 @@ down_proj: [intermediate_size, hidden_size]
 ### Shape Display Format
 
 ```
-Attention:   input_hidden → output_hidden [h=num_heads kv=num_kv_heads]
+Attention:   input_hidden → output_hidden [h=num_attention_heads kv=num_kv_heads]
 FFN:         input_hidden → intermediate → output_hidden
 Embedding:   vocab_size → hidden_size
 Output Head: hidden_size → vocab_size
@@ -273,7 +274,7 @@ graph TB
 
     subgraph Output
         LN[Final RMSNorm<br/>4096]
-        LM[lm_head<br/>4096→vocab_size]
+        LM[lm_head<br/>4096→32000]
     end
 
     E --> N1
