@@ -245,6 +245,7 @@ Tool: `@mermaid-js/mermaid-cli` (npm package)
 
 ```
 create_model_arch_diagram/
+├── SKILL.md                     # Skill main entry file
 ├── docs/
 │   └── superpowers/
 │       └── specs/
@@ -259,10 +260,9 @@ create_model_arch_diagram/
 │   ├── kimi/
 │   ├── minimax/
 │   └── gpt-oss/
-├── src/
-│   ├── parser/                   # Input parsing
-│   ├── template_engine/          # Template handling
-│   ├── mermaid_generator/        # Mermaid syntax generation
-│   └── renderer/                 # PNG/SVG rendering
-└── skill.yaml                    # Skill definition
+└── src/                          # Implementation (if needed)
+    ├── parser/
+    ├── template_engine/
+    ├── mermaid_generator/
+    └── renderer/
 ```
