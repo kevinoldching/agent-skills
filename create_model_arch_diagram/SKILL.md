@@ -240,52 +240,34 @@ Output Head: hidden_size → vocab_size
 
 ### Key Formatting Rules
 
-1. Use `subgraph` for logical groups: Embedding, Block_N, Output
-2. Label layers with type + shape: `Attention<br/>4096→4096<br/>h=32 kv=32`
-3. Use `direction TB` for top-to-bottom within blocks
-4. Show residual connections implicitly via the flow
-5. Apply distinct styling to each subgraph type
+1. Use `graph TB` for top-to-bottom layout
+2. Keep labels simple: `Attention`, `MLP / FFN`, `Layer Normalization`
+3. Show layer count in Transformer Stack: `Transformer Stack<br/>N Layers`
+4. Use `-.->|Repeat N|` to indicate layer repetition
+5. Apply distinct styling to distinguish module types
+6. For GQA: show `h=num_attention_heads, kv=num_key_value_heads` in Attention label
+7. Optional: expand specific layer internals when users request detail
 
 ### Reference Example: 2-Layer LLaMA-style Model
 
 ```mermaid
 graph TB
-    subgraph Embedding
-        E[embed_tokens<br/>4096]
-    end
+    Input[Token IDs] --> Embed[Embedding Layer]
+    Embed --> TransformerStack[Transformer Stack<br/>N Layers]
 
-    subgraph Block_1[Block 1]
-        direction TB
-        N1[RMSNorm<br/>4096]
-        A1[Attention<br/>4096→4096<br/>h=32]
-        F1[FFN<br/>4096→14336→4096]
-        N1 --> A1
-        A1 --> F1
-    end
+    TransformerStack --> Layer1[Layer 1]
+    Layer1 --> Attention1[Attention]
+    Attention1 --> MLP1[MLP / FFN]
+    MLP1 --> Layer2[Layer 2]
+    Layer2 -.->|Repeat N| Attention1
 
-    subgraph Block_2[Block 2]
-        direction TB
-        N2[RMSNorm<br/>4096]
-        A2[Attention<br/>4096→4096<br/>h=32]
-        F2[FFN<br/>4096→14336→4096]
-        N2 --> A2
-        A2 --> F2
-    end
+    TransformerStack --> Norm[Layer Normalization]
+    Norm --> LMHead[LM Head / Output Proj]
+    LMHead --> Output[Logits]
 
-    subgraph Output
-        LN[Final RMSNorm<br/>4096]
-        LM[lm_head<br/>4096→32000]
-    end
-
-    E --> N1
-    N1 --> N2
-    N2 --> LN
-    LN --> LM
-
-    style Block_1 fill:#f9f,stroke:#333,stroke-width:2px
-    style Block_2 fill:#f9f,stroke:#333,stroke-width:2px
-    style Embedding fill:#bbf,stroke:#333,stroke-width:2px
-    style Output fill:#bfb,stroke:#333,stroke-width:2px
+    style TransformerStack fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Attention1 fill:#e1f5ff
+    style MLP1 fill:#fff4e1
 ```
 
 ### Example: LLaMA-3-8B with GQA
@@ -294,51 +276,46 @@ For LLaMA-3-8B where `num_attention_heads=32` and `num_key_value_heads=8`:
 
 ```mermaid
 graph TB
-    subgraph Embedding
-        E[embed_tokens<br/>4096]
-    end
+    Input[Token IDs] --> Embed[Embedding Layer]
+    Embed --> TransformerStack[Transformer Stack<br/>32 Layers]
 
-    subgraph Block_1[Block 1]
-        direction TB
-        N1[RMSNorm<br/>4096]
-        A1[Attention<br/>4096→4096<br/>h=32 kv=8]
-        F1[FFN<br/>4096→14336→4096]
-        N1 --> A1
-        A1 --> F1
-    end
+    TransformerStack --> Layer1[Layer 1]
+    Layer1 --> Attention1[Attention<br/>h=32, kv=8]
+    Attention1 --> MLP1[MLP / FFN]
+    MLP1 --> Layer2[Layer 2]
+    Layer2 -.->|Repeat N| Attention1
 
-    subgraph Block_2[Block 2]
-        direction TB
-        N2[RMSNorm<br/>4096]
-        A2[Attention<br/>4096→4096<br/>h=32 kv=8]
-        F2[FFN<br/>4096→14336→4096]
-        N2 --> A2
-        A2 --> F2
-    end
+    TransformerStack --> Norm[Layer Normalization]
+    Norm --> LMHead[LM Head<br/>vocab=128256]
+    LMHead --> Output[Logits]
 
-    subgraph Output
-        LN[Final RMSNorm<br/>4096]
-        LM[lm_head<br/>4096→128256]
-    end
-
-    E --> N1
-    N1 --> N2
-    N2 --> LN
-    LN --> LM
-
-    style Block_1 fill:#f9f,stroke:#333,stroke-width:2px
-    style Block_2 fill:#f9f,stroke:#333,stroke-width:2px
-    style Embedding fill:#bbf,stroke:#333,stroke-width:2px
-    style Output fill:#bfb,stroke:#333,stroke-width:2px
+    style TransformerStack fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style Attention1 fill:#e1f5ff
+    style MLP1 fill:#fff4e1
 ```
 
 ### Subgraph Style Conventions
 
-| Subgraph Type | Fill Color | Border |
-|---------------|-------------|--------|
-| Embedding | #bbf (light blue) | #333 |
-| Block (hidden layers) | #f9f (light pink) | #333 |
-| Output | #bfb (light green) | #333 |
+| Element | Fill Color | Border |
+|---------|-------------|--------|
+| Transformer Stack | #f9f9f9 (light gray) | #333 |
+| Attention | #e1f5ff (light blue) | #333 |
+| MLP / FFN | #fff4e1 (light orange) | #333 |
+| Layer Normalization | #f5f5f5 (very light gray) | #333 |
+
+### Layer Detail (Optional Expanded View)
+
+When users want to see layer internals:
+
+```mermaid
+subgraph Block_N[Layer N]
+    direction TB
+    Norm[LayerNorm / RMSNorm] --> Attention
+    Attention --> Residual[Residual Connection]
+    Residual --> MLP[MLP / FFN]
+    MLP --> Residual
+end
+```
 
 ---
 
