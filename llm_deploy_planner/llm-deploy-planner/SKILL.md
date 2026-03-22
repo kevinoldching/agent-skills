@@ -110,29 +110,19 @@ imbalance >= 0.8 → 分离
 - TTFT&TPOT优先 → PD分离
 - TPS优先+卡数有限 → PD混部（无kvcache传输开销、所有卡都可以用于decode）
 
-## 第三步：调用显存估算
+## 第三步：遍历并行策略组合
 
-根据 PD 策略决策结果，使用 `llm_mem_estimator` skill 估算显存占用：
-
-### PD 混部场景
-- 模型权重大小
-- KV Cache 显存占用（基于 batch_size 和序列长度）
-- 不同 TP 配置下的显存分布
-
-### PD 分离场景
-分别估算 Prefill 和 Decode 的显存需求：
-- Prefill：权重 + 激活值（compute-bound，batch_size 较大）
-- Decode：权重 + KV Cache（memory-bound，需要缓存更多上下文）
-
-## 第四步：并行策略计算
+在约束条件下，遍历所有可能的 TP/EP/DP 组合，对每个组合调用 `llm-mem-estimator` 验证显存是否满足要求。
 
 ### 约束条件
 
-- TP <= 单机卡数 或 TP = 单机卡数 × 机器数量（当单机无法放下模型权重时，需多机扩展 TP）
-- TP × DP <= EP
-- EP < P/D实例总卡数
-- EP < MoE expert数量（仅MoE模型）
+- TP <= 单机卡数 或 TP = 单机卡数 × 机器数量
+- TP × DP = EP
+- EP_Prefill = TP_prefill × DP_prefill（PD分离时）
+- EP_Decode = y × TP_decode × DP_decode（PD分离时，y=1）
+- EP <= MoE expert数量（仅MoE模型）
 - TP/EP/DP 为2的幂（1, 2, 4, 8, 16, 32）
+- 总卡数必须是单机卡数的整数倍
 
 ### EP 标注规则
 
@@ -140,8 +130,70 @@ imbalance >= 0.8 → 分离
 
 | 模型类型 | EP 取值 | 说明 |
 |----------|---------|------|
-| Dense 模型 | EP = 1 或 EP = TP | 无需 Expert Parallel |
-| MoE 模型 | 1 < EP < min(总卡数, expert数量) | EP 必须小于 expert 数量 |
+| Dense 模型 | EP = 1（固定） | 无需 Expert Parallel |
+| MoE 模型 | 1 < EP <= min(总卡数, expert数量) | EP 必须不超过 expert 数量 |
+
+### 遍历策略
+
+**核心逻辑**：根据是否提供 batch_size，分为两种遍历方式：
+
+#### 情况1：已提供 batch_size
+1. 固定 batch_size
+2. 遍历 TP 值（1, 2, 4, 8, 16, 32）
+3. 根据模型类型确定 EP 值：
+- Dense 模型：EP = [1]（固定，无需 Expert Parallel）
+- MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1，以实现专家分片）
+4. 计算 DP = EP / TP
+5. 检查 TP 是否满足单机卡数约束
+6. 对每个 (batch_size, TP, EP, DP) 组合调用 `llm-mem-estimator` 验证显存是否满足
+
+#### 情况2：未提供 batch_size
+1. 遍历 TP 值（1, 2, 4, 8, 16, 32）
+2. 根据模型类型确定 EP 值：
+- Dense 模型：EP = [1]（固定，无需 Expert Parallel）
+- MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1，以实现专家分片）
+3. 计算 DP = EP / TP
+4. 检查 TP 是否满足单机卡数约束
+5. 对每个 (TP, EP, DP) 组合调用 `llm-mem-estimator`，记录该配置下的 max_batch_size
+6. 最终得到所有 (max_batch_size, TP, EP, DP) 候选配置
+
+### 调用方式
+
+使用 Skill tool 调用 `llm-mem-estimator`，每次调用传入不同的 (TP, EP, DP) 组合：
+
+```
+模型: <模型名称>
+芯片: <芯片型号，如 H100-80GB、A100-80GB>
+并行策略: TP=<TP值>, EP=<EP值>, DP=<DP值>
+batch_size: <目标batch_size>
+输入长度: <输入token数>
+```
+
+### PD 分离场景
+
+Prefill 和 Decode 阶段分别遍历和验证：
+- **Prefill**：compute-bound，batch_size 较大，激活值是主要瓶颈
+- **Decode**：memory-bound，KV Cache 是主要瓶颈
+
+### 收集结果
+
+对每个有效配置记录：
+- `(TP, EP, DP)` 值
+- `max_batch_size`：该配置下最大 batch_size
+- `每卡显存占用`：权重 + KV Cache + 激活值
+
+### 错误处理
+
+若 `llm-mem-estimator` 调用失败，使用手动估算：
+```
+权重（FP16）≈ 参数数量（B）× 2 GB
+KV Cache 每 token ≈ 2 × hidden_size × num_layers × 2 / 1024² MB
+```
+在输出中注明"部分数据来自手动估算"
+
+## 第四步：验证与选择
+
+基于第三步收集的有效配置，使用性能公式验证并选择最优配置。
 
 ### 估算公式
 
@@ -155,24 +207,38 @@ Decode TPS = batch_size × (S_in + S_out) / (TTFT + S_out × TPOT)
 Decode TPS = batch_size / TPOT
 ```
 
-### 估算流程
+### 情况1: 未提供 batch_size
 
-**情况1: 未提供 batch_size**
-1. 调用 llm_mem_estimator 反推符合要求的 (batch_size, TP, EP, DP)
-2. 根据 TTFT vs (batch_size×S_in)/(TP×η×DP)、TPOT vs batch_size/(TP×η×DP) 推导最高TPS的组合
-3. 结合约束和单机卡数，给出最终GPU数和并行策略
+1. 第三步已筛选出所有候选 (max_batch_size, TP, EP, DP) 配置
+2. 根据 max_batch_size 计算每个配置的预估 TPS
+3. 根据性能目标选择最优配置：
+   - **TPS优先**：选择 max_batch_size × (S_in + S_out) / (TTFT + S_out × TPOT) 最大的配置，如果用户也指定了TTFT/TPOT，也需要满足
+   - **时延优先（TTFT/TPOT）**：选择满足用户指定TTFT/TPOT时TPS最高的配置
+4. 输出最优 (max_batch_size, TP, EP, DP) 组合及总卡数
 
-**情况2: 已提供 batch_size**
-1. 调用 llm_mem_estimator 验证
-2. 后续步骤同上（跳过batch遍历）
+### 情况2: 已提供 batch_size
+
+1. 第三步已对目标 batch_size 做过验证，得到所有满足显存的 (TP, EP, DP) 候选配置
+2. 根据性能目标选择最优配置：
+   - **TPS优先**：选择 TP × DP（总计算力）最大的配置，如果用户也指定了TTFT/TPOT，也需要满足
+   - **时延优先（TTFT/TPOT）**：选择满足用户指定TTFT/TPOT时TPS最高的配置
+3. 若没有配置能满足目标 batch_size，报告不可行并建议调整，否则输出最优 (TP, EP, DP) 组合及总卡数
 
 ### xPyD 计算（仅 PD 分离场景）
 
-- Prefill卡数 = TP_prefill × DP_prefill
-- Decode卡数 = TP_decode × DP_decode
-- Prefill实例数 x = ceil(prefill总卡数 / 单实例卡数)
-- 当前仅支持 y=1
-- Prefill和Decode需使用相同总卡数
+**关键约束**：
+- **y = 1（固定，不可更改）** - Decode 实例数只能为 1
+- Prefill每实例卡数 = TP_prefill × DP_prefill
+- Decode每实例卡数 = TP_decode × DP_decode
+- **Prefill总卡数 = Decode总卡数**（即 x × TP_prefill × DP_prefill = y × TP_decode × DP_decode）
+- **x × TP_prefill × DP_prefill + y × TP_decode × DP_decode <= 总可用卡数**
+
+**计算步骤**：
+1. 确定总卡数（满足单机卡数整数倍约束）
+2. 确定 Prefill 和 Decode 的并行策略（TP, EP, DP）
+3. 使 Prefill总卡数 = Decode总卡数
+4. 计算 x = ceil(Prefill总卡数 / (TP_prefill × DP_prefill))
+5. 验证总卡数不超过可用卡数
 
 ## 第五步：输出格式
 
@@ -210,15 +276,6 @@ Decode TPS = batch_size / TPOT
 ### 并行配置显存验证
 
 列出满足约束条件的 TP/EP/DP 组合：
-
-**约束条件**：
-- TP <= 单机卡数 或 TP = 单机卡数×机器数量
-- TP × DP <= EP
-- TP/EP/DP 为2的幂（1, 2, 4, 8, 16, 32）
-
-**EP 取值**：
-- 非MoE模型：固定 EP=1
-- MoE模型：1 < EP < min(实例总卡数, expert数量)
 
 | 配置 | 权重 | KV Cache | 总占用 | 可用 |
 |------|------|----------|--------|------|
@@ -278,14 +335,7 @@ Decode TPS = batch_size / TPOT
 
 **总卡数: [X]**
 
-## 5. 约束验证
-- [ ] TP=[X] <= 单机卡数=[X]
-- [ ] TP×DP=[X] <= EP=[X]
-- [ ] EP=[X] < 实例总卡数=[X]
-- [ ] [若MoE] EP=[X] < expert数量=[X]
-- [ ] TP/EP/DP 为2的幂: [X]
-
-## 6. 实现注意事项
+## 5. 实现注意事项
 - [具体配置建议和注意事项]
 ```
 
@@ -303,9 +353,10 @@ Decode TPS = batch_size / TPOT
 
 始终验证：
 1. `TP <= 单机卡数 或 TP = 单机卡数 × 机器数量`
-2. `TP × DP <= EP`
+2. `TP × DP = EP`
 3. `EP < 实例总卡数`
-4. `[若MoE] EP < expert数量`
-5. xPyD: `y = 1`（当前支持），`x >= 1`
+4. `[若MoE] EP >= 2 且 EP <= expert数量`
+5. **xPyD: y = 1（固定，不可更改），x × TP_prefill × DP_prefill = y × TP_decode × DP_decode（Prefill和Decode总卡数必须相等）**
 6. 总卡数 <= 可用卡数
 7. TP/EP/DP 为2的幂（1, 2, 4, 8, 16, 32）
+8. **总卡数必须是单机卡数的整数倍**（total_cards % 单机卡数 == 0，避免出现56、42等无法整除的值）
