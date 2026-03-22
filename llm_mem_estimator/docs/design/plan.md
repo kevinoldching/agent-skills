@@ -108,8 +108,7 @@
 
 | FFN 类型 | 参数字段 |
 |----------|----------|
-| standard | intermediate_size |
-| swiglu | intermediate_size |
+| dense | intermediate_size |
 | moe | moe_intermediate_size, topk, num_router_experts, num_shared_experts |
 
 **MoE 完整参数**:
@@ -117,6 +116,8 @@
 - topk: 激活的专家数量
 - num_router_experts: 路由专家总数
 - num_shared_experts: 共享专家数量
+
+**注意**: SwiGLU、GeGLU 等激活函数属于 dense 类型，使用与标准 FFN 相同的显存公式。
 
 #### 1.4 Norm 类型
 

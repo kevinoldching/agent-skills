@@ -126,7 +126,7 @@ class TestArchitectureConfig:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000,
             num_attention_heads=32,
@@ -179,7 +179,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000
         )
@@ -195,7 +195,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000
         )
@@ -211,7 +211,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000,
             num_attention_heads=32,
@@ -232,7 +232,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="mla",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000,
             kv_lora_rank=512,
@@ -252,7 +252,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000
         )
@@ -302,7 +302,7 @@ class TestFormulaEvaluator:
             hidden_size=4096,
             num_layers=32,
             attention_type="gqa",
-            ffn_type="standard",
+            ffn_type="dense",
             norm_type="rmsnorm",
             vocab_size=32000
         )

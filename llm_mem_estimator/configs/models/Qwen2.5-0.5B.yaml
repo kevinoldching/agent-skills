@@ -6,7 +6,7 @@ architecture_config:
   hidden_size: 896
   num_layers: 24
   attention_type: swa
-  ffn_type: standard
+  ffn_type: dense
   norm_type: rmsnorm
   vocab_size: 151936
   head_dim: 64
@@ -38,6 +38,6 @@ computation_rules:
     has_prefill: 1.25
     decode: 12.5
   kv_cache: 2 * batch_size * min(seq_len, window_size) * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)
-  activation: 
+  activation: batch_size * seq_len * hidden_size * recommended_capacity_factor / cp_size
   system_reserved_gb: 2.0
   gpu_util: 0.9

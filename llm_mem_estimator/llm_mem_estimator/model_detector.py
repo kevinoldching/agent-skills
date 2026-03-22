@@ -556,10 +556,10 @@ class ConfigGenerator:
         experts = num_experts if num_experts is not None else config.get('num_experts')
         if experts:
             return "moe"
-        elif 'hidden_act' in config and 'swiglu' in config['hidden_act'].lower():
-            return "swiglu"
         else:
-            return "standard"
+            # SwiGLU, GeGLU, and standard FFN all use the same dense activation formula
+            # Use "dense" for non-MoE FFN types
+            return "dense"
 
     def _detect_norm_type(self, config: Dict[str, Any]) -> str:
         """Detect normalization type from config"""

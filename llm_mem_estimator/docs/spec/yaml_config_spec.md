@@ -50,7 +50,7 @@ model_identity:
 | hidden_size | int | 是 | 隐藏层维度 | `2880` |
 | num_layers | int | 是 | Transformer 层数 | `36` |
 | attention_type | string | 是 | 注意力类型 | `mha`, `gqa`, `mla`, `mqa` |
-| ffn_type | string | 是 | FFN 类型 | `standard`, `swiglu`, `moe` |
+| ffn_type | string | 是 | FFN 类型 | `dense`, `moe` |
 | norm_type | string | 是 | 归一化类型 | `layernorm`, `rmsnorm` |
 | vocab_size | int | 是 | 词表大小 | `201088` |
 | num_attention_heads | int | 否 | 注意力头数 | `64` |

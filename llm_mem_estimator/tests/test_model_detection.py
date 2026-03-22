@@ -72,7 +72,7 @@ def validate_model_config_structure(config: ModelConfig) -> Tuple[bool, List[str
     if arch.attention_type not in valid_attention_types:
         errors.append(f"attention_type={arch.attention_type} 不在有效类型中: {valid_attention_types}")
 
-    valid_ffn_types = ["standard", "swiglu", "moe"]
+    valid_ffn_types = ["dense", "moe"]
     if arch.ffn_type not in valid_ffn_types:
         errors.append(f"ffn_type={arch.ffn_type} 不在有效类型中: {valid_ffn_types}")
 
