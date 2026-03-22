@@ -1,0 +1,46 @@
+model_identity:
+  name: Qwen3-235B-A22B-Instruct-2507
+  total_params: '235.09B'
+  num_layers: 94
+architecture_config:
+  hidden_size: 4096
+  num_layers: 94
+  attention_type: gqa
+  ffn_type: moe
+  norm_type: rmsnorm
+  vocab_size: 151936
+  head_dim: 128
+  num_attention_heads: 64
+  num_key_value_heads: 4
+  intermediate_size: 12288
+  num_experts: 128
+  num_experts_per_tok: 8
+  moe_intermediate_size: 1536
+modules:
+  norm:
+    input_layernorm.weight: {shape: [4096], dtype: BF16, layers: 94, parallel_strategy: replicated}
+    post_attention_layernorm.weight: {shape: [4096], dtype: BF16, layers: 94, parallel_strategy: replicated}
+    model.norm.weight: {shape: [4096], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  ffn_moe:
+    mlp.experts.N.down_proj.weight: {shape: [128, 4096, 1536], dtype: BF16, layers: 94, parallel_strategy: EP}
+    mlp.experts.N.gate_proj.weight: {shape: [128, 1536, 4096], dtype: BF16, layers: 94, parallel_strategy: EP}
+    mlp.experts.N.up_proj.weight: {shape: [128, 1536, 4096], dtype: BF16, layers: 94, parallel_strategy: EP}
+    mlp.gate.weight: {shape: [128, 4096], dtype: BF16, layers: 94, parallel_strategy: replicated}
+  attention:
+    self_attn.k_norm.weight: {shape: [128], dtype: BF16, layers: 94, parallel_strategy: replicated}
+    self_attn.k_proj.weight: {shape: [512, 4096], dtype: BF16, layers: 94, parallel_strategy: TP}
+    self_attn.o_proj.weight: {shape: [4096, 8192], dtype: BF16, layers: 94, parallel_strategy: TP}
+    self_attn.q_norm.weight: {shape: [128], dtype: BF16, layers: 94, parallel_strategy: replicated}
+    self_attn.q_proj.weight: {shape: [8192, 4096], dtype: BF16, layers: 94, parallel_strategy: TP}
+    self_attn.v_proj.weight: {shape: [512, 4096], dtype: BF16, layers: 94, parallel_strategy: TP}
+  embedding:
+    lm_head.weight: {shape: [151936, 4096], dtype: BF16, layers: 1, parallel_strategy: TP}
+    model.embed_tokens.weight: {shape: [151936, 4096], dtype: BF16, layers: 1, parallel_strategy: TP}
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: 2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)
+  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

@@ -1,0 +1,42 @@
+model_identity:
+  name: Qwen3-32B
+  total_params: '32.76B'
+  num_layers: 64
+architecture_config:
+  hidden_size: 5120
+  num_layers: 64
+  attention_type: gqa
+  ffn_type: dense
+  norm_type: rmsnorm
+  vocab_size: 151936
+  head_dim: 128
+  num_attention_heads: 64
+  num_key_value_heads: 8
+  intermediate_size: 25600
+modules:
+  norm:
+    input_layernorm.weight: {shape: [5120], dtype: BF16, layers: 64, parallel_strategy: replicated}
+    post_attention_layernorm.weight: {shape: [5120], dtype: BF16, layers: 64, parallel_strategy: replicated}
+    model.norm.weight: {shape: [5120], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  ffn_dense:
+    mlp.down_proj.weight: {shape: [5120, 25600], dtype: BF16, layers: 64, parallel_strategy: TP}
+    mlp.up_proj.weight: {shape: [25600, 5120], dtype: BF16, layers: 64, parallel_strategy: TP}
+    mlp.gate_proj.weight: {shape: [25600, 5120], dtype: BF16, layers: 64, parallel_strategy: TP}
+  attention:
+    self_attn.k_norm.weight: {shape: [128], dtype: BF16, layers: 64, parallel_strategy: replicated}
+    self_attn.k_proj.weight: {shape: [1024, 5120], dtype: BF16, layers: 64, parallel_strategy: TP}
+    self_attn.o_proj.weight: {shape: [5120, 8192], dtype: BF16, layers: 64, parallel_strategy: TP}
+    self_attn.q_norm.weight: {shape: [128], dtype: BF16, layers: 64, parallel_strategy: replicated}
+    self_attn.q_proj.weight: {shape: [8192, 5120], dtype: BF16, layers: 64, parallel_strategy: TP}
+    self_attn.v_proj.weight: {shape: [1024, 5120], dtype: BF16, layers: 64, parallel_strategy: TP}
+  embedding:
+    model.embed_tokens.weight: {shape: [151936, 5120], dtype: BF16, layers: 1, parallel_strategy: TP}
+    lm_head.weight: {shape: [151936, 5120], dtype: BF16, layers: 1, parallel_strategy: TP}
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: 2 * batch_size * seq_len * num_key_value_heads * head_dim * num_layers / (tp_size * cp_size)
+  activation: batch_size * seq_len * hidden_size * recommended_capacity_factor / cp_size
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

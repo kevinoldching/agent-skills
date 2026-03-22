@@ -389,9 +389,9 @@ modules:
     language_model.mlp.experts.N.up_proj.weight_scale: {shape: [384, 2048, 224], dtype: BF16, layers: 60, parallel_strategy: EP}
     language_model.mlp.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
   ffn_shared_expert:
-    language_model.mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: BF16, layers: 60, parallel_strategy: TP}
-    language_model.mlp.shared_experts.gate_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: TP}
-    language_model.mlp.shared_experts.up_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: TP}
+    language_model.mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.shared_experts.gate_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.shared_experts.up_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
 computation_rules:
   recommended_capacity_factor:
     has_prefill: 1.25

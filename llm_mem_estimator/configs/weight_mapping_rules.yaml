@@ -31,7 +31,8 @@ generic:
   ffn_shared_expert:
     patterns:
       - "^mlp\\.shared_experts\\..*"
-      - ".*\\.mlp\\.shared_expert\\s*\\..*"
+      - ".*\\.mlp\\.shared_experts\\..*"
+      - ".*\\.shared_experts\\..*"
 
   ffn_dense:
     patterns:
@@ -120,6 +121,7 @@ deepseek:
     patterns:
       - "^mlp\\.shared_experts\\..*"
       - ".*\\.mlp\\.shared_experts\\..*"
+      - ".*\\.shared_experts\\..*"
 
   ffn_dense:
     patterns:
