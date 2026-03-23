@@ -1,5 +1,5 @@
 ---
-name: llm-memory-estimator
+name: llm-mem-estimator
 description: |
   LLM GPU 显存估算工具 - 估算大语言模型的 GPU 显存占用。
   当用户想要以下操作时使用此 Skill：
