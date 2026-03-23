@@ -140,27 +140,32 @@ imbalance >= 0.8 → 分离
 
 ### 遍历策略
 
-**核心逻辑**：根据是否提供 batch_size，分为两种遍历方式：
+**核心逻辑**：对每个 EP 候选值，枚举所有满足 `TP × DP = EP` 且 `TP <= 单机卡数` 的 TP 值。
 
 #### 情况1：已提供 batch_size
 1. 固定 batch_size
-2. 遍历 TP 值（1, 2, 4, 8, 16, 32）
-3. 根据模型类型确定 EP 值：
-- Dense 模型：EP = [1]（固定，无需 Expert Parallel）
-- MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1，以实现专家分片）
-4. 计算 DP = EP / TP
-5. 检查 TP 是否满足单机卡数约束
-6. 对每个 (batch_size, TP, EP, DP) 组合调用 `llm-mem-estimator` 验证显存是否满足
+2. **确定 EP 候选列表**：
+   - Dense 模型：EP = [1]（固定）
+   - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
+3. **对每个 EP 值，枚举所有有效 TP**：
+   - 遍历 TP 值（1, 2, 4, 8, 16, 32）
+   - 计算 DP = EP / TP
+   - **仅当 TP 能整除 EP（即 DP 为整数）且 TP <= 单机卡数时**，该 TP 值有效
+   - 跳过无效 TP（如 EP=32 时，TP=6 因 32/6 非整数而无效）
+4. 对每个 (batch_size, TP, EP, DP) 组合调用 `llm-mem-estimator` 验证显存是否满足
+5. **必须验证所有有效 TP 值，不得在找到第一个通过的配置后停止**
 
 #### 情况2：未提供 batch_size
-1. 遍历 TP 值（1, 2, 4, 8, 16, 32）
-2. 根据模型类型确定 EP 值：
-- Dense 模型：EP = [1]（固定，无需 Expert Parallel）
-- MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1，以实现专家分片）
-3. 计算 DP = EP / TP
-4. 检查 TP 是否满足单机卡数约束
-5. 对每个 (TP, EP, DP) 组合调用 `llm-mem-estimator`，记录该配置下的 max_batch_size
-6. 最终得到所有 (max_batch_size, TP, EP, DP) 候选配置
+1. **确定 EP 候选列表**：
+   - Dense 模型：EP = [1]（固定）
+   - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
+2. **对每个 EP 值，枚举所有有效 TP**：
+   - 遍历 TP 值（1, 2, 4, 8, 16, 32）
+   - 计算 DP = EP / TP
+   - **仅当 TP 能整除 EP 且 TP <= 单机卡数时**，该 TP 值有效
+3. 对每个 (TP, EP, DP) 组合调用 `llm-mem-estimator`，记录该配置下的 max_batch_size
+4. 最终得到所有 (max_batch_size, TP, EP, DP) 候选配置
+5. **必须验证所有有效 TP 值，不得在找到第一个通过的配置后停止**
 
 ### 调用方式
 
