@@ -341,7 +341,7 @@ end
 - Node.js installed
 - `@mermaid-js/mermaid-cli` installed (via npm or npx)
 
-### Installation
+### Installation (Linux/macOS)
 
 ```bash
 # Global install
@@ -350,6 +350,36 @@ npm install -g @mermaid-js/mermaid-cli
 # Or use via npx
 npx @mermaid-js/mermaid-cli mmdc --version
 ```
+
+### Installation (Windows)
+
+1. Install Node.js from [https://nodejs.org/](https://nodejs.org/) (LTS version recommended)
+2. Open PowerShell and install mermaid-cli:
+
+```powershell
+# Global install
+npm install -g @mermaid-js/mermaid-cli
+
+# Verify installation
+npx @mermaid-js/mermaid-cli mmdc --version
+```
+
+### Windows Usage with PowerShell
+
+The helper script `scripts/render_mermaid.ps1` provides PowerShell-compatible rendering:
+
+```powershell
+# Navigate to the script directory
+cd scripts
+
+# Render PNG
+.\render_mermaid.ps1 -Input "diagram.mmd" -OutputPng "diagram.png"
+
+# Render PNG and SVG
+.\render_mermaid.ps1 -Input "diagram.mmd" -OutputPng "diagram.png" -OutputSvg "diagram.svg"
+```
+
+**Note:** On Windows, use backslashes in paths or PowerShell will interpret them correctly with tab completion.
 
 ### Rendering Commands
 
@@ -405,7 +435,8 @@ create_model_arch_diagram/
 │   ├── minimax/
 │   └── gpt-oss/
 └── scripts/
-    └── render_mermaid.sh        # Helper script for CLI rendering
+    ├── render_mermaid.sh        # Bash helper script for CLI rendering (Linux/macOS)
+    └── render_mermaid.ps1      # PowerShell helper script for CLI rendering (Windows)
 ```
 
 ---
