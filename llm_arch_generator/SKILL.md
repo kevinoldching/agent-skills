@@ -1,3 +1,8 @@
+---
+name: llm-arch-generator
+description: Generate professional LLM model architecture diagrams from HuggingFace models or YAML configs. Supports PNG/SVG/Mermaid output formats.
+---
+
 # LLM Architecture Generator
 
 ## Overview
