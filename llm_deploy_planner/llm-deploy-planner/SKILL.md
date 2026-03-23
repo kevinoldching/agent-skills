@@ -126,7 +126,7 @@ imbalance >= 0.8 → 分离
 - EP_Prefill = TP_prefill × DP_prefill（PD分离时）
 - EP_Decode = y × TP_decode × DP_decode（PD分离时，y=1）
 - EP <= MoE expert数量（仅MoE模型）
-- TP/EP 为2的幂，TP/EP 取值范围为 1 或 单机卡数 × N；DP = EP / TP（由 EP/TP 推导）
+- TP/EP 取值：1 或 单机卡数×N（N=1,2,3,...）且必须为2的幂；EP=1 仅限非MoE模型；MoE模型 EP >= 单机卡数
 - 总卡数必须是单机卡数的整数倍
 
 ### EP 标注规则
@@ -146,9 +146,9 @@ imbalance >= 0.8 → 分离
 1. 固定 batch_size
 2. **确定 EP 候选列表**：
    - Dense 模型：EP = [1]（固定）
-   - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
+   - MoE 模型：EP = [单机卡数, 单机卡数×2, 单机卡数×3, ...]（EP >= 单机卡数）
 3. **对每个 EP 值，枚举所有有效 TP**：
-   - 遍历 TP 值（1, 2, 4, 8, ...，单机卡数, 单机卡数×2, ...）
+   - 遍历 TP/EP 值（1, 单机卡数, 单机卡数×2, 单机卡数×3, ...），均为2的幂，仅当 TP 能整除 EP 且 TP/EP 在候选列表中时有效
    - 计算 DP = EP / TP
    - **仅当 TP 能整除 EP（即 DP 为整数）且 TP <= 单机卡数 或 TP = 单机卡数×N 时**，该 TP 值有效
    - 跳过无效 TP（如 EP=32 时，TP=6 因 32/6 非整数而无效）
@@ -158,9 +158,9 @@ imbalance >= 0.8 → 分离
 #### 情况2：未提供 batch_size
 1. **确定 EP 候选列表**：
    - Dense 模型：EP = [1]（固定）
-   - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
+   - MoE 模型：EP = [单机卡数, 单机卡数×2, 单机卡数×3, ...]（EP >= 单机卡数）
 2. **对每个 EP 值，枚举所有有效 TP**：
-   - 遍历 TP 值（1, 2, 4, 8, ...，单机卡数, 单机卡数×2, ...）
+   - 遍历 TP/EP 值（1, 单机卡数, 单机卡数×2, 单机卡数×3, ...），均为2的幂，仅当 TP 能整除 EP 且 TP/EP 在候选列表中时有效
    - 计算 DP = EP / TP
    - **仅当 TP 能整除 EP 且 TP <= 单机卡数 或 TP = 单机卡数×N 时**，该 TP 值有效
 3. 对每个 (TP, EP, DP) 组合调用 `llm-mem-estimator`，记录该配置下的 max_batch_size
@@ -368,5 +368,5 @@ Decode TPS = batch_size / TPOT
 4. `[若MoE] EP >= 2 且 EP <= expert数量`
 5. **xPyD: y = 1（固定，不可更改），x × TP_prefill × DP_prefill = y × TP_decode × DP_decode（Prefill和Decode总卡数必须相等）**
 6. 总卡数 <= 可用卡数
-7. TP/EP 为2的幂，TP/EP 取值范围为 1 或 单机卡数 × N；DP = EP / TP（由 EP/TP 推导）
+7. TP/EP 取值：1 或 单机卡数×N（N=1,2,3,...）且必须为2的幂；EP=1 仅限非MoE模型；MoE模型 EP >= 单机卡数
 8. **总卡数必须是单机卡数的整数倍**（total_cards % 单机卡数 == 0，避免出现56、42等无法整除的值）
