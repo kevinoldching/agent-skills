@@ -1,4 +1,4 @@
-# Model Architecture Diagram Skill
+# LLM Architecture Generator
 
 ## Overview
 
@@ -7,7 +7,7 @@ A Claude Code skill that generates professional model architecture diagrams from
 ## Invocation Syntax
 
 ```
-/create_model_arch_diagram <model> [--format png,svg,mmd] [--output /path/to/dir]
+/llm-arch-generator <model> [--format png,svg,mmd] [--output /path/to/dir]
 ```
 
 ### Parameters
@@ -22,13 +22,13 @@ A Claude Code skill that generates professional model architecture diagrams from
 
 ```bash
 # Generate diagram from HuggingFace model
-/create_model_arch_diagram meta-llama/Llama-3-8b
+/llm-arch-generator meta-llama/Llama-3-8b
 
 # Generate PNG and SVG from local model
-/create_model_arch_diagram /path/to/local/model --format png,svg
+/llm-arch-generator /path/to/local/model --format png,svg
 
 # Generate from YAML config with custom output
-/create_model_arch_diagram /path/to/model.yaml --output ./diagrams
+/llm-arch-generator /path/to/model.yaml --output ./diagrams
 ```
 
 ---
@@ -355,13 +355,13 @@ npx @mermaid-js/mermaid-cli mmdc --version
 
 ```bash
 # Render PNG (default)
-/create_model_arch_diagram meta-llama/Llama-3-8b --format png
+/llm-arch-generator meta-llama/Llama-3-8b --format png
 
 # Render PNG and SVG
-/create_model_arch_diagram meta-llama/Llama-3-8b --format png,svg
+/llm-arch-generator meta-llama/Llama-3-8b --format png,svg
 
 # Output to specific directory
-/create_model_arch_diagram meta-llama/Llama-3-8b --output ./diagrams
+/llm-arch-generator meta-llama/Llama-3-8b --output ./diagrams
 ```
 
 ### Manual Rendering (if needed)
@@ -413,7 +413,7 @@ create_model_arch_diagram/
 ## Complete Workflow
 
 ```
-1. User invokes: /create_model_arch_diagram <model> [--format ...] [--output ...]
+1. User invokes: /llm-arch-generator <model> [--format ...] [--output ...]
 2. Parse input:
    - HuggingFace ID: Download config.json
    - Local path: Read config.json or YAML
@@ -432,14 +432,14 @@ create_model_arch_diagram/
 
 ```bash
 # Basic usage with HuggingFace model
-/create_model_arch_diagram meta-llama/Llama-3-8b
+/llm-arch-generator meta-llama/Llama-3-8b
 
 # Multi-format output
-/create_model_arch_diagram mistralai/Mistral-7B-v0.3 --format png,svg,mmd
+/llm-arch-generator mistralai/Mistral-7B-v0.3 --format png,svg,mmd
 
 # Local model with custom output
-/create_model_arch_diagram /home/user/models/my-llama --output ./output
+/llm-arch-generator /home/user/models/my-llama --output ./output
 
 # Custom YAML config
-/create_model_arch_diagram /path/to/model.yaml --format png
+/llm-arch-generator /path/to/model.yaml --format png
 ```
