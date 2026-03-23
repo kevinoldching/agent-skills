@@ -8,8 +8,8 @@ description: |
   - GPU/NPU 资源规划
   - 并行策略（TP/EP/DP）配置
   - xPyD 部署（如 4P1D 表示 4 个 Prefill 实例 + 1 个 Decode 实例）
-  - LLM 推理所需 GPU 数量评估
-  关键词：LLM部署规划、PD分离、Prefill Decode、xPyD、GPU数量、LLM推理规划、TP EP DP、并行策略
+  - LLM 推理所需 卡 数量评估
+  关键词：LLM部署规划、PD分离、Prefill Decode、xPyD、卡数量、LLM推理规划、TP EP DP、并行策略
 ---
 
 # LLM PD 部署规划工具
@@ -306,7 +306,7 @@ Decode TPS = batch_size / TPOT
 
 | 参数 | 值 |
 |------|-----|
-| 总GPU数 | [X] |
+| 总卡数 | [X] |
 | Tensor Parallel | [X] |
 | Expert Parallel | [X]（仅MoE模型）|
 | Data Parallel | [X] |
