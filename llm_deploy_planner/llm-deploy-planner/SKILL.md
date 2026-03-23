@@ -126,7 +126,7 @@ imbalance >= 0.8 → 分离
 - EP_Prefill = TP_prefill × DP_prefill（PD分离时）
 - EP_Decode = y × TP_decode × DP_decode（PD分离时，y=1）
 - EP <= MoE expert数量（仅MoE模型）
-- TP/EP/DP 为2的幂（1, 2, 4, 8, 16, 32）
+- TP/EP 为2的幂，TP/EP 取值范围为 1 或 单机卡数 × N；DP = EP / TP（由 EP/TP 推导）
 - 总卡数必须是单机卡数的整数倍
 
 ### EP 标注规则
@@ -148,9 +148,9 @@ imbalance >= 0.8 → 分离
    - Dense 模型：EP = [1]（固定）
    - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
 3. **对每个 EP 值，枚举所有有效 TP**：
-   - 遍历 TP 值（1, 2, 4, 8, 16, 32）
+   - 遍历 TP 值（1, 2, 4, 8, ...，单机卡数, 单机卡数×2, ...）
    - 计算 DP = EP / TP
-   - **仅当 TP 能整除 EP（即 DP 为整数）且 TP <= 单机卡数时**，该 TP 值有效
+   - **仅当 TP 能整除 EP（即 DP 为整数）且 TP <= 单机卡数 或 TP = 单机卡数×N 时**，该 TP 值有效
    - 跳过无效 TP（如 EP=32 时，TP=6 因 32/6 非整数而无效）
 4. 对每个 (batch_size, TP, EP, DP) 组合调用 `llm-mem-estimator` 验证显存是否满足
 5. **必须验证所有有效 TP 值，不得在找到第一个通过的配置后停止**
@@ -160,9 +160,9 @@ imbalance >= 0.8 → 分离
    - Dense 模型：EP = [1]（固定）
    - MoE 模型：EP = [2, 4, 8, 16, ...]（必须 EP > 1）
 2. **对每个 EP 值，枚举所有有效 TP**：
-   - 遍历 TP 值（1, 2, 4, 8, 16, 32）
+   - 遍历 TP 值（1, 2, 4, 8, ...，单机卡数, 单机卡数×2, ...）
    - 计算 DP = EP / TP
-   - **仅当 TP 能整除 EP 且 TP <= 单机卡数时**，该 TP 值有效
+   - **仅当 TP 能整除 EP 且 TP <= 单机卡数 或 TP = 单机卡数×N 时**，该 TP 值有效
 3. 对每个 (TP, EP, DP) 组合调用 `llm-mem-estimator`，记录该配置下的 max_batch_size
 4. 最终得到所有 (max_batch_size, TP, EP, DP) 候选配置
 5. **必须验证所有有效 TP 值，不得在找到第一个通过的配置后停止**
@@ -368,5 +368,5 @@ Decode TPS = batch_size / TPOT
 4. `[若MoE] EP >= 2 且 EP <= expert数量`
 5. **xPyD: y = 1（固定，不可更改），x × TP_prefill × DP_prefill = y × TP_decode × DP_decode（Prefill和Decode总卡数必须相等）**
 6. 总卡数 <= 可用卡数
-7. TP/EP/DP 为2的幂（1, 2, 4, 8, 16, 32）
+7. TP/EP 为2的幂，TP/EP 取值范围为 1 或 单机卡数 × N；DP = EP / TP（由 EP/TP 推导）
 8. **总卡数必须是单机卡数的整数倍**（total_cards % 单机卡数 == 0，避免出现56、42等无法整除的值）
