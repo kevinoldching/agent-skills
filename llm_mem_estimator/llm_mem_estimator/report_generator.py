@@ -32,7 +32,7 @@ class ReportGenerator:
                        batch_size: int, parallel_config: Dict[str, int],
                        prompt_len: int = 0, gen_len: int = 0,
                        chip_info: Optional[Dict[str, Any]] = None,
-                       stage: str = "mixed") -> str:
+                       stage: str = "hybrid") -> str:
         """Generate a markdown report"""
         lines = []
 

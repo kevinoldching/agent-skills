@@ -5,9 +5,9 @@
 generic:
   embedding:
     patterns:
-      - "^embed_tokens\\.weight$"
+      - ".*\\.embed_tokens\\.weight$"
       - "^model\\.embed_tokens\\.weight$"
-      - "^lm_head\\.weight$"
+      - ".*\\.lm_head\\.weight$"
       - ".*wte.*"              # GPT style
       - ".*word_embeddings.*"  # BERT style
 
@@ -51,7 +51,13 @@ generic:
       - "^model\\.norm\\.weight$"
       - "^norm\\.weight$"
 
-  # 默认并行策略配置
+  # 默认并行策略配置（PD分离-三层结构）
+  # parallel_defaults: 混部/通用场景（stage=hybrid）
+  # parallel_defaults.prefill: PD分离-prefill专用（stage=prefill）
+  # parallel_defaults.decode: PD分离-decode专用（stage=decode）
+  # 三层为平级key，不是嵌套关系
+  # 继承规则：模型定义了某stage → 使用模型的；模型未定义 → 使用generic的同名stage
+  # 注意：generic只定义parallel_defaults，prefill/decode由具体模型定义
   parallel_defaults:
     embedding: TP
     attention:
@@ -198,8 +204,20 @@ minimax_m2:
 Kimi-K2.5:
   inherit: generic
 
+  # 混部/通用场景的并行策略（继承generic，仅覆盖ffn_shared_expert）
   parallel_defaults:
     ffn_shared_expert: TP
+
+  # PD分离-decode专用
+  parallel_defaults.decode:
+    ffn_dense: replicated
+    attention:
+      q_proj.weight: replicated
+      k_proj.weight: replicated
+      v_proj.weight: replicated
+      o_proj.weight: TP
+      q_b_proj.weight: replicated
+      kv_b_proj.weight: replicated
 
 # ============================================================================
 # Architecture Config 字段映射

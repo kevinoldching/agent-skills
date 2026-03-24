@@ -155,6 +155,16 @@ python scripts/calculate_mem.py \
     --batch-size 1 \
     --prompt-len 4096 \
     --gen-len 1024
+
+### PD分离场景（--stage 参数）
+
+```bash
+# 混部场景（不指定 --stage，走 hybrid 层）
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4
+
+# PD分离场景
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage prefill
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage decode
 ```
 
 ### 查找最大序列长度 / 最大 batch_size

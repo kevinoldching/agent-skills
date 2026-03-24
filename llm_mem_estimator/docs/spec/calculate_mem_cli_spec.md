@@ -74,6 +74,12 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 | `--dp` | Data Parallel (DP) 并行度 | 1 |
 | `--cp` | Context Parallel (CP) 并行度 | 1 |
 | `--ep` | Expert Parallel (EP) 并行度 | 1 |
+| `--stage` | PD分离阶段 | None（混部/通用并行配置） |
+
+`--stage` 选项：
+- 不指定：`parallel_defaults.hybrid`（混部/通用场景）
+- `prefill`：使用 `parallel_defaults.prefill`
+- `decode`：使用 `parallel_defaults.decode`
 
 ### 示例：多卡并行估算
 
@@ -83,6 +89,17 @@ python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 8
 
 # 2路并行 (TP=2, PP=2)
 python scripts/calculate_mem.py --config configs/models/gpt-oss-120b.yaml --tp 2 --pp 2
+```
+
+### 示例：PD分离场景
+
+```bash
+# 混部场景（不指定 --stage）
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4
+
+# PD分离场景
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage prefill
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage decode
 ```
 
 ## 硬件配置

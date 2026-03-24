@@ -88,7 +88,7 @@ class MemoryResult:
     breakdown: Dict[str, float]  # Detailed breakdown by module type
     max_sequence_length: Optional[int] = None
     max_batch_size: Optional[int] = None
-    stage: Optional[str] = None  # PD分离阶段: mixed, prefill, decode
+    stage: Optional[str] = None  # PD分离阶段: hybrid, prefill, decode
 
 
 # ============================================================================
@@ -276,13 +276,13 @@ class ConfigLoader:
 
         Returns structure:
         {
-            "mixed": {...},       # 混部/通用场景 (original parallel_defaults)
+            "hybrid": {...},       # 混部/通用场景 (original parallel_defaults)
             "prefill": {...},     # PD分离-prefill
             "decode": {...}       # PD分离-decode
         }
 
         Inheritance rules (per-module-type):
-        - mixed: model's parallel_defaults > generic's parallel_defaults
+        - hybrid: model's parallel_defaults > generic's parallel_defaults
         - prefill: model's parallel_defaults.prefill > model's parallel_defaults >
                    generic's parallel_defaults.prefill > generic's parallel_defaults
         - decode: model's parallel_defaults.decode > model's parallel_defaults >
@@ -296,13 +296,13 @@ class ConfigLoader:
 
         generic_defaults = (generic_raw or {})
 
-        # For mixed (混部/通用): inherits from generic.parallel_defaults
+        # For hybrid (混部/通用): inherits from generic.parallel_defaults
         model_mixed = raw.get("parallel_defaults", {}) if raw else {}
         generic_mixed = generic_defaults.get("parallel_defaults", {})
         merged_mixed = dict(generic_mixed)
         for module_type, strategy in model_mixed.items():
             merged_mixed[module_type] = strategy
-        result["mixed"] = merged_mixed
+        result["hybrid"] = merged_mixed
 
         # For prefill:
         # 1. Start with generic's parallel_defaults (lowest priority)
@@ -310,7 +310,7 @@ class ConfigLoader:
         # 2. Overlay with generic's parallel_defaults.prefill
         for module_type, strategy in generic_defaults.get("parallel_defaults.prefill", {}).items():
             merged_prefill[module_type] = strategy
-        # 3. Overlay with model's parallel_defaults (mixed)
+        # 3. Overlay with model's parallel_defaults (hybrid)
         for module_type, strategy in model_mixed.items():
             merged_prefill[module_type] = strategy
         # 4. Overlay with model's parallel_defaults.prefill (highest priority)
@@ -327,7 +327,7 @@ class ConfigLoader:
         # 3. Overlay with generic's parallel_defaults.decode
         for module_type, strategy in generic_defaults.get("parallel_defaults.decode", {}).items():
             merged_decode[module_type] = strategy
-        # 4. Overlay with model's parallel_defaults (mixed)
+        # 4. Overlay with model's parallel_defaults (hybrid)
         for module_type, strategy in model_mixed.items():
             merged_decode[module_type] = strategy
         # 5. Overlay with model's parallel_defaults.decode (highest priority)

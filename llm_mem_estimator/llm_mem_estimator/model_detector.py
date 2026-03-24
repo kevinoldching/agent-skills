@@ -13,11 +13,11 @@ import time
 import json
 import re
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, Literal
 from collections import defaultdict
 
 from .model_config import (
-    ModelConfig, ModelIdentity, ArchitectureConfig, WeightInfo
+    ModelConfig, ModelIdentity, ArchitectureConfig, WeightInfo, ConfigLoader
 )
 
 
@@ -31,6 +31,9 @@ class WeightClassifier:
     def __init__(self, rules: Dict[str, Any]):
         self.rules = rules
         self._resolve_inheritance()
+        # Parse three-level parallel defaults for PD separation support
+        self._parallel_defaults_cache: Dict[str, Dict[str, Dict]] = {}
+        self._resolve_parallel_defaults_inheritance()
 
     def _resolve_inheritance(self):
         """Resolve 'inherit' directives in rules"""
@@ -49,6 +52,26 @@ class WeightClassifier:
                             else:
                                 merged_rules[key] = value
                     self.rules[model_type] = merged_rules
+
+    def _resolve_parallel_defaults_inheritance(self):
+        """Resolve three-level parallel_defaults structure for PD separation
+
+        Parses:
+        - parallel_defaults → hybrid (混部/通用场景)
+        - parallel_defaults.prefill → prefill (PD分离-prefill)
+        - parallel_defaults.decode → decode (PD分离-decode)
+
+        Each level inherits from generic if not explicitly defined in model.
+        """
+        generic_rules = self.rules.get('generic', {})
+
+        for model_type, model_rules in self.rules.items():
+            if not isinstance(model_rules, dict):
+                continue
+
+            # Use ConfigLoader's helper to parse the three-level structure
+            parsed = ConfigLoader._parse_parallel_defaults(model_rules, generic_rules)
+            self._parallel_defaults_cache[model_type] = parsed
 
     def classify_weight(self, weight_name: str, model_name: Optional[str] = None,
                        model_type: Optional[str] = None) -> str:
@@ -83,29 +106,42 @@ class WeightClassifier:
         # Default to others
         return "others"
 
-    def get_parallel_strategy(self, weight_name: str, module_type: str, model_type: Optional[str] = None) -> str:
+    def get_parallel_strategy(self, weight_name: str, module_type: str, model_type: Optional[str] = None,
+                               stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> str:
         """Determine parallel strategy based on weight name and module type
 
         Args:
             weight_name: The weight name (e.g., 'mlp.experts.0.gate_proj.weight')
             module_type: The module type (e.g., 'ffn_moe', 'attention', 'embedding')
             model_type: Optional model type for model-specific rules
+            stage: PD separation stage - "hybrid" (混部/通用), "prefill" (PD分离-prefill), "decode" (PD分离-decode)
 
         Returns:
             Parallel strategy (e.g., 'TP', 'EP', 'replicated')
         """
-        # Get parallel_defaults from model-specific or generic rules
+        # Get parallel_defaults from cached three-level structure
+        # Fall back to old-style single-level lookup for backward compatibility
         parallel_defaults = None
 
-        # Try model-specific rules first
-        if model_type and model_type in self.rules:
-            model_rules = self.rules[model_type]
-            parallel_defaults = model_rules.get('parallel_defaults')
+        # Try to get from cached three-level structure
+        if model_type and model_type in self._parallel_defaults_cache:
+            parallel_defaults = self._parallel_defaults_cache[model_type].get(stage, {})
+        elif 'generic' in self._parallel_defaults_cache:
+            parallel_defaults = self._parallel_defaults_cache['generic'].get(stage, {})
 
-        # Fall back to generic rules
-        if not parallel_defaults:
-            generic_rules = self.rules.get('generic', {})
-            parallel_defaults = generic_rules.get('parallel_defaults', {})
+        # For backward compatibility: if stage is 'hybrid' and we still don't have defaults,
+        # fall back to old-style single-level parallel_defaults lookup
+        # This handles old YAML configs that only have single parallel_defaults
+        if not parallel_defaults and stage == "hybrid":
+            # Try model-specific rules first
+            if model_type and model_type in self.rules:
+                model_rules = self.rules[model_type]
+                parallel_defaults = model_rules.get('parallel_defaults')
+
+            # Fall back to generic rules
+            if not parallel_defaults:
+                generic_rules = self.rules.get('generic', {})
+                parallel_defaults = generic_rules.get('parallel_defaults', {})
 
         if not parallel_defaults:
             return 'replicated'
@@ -527,7 +563,9 @@ class ConfigGenerator:
             model_identity=model_identity,
             architecture_config=architecture_config,
             modules=modules,
-            computation_rules=computation_rules
+            computation_rules=computation_rules,
+            weight_classifier=self.classifier,
+            model_type=model_type
         )
 
     def _detect_attention_type(self, config: Dict[str, Any]) -> str:

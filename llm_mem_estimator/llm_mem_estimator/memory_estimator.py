@@ -3,9 +3,9 @@
 Memory estimator for LLM Memory Estimator
 """
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Literal, Optional
 
-from .model_config import ModelConfig, MemoryResult, calculate_weight_memory, get_dtype_bytes, FormulaEvaluator
+from .model_config import ModelConfig, MemoryResult, calculate_weight_memory, get_dtype_bytes, FormulaEvaluator, WeightInfo
 
 
 class MemoryEstimator:
@@ -15,7 +15,8 @@ class MemoryEstimator:
         self.config = config
         self.evaluator = FormulaEvaluator(config.architecture_config, config.computation_rules)
 
-    def calculate_weights_memory(self, tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1) -> Tuple[float, Dict[str, float]]:
+    def calculate_weights_memory(self, tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
+                                  stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> Tuple[float, Dict[str, float]]:
         """Calculate total weights memory and breakdown by module type
 
         Args:
@@ -24,14 +25,34 @@ class MemoryEstimator:
             dp: Data Parallel degree
             cp: Context Parallel degree
             ep: Expert Parallel degree
+            stage: PD separation stage - "hybrid" (混部/通用), "prefill" (PD分离-prefill), "decode" (PD分离-decode)
         """
         total_memory = 0.0
         breakdown = {}
 
+        # Check if we have a classifier for stage-specific parallel strategy
+        classifier = self.config.weight_classifier
+        model_type = self.config.model_type
+
         for module_type, weights in self.config.modules.items():
             module_memory = 0.0
             for weight_name, weight_info in weights.items():
-                weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
+                # If classifier available, recompute parallel strategy with stage
+                if classifier is not None:
+                    parallel_strategy = classifier.get_parallel_strategy(
+                        weight_name, module_type, model_type, stage=stage
+                    )
+                    # Create a temporary WeightInfo with updated strategy
+                    updated_weight_info = WeightInfo(
+                        shape=weight_info.shape,
+                        dtype=weight_info.dtype,
+                        layers=weight_info.layers,
+                        parallel_strategy=parallel_strategy,
+                        world_size=weight_info.world_size
+                    )
+                    weight_memory = calculate_weight_memory(updated_weight_info, tp, pp, dp, cp, ep)
+                else:
+                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
                 module_memory += weight_memory
 
             breakdown[module_type] = module_memory
@@ -116,7 +137,8 @@ class MemoryEstimator:
                         tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                         system_reserved_gb: float = 2.0,
                         use_decode_factor: bool = True,
-                        activation_peak_gb: float = None) -> MemoryResult:
+                        activation_peak_gb: float = None,
+                        stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> MemoryResult:
         """Estimate total memory usage
 
         Args:
@@ -133,10 +155,11 @@ class MemoryEstimator:
             system_reserved_gb: System reserved memory in GB
             use_decode_factor: If True, use decode factor (12.5) with seq_len=1; otherwise use has_prefill factor (1.25) with seq_len=total_seq_len
             activation_peak_gb: If specified, use this fixed activation peak value (GB) instead of calculating from formula
+            stage: PD separation stage - "hybrid" (混部/通用), "prefill" (PD分离-prefill), "decode" (PD分离-decode)
         """
         # Calculate weights memory (with parallel strategy sharding)
         weights_memory, weights_breakdown = self.calculate_weights_memory(
-            tp=tp, pp=pp, dp=dp, cp=cp, ep=ep
+            tp=tp, pp=pp, dp=dp, cp=cp, ep=ep, stage=stage
         )
 
         # Calculate KV cache memory (prompt_len + gen_len)
@@ -172,7 +195,8 @@ class MemoryEstimator:
             kv_cache_memory_gb=kv_cache_memory,
             activation_memory_gb=activation_memory,
             system_reserved_gb=system_reserved_gb,
-            breakdown=weights_breakdown
+            breakdown=weights_breakdown,
+            stage=stage
         )
 
     def find_max_sequence_length(self, available_memory_gb: float, batch_size: int = 1,
@@ -181,7 +205,8 @@ class MemoryEstimator:
                                   tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                                   system_reserved_gb: float = 2.0,
                                   use_decode_factor: bool = True,
-                                  activation_peak_gb: float = None) -> int:
+                                  activation_peak_gb: float = None,
+                                  stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> int:
         """Binary search to find maximum generated length (gen_len)
 
         Args:
@@ -199,7 +224,7 @@ class MemoryEstimator:
             activation_peak_gb: If specified, use this fixed activation peak value (GB)
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage)
         fixed_memory = weights_memory + system_reserved_gb
 
         # KV cache for prompt (fixed)
@@ -262,7 +287,8 @@ class MemoryEstimator:
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                             tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                             system_reserved_gb: float = 2.0,
-                            activation_peak_gb: float = None) -> int:
+                            activation_peak_gb: float = None,
+                            stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> int:
         """Binary search to find maximum prompt length (prompt_len) with fixed gen_len
 
         This is used for PD separation scenarios where we want to find the maximum
@@ -280,9 +306,10 @@ class MemoryEstimator:
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
             activation_peak_gb: If specified, use this fixed activation peak value (GB)
+            stage: PD separation stage - "hybrid" (混部/通用), "prefill" (PD分离-prefill), "decode" (PD分离-decode)
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage)
         fixed_memory = weights_memory + system_reserved_gb
 
         # Activation peak is fixed when specified (not incremental per token)
@@ -331,7 +358,8 @@ class MemoryEstimator:
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
                             tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
                             system_reserved_gb: float = 2.0,
-                            activation_peak_gb: float = None) -> int:
+                            activation_peak_gb: float = None,
+                            stage: Literal["hybrid", "prefill", "decode"] = "hybrid") -> int:
         """Binary search to find maximum batch_size that fits in available memory
 
         This is used for Scene 8 scenarios where both prompt_len and gen_len are fixed,
@@ -349,9 +377,10 @@ class MemoryEstimator:
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
             activation_peak_gb: If specified, use this fixed activation peak value (GB)
+            stage: PD separation stage - "hybrid" (混部/通用), "prefill" (PD分离-prefill), "decode" (PD分离-decode)
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage)
         fixed_memory = weights_memory + system_reserved_gb
 
         # Activation peak is fixed when specified (not incremental per token)

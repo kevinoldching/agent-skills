@@ -312,6 +312,84 @@ computation_rules:
 
 ---
 
+## 4.1 parallel_defaults（并行策略配置）
+
+### 4.1.1 PD 分离支持
+
+`parallel_defaults` 支持三层结构，用于 Prefill/Decode 分离部署场景：
+
+| Key | 说明 | CLI `--stage` |
+|-----|------|---------------|
+| `parallel_defaults` | 混部/通用场景 | 不指定 `--stage` 或 `--stage both` |
+| `parallel_defaults.prefill` | PD分离-prefill阶段专用 | `--stage prefill` |
+| `parallel_defaults.decode` | PD分离-decode阶段专用 | `--stage decode` |
+
+**继承规则（整层继承）**：
+- 模型定义了某 stage → 使用模型的
+- 模型未定义某 stage → 使用 generic 的同名 stage
+- generic 也未定义 → `{}`（空）
+
+**示例**：
+
+```yaml
+generic:
+  # 混部/通用场景的并行策略
+  parallel_defaults:
+    embedding: TP
+    ffn_moe:
+      experts: EP
+    ffn_dense: TP
+    norm: replicated
+
+  # PD分离-prefill专用（可选）
+  parallel_defaults.prefill:
+    ffn_moe:
+      experts: EP
+
+  # PD分离-decode专用（可选）
+  parallel_defaults.decode:
+    ffn_moe:
+      experts: EP
+
+Kimi-K2.5:
+  inherit: generic
+
+  # 混部继承generic，仅覆盖ffn_shared_expert
+  parallel_defaults:
+    ffn_shared_expert: TP
+
+  # PD分离-prefill：ffn_moe使用EP
+  parallel_defaults.prefill:
+    ffn_moe: EP
+
+  # PD分离-decode：ffn_moe使用TP
+  parallel_defaults.decode:
+    ffn_moe: TP
+```
+
+### 4.1.2 CLI 使用
+
+```bash
+# 混部场景（不指定 --stage，走 hybrid 层）
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4
+
+# PD分离场景
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage prefill
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage decode
+
+# both 模式：对比 prefill vs decode 的 weight 分片差异
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage both
+```
+
+### 4.1.3 回退兼容
+
+已有 YAML 只有单层 `parallel_defaults` 时，自动映射到三层：
+- `hybrid` = 原 `parallel_defaults`
+- `prefill` = 继承 `hybrid`（未单独定义时）
+- `decode` = 继承 `hybrid`（未单独定义时）
+
+---
+
 ## 5. 如何手动创建配置文件
 
 ### 5.1 自动生成（推荐）

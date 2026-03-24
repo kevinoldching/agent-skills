@@ -77,10 +77,10 @@ def main():
     args = parser.parse_args()
 
     # Map args.stage to stage string for estimator
-    # None → "mixed" (backward compatible, use generic/mixed parallel defaults)
+    # None → "hybrid" (backward compatible, use generic/hybrid parallel defaults)
     # "prefill" → "prefill"
     # "decode" → "decode"
-    stage = "mixed"
+    stage = "hybrid"
     if args.stage == "prefill":
         stage = "prefill"
     elif args.stage == "decode":
