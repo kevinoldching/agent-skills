@@ -63,7 +63,8 @@ def main():
                        help="PD分离阶段: prefill/decode（不指定则走混部/通用并行配置）")
 
     # Hardware configuration
-    parser.add_argument('--chip', type=str, help="Chip name (e.g., nvidia/H100-80GB)")
+    parser.add_argument('--chip', type=str, nargs='?', const='', default=None,
+                       help="Chip name (e.g., nvidia/H100-80GB)")
     parser.add_argument('--find-max-seq-len', action='store_true',
                        help="Find maximum sequence length for given hardware")
 
