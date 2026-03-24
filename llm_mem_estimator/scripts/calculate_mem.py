@@ -208,8 +208,12 @@ def main():
             if chips_path.exists():
                 chips_config = ConfigLoader.load_chips_config(str(chips_path))
                 supported_chips = format_supported_chips(chips_config)
-                print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
-                print(f"Supported chips:\n{supported_chips}", file=sys.stderr)
+                if args.chip:
+                    print(f"Error: Chip '{args.chip}' not found.", file=sys.stderr)
+                    print(f"Supported chips:\n{supported_chips}\n(Use 'Vendor/ChipName' format, e.g., 'nvidia/H100-80GB' or short name like 'H100-80GB')", file=sys.stderr)
+                else:
+                    print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
+                    print(f"Supported chips:\n{supported_chips}", file=sys.stderr)
             else:
                 print("Error: --chip must be specified with --find-max-seq-len", file=sys.stderr)
             sys.exit(1)
