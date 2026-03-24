@@ -6,7 +6,7 @@ Report generator for LLM Memory Estimator
 import re
 from typing import Dict, Optional, Any
 
-from .model_config import ModelConfig, MemoryResult, get_dtype_bytes, calculate_weight_memory
+from .model_config import ModelConfig, MemoryResult, get_dtype_bytes, calculate_weight_memory, WeightInfo
 
 
 def simplify_weight_name(weight_name: str) -> str:
@@ -31,7 +31,8 @@ class ReportGenerator:
     def generate_report(config: ModelConfig, result: MemoryResult,
                        batch_size: int, parallel_config: Dict[str, int],
                        prompt_len: int = 0, gen_len: int = 0,
-                       chip_info: Optional[Dict[str, Any]] = None) -> str:
+                       chip_info: Optional[Dict[str, Any]] = None,
+                       stage: str = "mixed") -> str:
         """Generate a markdown report"""
         lines = []
 
@@ -183,7 +184,21 @@ class ReportGenerator:
 
                 module_memory = 0.0
                 for weight_name, weight_info in module_weights.items():
-                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
+                    # Use stage-specific parallel strategy from classifier if available
+                    if config.weight_classifier and config.model_type:
+                        strat = config.weight_classifier.get_parallel_strategy(
+                            weight_name, module_type, config.model_type, stage=stage
+                        )
+                        temp_weight_info = WeightInfo(
+                            shape=weight_info.shape,
+                            dtype=weight_info.dtype,
+                            layers=weight_info.layers,
+                            parallel_strategy=strat,
+                            world_size=weight_info.world_size
+                        )
+                        weight_memory = calculate_weight_memory(temp_weight_info, tp, pp, dp, cp, ep)
+                    else:
+                        weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
                     module_memory += weight_memory
 
                 if module_memory > 0:
@@ -235,11 +250,24 @@ class ReportGenerator:
                     # Simplify weight name for display (e.g., blocks.0. -> blocks.N.)
                     display_name = simplify_weight_name(weight_name)
                     shape_str = str(weight_info.shape).replace(" ", "")
-                    parallel_strategy = weight_info.parallel_strategy or "N/A"
+                    # Use stage-specific parallel strategy from classifier if available
+                    if config.weight_classifier and config.model_type:
+                        parallel_strategy = config.weight_classifier.get_parallel_strategy(
+                            weight_name, module_type, config.model_type, stage=stage
+                        )
+                        # Create temp WeightInfo with stage-specific strategy for memory calculation
+                        temp_weight_info = WeightInfo(
+                            shape=weight_info.shape,
+                            dtype=weight_info.dtype,
+                            layers=weight_info.layers,
+                            parallel_strategy=parallel_strategy,
+                            world_size=weight_info.world_size
+                        )
+                        weight_memory = calculate_weight_memory(temp_weight_info, tp, pp, dp, cp, ep)
+                    else:
+                        parallel_strategy = weight_info.parallel_strategy or "N/A"
+                        weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
                     dtype = weight_info.dtype
-
-                    # Calculate memory with parallel strategy
-                    weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
 
                     # Create key for merging
                     key = (module_type, display_name, shape_str, dtype, parallel_strategy)

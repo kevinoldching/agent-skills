@@ -58,6 +58,9 @@ def main():
     parser.add_argument('--dp', type=int, default=1, help="Data parallel size")
     parser.add_argument('--cp', type=int, default=1, help="Context parallel size")
     parser.add_argument('--ep', type=int, default=1, help="Expert parallel size")
+    parser.add_argument('--stage', type=str, default=None,
+                       choices=["prefill", "decode"],
+                       help="PD分离阶段: prefill/decode（不指定则走混部/通用并行配置）")
 
     # Hardware configuration
     parser.add_argument('--chip', type=str, help="Chip name (e.g., nvidia/H100-80GB)")
@@ -72,6 +75,16 @@ def main():
     parser.add_argument('--output', type=str, help="Output report path")
 
     args = parser.parse_args()
+
+    # Map args.stage to stage string for estimator
+    # None → "mixed" (backward compatible, use generic/mixed parallel defaults)
+    # "prefill" → "prefill"
+    # "decode" → "decode"
+    stage = "mixed"
+    if args.stage == "prefill":
+        stage = "prefill"
+    elif args.stage == "decode":
+        stage = "decode"
 
     # Skip validation for --generate-config (only generates config, no memory calculation needed)
     if args.generate_config:
@@ -136,6 +149,9 @@ def main():
         # Load from YAML config
         config = ConfigLoader.load_yaml_config(args.config)
         model_name = config.model_identity.name
+        # Attach classifier and model_type for stage-specific parallel strategy lookup
+        config.weight_classifier = classifier
+        config.model_type = model_name
     else:
         # Generate config from model
         generator = ConfigGenerator(classifier)
@@ -235,7 +251,8 @@ def main():
                     ep=args.ep,
                     system_reserved_gb=system_reserved_gb,
                     use_decode_factor=False,
-                    activation_peak_gb=args.activation_peak
+                    activation_peak_gb=args.activation_peak,
+                    stage=stage
                 )
 
                 parallel_config = {
@@ -253,7 +270,8 @@ def main():
                     parallel_config=parallel_config,
                     prompt_len=effective_prompt_len,
                     gen_len=effective_gen_len,
-                    chip_info=chip_info
+                    chip_info=chip_info,
+                    stage=stage
                 )
 
                 print(report)
@@ -284,7 +302,8 @@ def main():
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
-                activation_peak_gb=args.activation_peak
+                activation_peak_gb=args.activation_peak,
+                stage=stage
             )
 
             # Generate report with max batch size
@@ -301,7 +320,8 @@ def main():
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
                 use_decode_factor=False,
-                activation_peak_gb=args.activation_peak
+                activation_peak_gb=args.activation_peak,
+                stage=stage
             )
 
             parallel_config = {
@@ -319,7 +339,8 @@ def main():
                 parallel_config=parallel_config,
                 prompt_len=effective_prompt_len,
                 gen_len=effective_gen_len,
-                chip_info=chip_info
+                chip_info=chip_info,
+                stage=stage
             )
 
             print(report)
@@ -352,7 +373,8 @@ def main():
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
-                activation_peak_gb=args.activation_peak
+                activation_peak_gb=args.activation_peak,
+                stage=stage
             )
 
             # Generate report with max prompt length (Prefill scenario)
@@ -369,7 +391,8 @@ def main():
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
                 use_decode_factor=False,
-                activation_peak_gb=args.activation_peak
+                activation_peak_gb=args.activation_peak,
+                stage=stage
             )
 
             parallel_config = {
@@ -387,7 +410,8 @@ def main():
                 parallel_config=parallel_config,
                 prompt_len=max_prompt_len,
                 gen_len=effective_gen_len,
-                chip_info=chip_info
+                chip_info=chip_info,
+                stage=stage
             )
 
             print(report)
@@ -500,7 +524,8 @@ def main():
             ep=args.ep,
             system_reserved_gb=system_reserved_gb,
             use_decode_factor=True,
-            activation_peak_gb=args.activation_peak
+            activation_peak_gb=args.activation_peak,
+            stage=stage
         )
 
         # Generate report with max sequence length (Decode scenario)
@@ -517,7 +542,8 @@ def main():
             ep=args.ep,
             system_reserved_gb=system_reserved_gb,
             use_decode_factor=True,
-            activation_peak_gb=args.activation_peak
+            activation_peak_gb=args.activation_peak,
+            stage=stage
         )
 
         parallel_config = {
@@ -535,7 +561,8 @@ def main():
             parallel_config=parallel_config,
             prompt_len=effective_prompt_len,
             gen_len=max_gen_len,
-            chip_info=chip_info
+            chip_info=chip_info,
+            stage=stage
         )
 
         print(report)
@@ -642,7 +669,8 @@ def main():
         ep=args.ep,
         system_reserved_gb=system_reserved_gb,
         use_decode_factor=False,
-        activation_peak_gb=args.activation_peak
+        activation_peak_gb=args.activation_peak,
+        stage=stage
     )
 
     # Generate report
@@ -661,7 +689,8 @@ def main():
         parallel_config=parallel_config,
         prompt_len=effective_prompt_len,
         gen_len=effective_gen_len,
-        chip_info=chip_info
+        chip_info=chip_info,
+        stage=stage
     )
 
     # Output report

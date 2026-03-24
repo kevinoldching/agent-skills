@@ -72,6 +72,9 @@ class ModelConfig:
     architecture_config: ArchitectureConfig
     modules: Dict[str, Dict[str, WeightInfo]]  # module_type -> {weight_name: WeightInfo}
     computation_rules: Dict[str, Any]  # rule_name -> formula or value
+    # For PD separation: allows recomputing parallel strategy with different stage
+    weight_classifier: Optional[Any] = None
+    model_type: Optional[str] = None  # HuggingFace model_type for classifier lookup
 
 
 @dataclass
@@ -85,6 +88,7 @@ class MemoryResult:
     breakdown: Dict[str, float]  # Detailed breakdown by module type
     max_sequence_length: Optional[int] = None
     max_batch_size: Optional[int] = None
+    stage: Optional[str] = None  # PD分离阶段: mixed, prefill, decode
 
 
 # ============================================================================
@@ -265,6 +269,73 @@ class ConfigLoader:
         """Load weight mapping rules"""
         with open(rules_path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
+
+    @staticmethod
+    def _parse_parallel_defaults(raw: Dict, generic_raw: Optional[Dict] = None) -> Dict[str, Dict]:
+        """Parse parallel_defaults three-level structure for PD separation support
+
+        Returns structure:
+        {
+            "mixed": {...},       # 混部/通用场景 (original parallel_defaults)
+            "prefill": {...},     # PD分离-prefill
+            "decode": {...}       # PD分离-decode
+        }
+
+        Inheritance rules (per-module-type):
+        - mixed: model's parallel_defaults > generic's parallel_defaults
+        - prefill: model's parallel_defaults.prefill > model's parallel_defaults >
+                   generic's parallel_defaults.prefill > generic's parallel_defaults
+        - decode: model's parallel_defaults.decode > model's parallel_defaults >
+                  generic's parallel_defaults.decode > generic's parallel_defaults.prefill >
+                  generic's parallel_defaults
+
+        Supports both old format (single parallel_defaults) and new format
+        (parallel_defaults + parallel_defaults.prefill + parallel_defaults.decode).
+        """
+        result = {}
+
+        generic_defaults = (generic_raw or {})
+
+        # For mixed (混部/通用): inherits from generic.parallel_defaults
+        model_mixed = raw.get("parallel_defaults", {}) if raw else {}
+        generic_mixed = generic_defaults.get("parallel_defaults", {})
+        merged_mixed = dict(generic_mixed)
+        for module_type, strategy in model_mixed.items():
+            merged_mixed[module_type] = strategy
+        result["mixed"] = merged_mixed
+
+        # For prefill:
+        # 1. Start with generic's parallel_defaults (lowest priority)
+        merged_prefill = dict(generic_mixed)
+        # 2. Overlay with generic's parallel_defaults.prefill
+        for module_type, strategy in generic_defaults.get("parallel_defaults.prefill", {}).items():
+            merged_prefill[module_type] = strategy
+        # 3. Overlay with model's parallel_defaults (mixed)
+        for module_type, strategy in model_mixed.items():
+            merged_prefill[module_type] = strategy
+        # 4. Overlay with model's parallel_defaults.prefill (highest priority)
+        for module_type, strategy in raw.get("parallel_defaults.prefill", {}).items() if raw else []:
+            merged_prefill[module_type] = strategy
+        result["prefill"] = merged_prefill
+
+        # For decode:
+        # 1. Start with generic's parallel_defaults (lowest priority)
+        merged_decode = dict(generic_mixed)
+        # 2. Overlay with generic's parallel_defaults.prefill
+        for module_type, strategy in generic_defaults.get("parallel_defaults.prefill", {}).items():
+            merged_decode[module_type] = strategy
+        # 3. Overlay with generic's parallel_defaults.decode
+        for module_type, strategy in generic_defaults.get("parallel_defaults.decode", {}).items():
+            merged_decode[module_type] = strategy
+        # 4. Overlay with model's parallel_defaults (mixed)
+        for module_type, strategy in model_mixed.items():
+            merged_decode[module_type] = strategy
+        # 5. Overlay with model's parallel_defaults.decode (highest priority)
+        for module_type, strategy in raw.get("parallel_defaults.decode", {}).items() if raw else []:
+            merged_decode[module_type] = strategy
+        result["decode"] = merged_decode
+
+        return result
 
     @staticmethod
     def save_yaml_config(config: ModelConfig, output_path: str) -> None:
