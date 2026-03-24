@@ -422,7 +422,8 @@ def main():
 
             # Calculate fixed memory
             weights_memory, _ = estimator.calculate_weights_memory(
-                tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep
+                tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep,
+                stage=stage
             )
             fixed_memory = weights_memory + system_reserved_gb
 
@@ -573,7 +574,8 @@ def main():
 
         # Calculate fixed memory
         weights_memory, _ = estimator.calculate_weights_memory(
-            tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep
+            tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep,
+            stage=stage
         )
         fixed_memory = weights_memory + system_reserved_gb
 
