@@ -29,6 +29,23 @@ def format_supported_chips(chips_config):
 
 
 def main():
+    # Pre-check: if --chip is provided without a value, show supported chips and exit
+    if '--chip' in sys.argv:
+        chip_idx = sys.argv.index('--chip')
+        # Check if --chip is at the end or followed by another flag
+        if chip_idx + 1 >= len(sys.argv) or sys.argv[chip_idx + 1].startswith('-'):
+            # Show supported chips and exit
+            script_dir = Path(__file__).parent.parent
+            chips_path = script_dir / "configs" / "chips.json"
+            if chips_path.exists():
+                chips_config = ConfigLoader.load_chips_config(str(chips_path))
+                supported_chips = format_supported_chips(chips_config)
+                print("Error: --chip requires a value when specified.", file=sys.stderr)
+                print(f"Supported chips:\n{supported_chips}\n(Use 'Vendor/ChipName' format, e.g., 'nvidia/H100-80GB' or short name like 'H100-80GB')", file=sys.stderr)
+            else:
+                print("Error: --chip requires a value when specified.", file=sys.stderr)
+            sys.exit(1)
+
     parser = argparse.ArgumentParser(description="LLM Memory Estimator")
 
     # Input options
