@@ -313,13 +313,18 @@ graph TB
 When users want to see layer internals:
 
 ```mermaid
-subgraph Block_N[Layer N]
-    direction TB
-    Norm[LayerNorm / RMSNorm] --> Attention
-    Attention --> Residual[Residual Connection]
-    Residual --> MLP[MLP / FFN]
-    MLP --> Residual
-end
+graph TB
+    subgraph "Layer N"
+        direction TB
+        Input --> InputNorm[LayerNorm / RMSNorm]
+        InputNorm --> Attention[Attention]
+        Attention --> Post_Attn_Norm[LayerNorm / RMSNorm]
+        Post_Attn_Norm --> MLP[MLP / FFN]
+        MLP --> Output
+        Attention --> Add
+        InputNorm --> Add
+        Add --> Post_Attn_Norm
+    end
 ```
 
 ---
