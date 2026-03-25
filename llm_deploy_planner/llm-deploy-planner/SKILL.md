@@ -215,6 +215,14 @@ imbalance >= 0.7 → 分离
 
 ### 调用方式
 
+### 调用 llm-mem-estimator 注意事项
+
+**不要**自己去网上搜索模型参数（如参数量、层数、hidden_size等）。
+llm-mem-estimator 会自动从 HuggingFace 或本地缓存获取所需模型参数。
+只需提供模型名称（如 `Qwen/Qwen2.5-7B`）和配置参数即可。
+
+### 调用方式
+
 使用 Skill tool 调用 `llm-mem-estimator`，每次调用传入不同的 (TP, EP, DP) 组合：
 
 ```
@@ -393,26 +401,5 @@ Decode TPS = batch_size / TPOT
 
 ## 5. 实现注意事项
 - [具体配置建议和注意事项]
-```
 
-## 关键公式参考
-
-| 公式 | 说明 |
-|------|------|
-| `Decode TPS_混部 = batch_size × (S_in + S_out) / (TTFT + S_out × TPOT)` | 混部 TPS |
-| `Decode TPS_分离 = batch_size / TPOT` | 分离 TPS |
-| `prefill_cards = TP_prefill × DP_prefill` | Prefill 每实例卡数 |
-| `decode_cards = TP_decode × DP_decode` | Decode 每实例卡数 |
-| `x = ceil(prefill_cards_total / cards_per_instance)` | Prefill 实例数 |
-
-## 约束条件总结
-
-始终验证：
-1. `TP <= 单机卡数 或 TP = 单机卡数 × 机器数量`
-2. `TP × DP = EP`
-3. `EP < 实例总卡数`
-4. `[若MoE] EP >= 2 且 EP <= expert数量`
-5. **xPyD: y = 1（固定，不可更改），x × TP_prefill × DP_prefill = y × TP_decode × DP_decode（Prefill和Decode总卡数必须相等）**
-6. 总卡数 <= 可用卡数
-7. TP/EP 取值为2的幂；TP 在 [1, 单机卡数] 范围内为 1, 2, 4, 8, ...；超出单机卡数后为 单机卡数×2^k（k=1,2,3,...）；EP=1 仅限非MoE模型；MoE模型 EP >= 单机卡数
-8. **总卡数必须是单机卡数的整数倍**（total_cards % 单机卡数 == 0，避免出现56、42等无法整除的值）
+详细公式与约束条件参见 [references/rules.md](./references/rules.md)
