@@ -69,18 +69,18 @@ generic:
   # 继承规则：模型定义了某stage → 使用模型的；模型未定义 → 使用generic的同名stage
   # 注意：generic只定义parallel_defaults，prefill/decode由具体模型定义
   parallel_defaults:
-    embedding: TP_EMBEDDING
+    embedding: TP
     attention:
       q_proj.weight: TP
       k_proj.weight: TP
       v_proj.weight: TP
-      o_proj.weight: TP_O_PROJ
+      o_proj.weight: TP
       q_b_proj.weight: TP
       kv_b_proj.weight: TP
     ffn_moe:
       experts: EP
-    ffn_dense: TP_MLP
-    ffn_shared_expert: TP_SHARED_EXPERT
+    ffn_dense: TP
+    ffn_shared_expert: TP
     norm: replicated
     others: replicated
 
@@ -219,14 +219,9 @@ Kimi-K2.5:
 
   # PD分离-decode专用
   parallel_defaults.decode:
-    ffn_dense: replicated
+    embedding: TP_EMBEDDING
     attention:
-      q_proj.weight: replicated
-      k_proj.weight: replicated
-      v_proj.weight: replicated
       o_proj.weight: TP_O_PROJ
-      q_b_proj.weight: replicated
-      kv_b_proj.weight: replicated
 
 # ============================================================================
 # Architecture Config 字段映射

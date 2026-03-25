@@ -113,8 +113,18 @@ def main():
     elif args.stage == "decode":
         stage = "decode"
 
-    # Build tp_variant_sizes dict from CLI args (only include if explicitly set)
+    # Build tp_variant_sizes dict
+    # Start with YAML defaults (loaded from weight_mapping_rules), then overlay CLI overrides
+    script_dir = Path(__file__).parent.parent
+    rules_path = script_dir / "configs" / "weight_mapping_rules.yaml"
     tp_variant_sizes = {}
+    if rules_path.exists():
+        rules = ConfigLoader.load_weight_mapping_rules(str(rules_path))
+        classifier_for_defaults = WeightClassifier(rules)
+        # Get defaults from generic tp_variants
+        generic_tp_variants = classifier_for_defaults._tp_variants_cache.get('generic', {})
+        tp_variant_sizes = dict(generic_tp_variants)
+    # Overlay CLI overrides
     if args.tp_o_proj is not None:
         tp_variant_sizes['TP_O_PROJ'] = args.tp_o_proj
     if args.tp_mlp is not None:
