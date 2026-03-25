@@ -149,12 +149,24 @@ def main():
 
         if args.model:
             print(f"Generating config from HuggingFace model: {args.model}")
-            config = generator.generate_config(args.model, is_local=False)
             model_name = args.model.split('/')[-1]
+            # Try to match model_type from weight_mapping_rules
+            # Priority: exact match, then partial match
+            model_type = None
+            short_name = model_name
+            if short_name in classifier.rules:
+                model_type = short_name
+            else:
+                # Try to find a case-insensitive or partial match
+                for key in classifier.rules:
+                    if key not in ('generic', 'architecture_config') and key.lower() == short_name.lower():
+                        model_type = key
+                        break
+            config = generator.generate_config(args.model, is_local=False, model_type=model_type)
         elif args.local:
             print(f"Generating config from local weights: {args.local}")
-            config = generator.generate_config(args.local, is_local=True)
             model_name = Path(args.local).name
+            config = generator.generate_config(args.local, is_local=True)
         else:
             print("Error: --model or --local required with --generate-config", file=sys.stderr)
             sys.exit(1)
