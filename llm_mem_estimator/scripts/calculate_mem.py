@@ -324,7 +324,8 @@ def main():
                     prompt_len=effective_prompt_len,
                     gen_len=effective_gen_len,
                     chip_info=chip_info,
-                    stage=stage
+                    stage=stage,
+                    tp_variant_sizes=tp_variant_sizes
                 )
 
                 print(report)
@@ -395,7 +396,8 @@ def main():
                 prompt_len=effective_prompt_len,
                 gen_len=effective_gen_len,
                 chip_info=chip_info,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             print(report)
@@ -468,7 +470,8 @@ def main():
                 prompt_len=max_prompt_len,
                 gen_len=effective_gen_len,
                 chip_info=chip_info,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             print(report)
@@ -622,7 +625,8 @@ def main():
             prompt_len=effective_prompt_len,
             gen_len=max_gen_len,
             chip_info=chip_info,
-            stage=stage
+            stage=stage,
+            tp_variant_sizes=tp_variant_sizes
         )
 
         print(report)
@@ -752,7 +756,8 @@ def main():
         prompt_len=effective_prompt_len,
         gen_len=effective_gen_len,
         chip_info=chip_info,
-        stage=stage
+        stage=stage,
+        tp_variant_sizes=tp_variant_sizes
     )
 
     # Output report

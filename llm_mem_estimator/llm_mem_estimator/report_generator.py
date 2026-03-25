@@ -32,7 +32,8 @@ class ReportGenerator:
                        batch_size: int, parallel_config: Dict[str, int],
                        prompt_len: int = 0, gen_len: int = 0,
                        chip_info: Optional[Dict[str, Any]] = None,
-                       stage: str = "hybrid") -> str:
+                       stage: str = "hybrid",
+                       tp_variant_sizes: Optional[Dict[str, int]] = None) -> str:
         """Generate a markdown report"""
         lines = []
 
@@ -255,22 +256,38 @@ class ReportGenerator:
                         parallel_strategy = config.weight_classifier.get_parallel_strategy(
                             weight_name, module_type, config.model_type, stage=stage
                         )
-                        # Create temp WeightInfo with stage-specific strategy for memory calculation
+                        # Resolve TP_XXX variants to actual TP sizes
+                        display_strategy = parallel_strategy  # Keep original variant name for display
+                        resolved_strategy = parallel_strategy
+                        actual_tp_for_weight = tp
+                        if parallel_strategy.startswith('TP_'):
+                            # It's a TP variant
+                            if tp_variant_sizes:
+                                variant_size = tp_variant_sizes.get(parallel_strategy)
+                                if variant_size is not None:
+                                    actual_tp_for_weight = variant_size
+                                    resolved_strategy = 'TP'
+                                else:
+                                    resolved_strategy = 'TP'
+                            else:
+                                resolved_strategy = 'TP'
+                        # Create temp WeightInfo with resolved strategy for memory calculation
                         temp_weight_info = WeightInfo(
                             shape=weight_info.shape,
                             dtype=weight_info.dtype,
                             layers=weight_info.layers,
-                            parallel_strategy=parallel_strategy,
-                            world_size=weight_info.world_size
+                            parallel_strategy=resolved_strategy,
+                            world_size=actual_tp_for_weight if resolved_strategy == 'TP' else weight_info.world_size
                         )
-                        weight_memory = calculate_weight_memory(temp_weight_info, tp, pp, dp, cp, ep)
+                        weight_memory = calculate_weight_memory(temp_weight_info, actual_tp_for_weight, pp, dp, cp, ep)
                     else:
                         parallel_strategy = weight_info.parallel_strategy or "N/A"
+                        display_strategy = parallel_strategy
                         weight_memory = calculate_weight_memory(weight_info, tp, pp, dp, cp, ep)
                     dtype = weight_info.dtype
 
-                    # Create key for merging
-                    key = (module_type, display_name, shape_str, dtype, parallel_strategy)
+                    # Create key for merging (use display_strategy to group by original variant name)
+                    key = (module_type, display_name, shape_str, dtype, display_strategy)
 
                     if key not in merged_weights:
                         merged_weights[key] = {
@@ -292,6 +309,12 @@ class ReportGenerator:
                 # Calculate actual world size based on parallel strategy and CLI params
                 if parallel_strategy.upper() == "TP":
                     world_size = tp
+                elif parallel_strategy.upper().startswith("TP_"):
+                    # TP variant - get the resolved size from tp_variant_sizes
+                    if tp_variant_sizes and parallel_strategy in tp_variant_sizes:
+                        world_size = tp_variant_sizes[parallel_strategy]
+                    else:
+                        world_size = tp  # Fall back to global tp
                 elif parallel_strategy.upper() == "EP":
                     world_size = ep
                 elif parallel_strategy.upper() == "PP":
