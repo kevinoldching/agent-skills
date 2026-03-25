@@ -75,6 +75,15 @@ def main():
     parser.add_argument('--dp', type=int, default=1, help="Data parallel size")
     parser.add_argument('--cp', type=int, default=1, help="Context parallel size")
     parser.add_argument('--ep', type=int, default=1, help="Expert parallel size")
+    # TP variant sizes (overrides YAML defaults for TP_XXX strategies)
+    parser.add_argument('--tp-o-proj', type=int, default=None,
+                       help="TP size for o_proj.weight (TP_O_PROJ variant)")
+    parser.add_argument('--tp-mlp', type=int, default=None,
+                       help="TP size for FFN weights (TP_MLP variant)")
+    parser.add_argument('--tp-shared-expert', type=int, default=None,
+                       help="TP size for shared expert weights (TP_SHARED_EXPERT variant)")
+    parser.add_argument('--tp-embedding', type=int, default=None,
+                       help="TP size for embedding weights (TP_EMBEDDING variant)")
     parser.add_argument('--stage', type=str, default=None,
                        choices=["prefill", "decode"],
                        help="PD分离阶段: prefill/decode（不指定则走混部/通用并行配置）")
@@ -103,6 +112,17 @@ def main():
         stage = "prefill"
     elif args.stage == "decode":
         stage = "decode"
+
+    # Build tp_variant_sizes dict from CLI args (only include if explicitly set)
+    tp_variant_sizes = {}
+    if args.tp_o_proj is not None:
+        tp_variant_sizes['TP_O_PROJ'] = args.tp_o_proj
+    if args.tp_mlp is not None:
+        tp_variant_sizes['TP_MLP'] = args.tp_mlp
+    if args.tp_shared_expert is not None:
+        tp_variant_sizes['TP_SHARED_EXPERT'] = args.tp_shared_expert
+    if args.tp_embedding is not None:
+        tp_variant_sizes['TP_EMBEDDING'] = args.tp_embedding
 
     # Skip validation for --generate-config (only generates config, no memory calculation needed)
     if args.generate_config:
@@ -274,7 +294,8 @@ def main():
                     system_reserved_gb=system_reserved_gb,
                     use_decode_factor=False,
                     activation_peak_gb=args.activation_peak,
-                    stage=stage
+                    stage=stage,
+                    tp_variant_sizes=tp_variant_sizes
                 )
 
                 parallel_config = {
@@ -325,7 +346,8 @@ def main():
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
                 activation_peak_gb=args.activation_peak,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             # Generate report with max batch size
@@ -343,7 +365,8 @@ def main():
                 system_reserved_gb=system_reserved_gb,
                 use_decode_factor=False,
                 activation_peak_gb=args.activation_peak,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             parallel_config = {
@@ -396,7 +419,8 @@ def main():
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
                 activation_peak_gb=args.activation_peak,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             # Generate report with max prompt length (Prefill scenario)
@@ -414,7 +438,8 @@ def main():
                 system_reserved_gb=system_reserved_gb,
                 use_decode_factor=False,
                 activation_peak_gb=args.activation_peak,
-                stage=stage
+                stage=stage,
+                tp_variant_sizes=tp_variant_sizes
             )
 
             parallel_config = {
@@ -445,7 +470,7 @@ def main():
             # Calculate fixed memory
             weights_memory, _ = estimator.calculate_weights_memory(
                 tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep,
-                stage=stage
+                stage=stage, tp_variant_sizes=tp_variant_sizes
             )
             fixed_memory = weights_memory + system_reserved_gb
 
@@ -548,7 +573,8 @@ def main():
             system_reserved_gb=system_reserved_gb,
             use_decode_factor=True,
             activation_peak_gb=args.activation_peak,
-            stage=stage
+            stage=stage,
+            tp_variant_sizes=tp_variant_sizes
         )
 
         # Generate report with max sequence length (Decode scenario)
@@ -566,7 +592,8 @@ def main():
             system_reserved_gb=system_reserved_gb,
             use_decode_factor=True,
             activation_peak_gb=args.activation_peak,
-            stage=stage
+            stage=stage,
+            tp_variant_sizes=tp_variant_sizes
         )
 
         parallel_config = {
@@ -597,7 +624,7 @@ def main():
         # Calculate fixed memory
         weights_memory, _ = estimator.calculate_weights_memory(
             tp=args.tp, pp=args.pp, cp=args.cp, ep=args.ep,
-            stage=stage
+            stage=stage, tp_variant_sizes=tp_variant_sizes
         )
         fixed_memory = weights_memory + system_reserved_gb
 
@@ -694,7 +721,8 @@ def main():
         system_reserved_gb=system_reserved_gb,
         use_decode_factor=False,
         activation_peak_gb=args.activation_peak,
-        stage=stage
+        stage=stage,
+        tp_variant_sizes=tp_variant_sizes
     )
 
     # Generate report

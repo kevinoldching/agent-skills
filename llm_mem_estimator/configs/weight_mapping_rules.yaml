@@ -51,6 +51,16 @@ generic:
       - "^model\\.norm\\.weight$"
       - "^norm\\.weight$"
 
+  # TP 变体配置：定义可引用的 TP 变体及其默认值
+  # 变体名称格式：TP_XXX，其中 XXX 表示该变体应用的权重组
+  # 在 parallel_defaults 中引用这些变体名称，代码会根据变体名称应用对应的 TP size
+  # CLI 参数可覆盖这些默认值（如 --tp-o-proj 4 覆盖 TP_O_PROJ 的默认值）
+  tp_variants:
+    TP_O_PROJ: 8      # o_proj.weight 的默认 TP size
+    TP_MLP: 8         # FFN 权重的默认 TP size
+    TP_SHARED_EXPERT: 8  # 共享专家的默认 TP size
+    TP_EMBEDDING: 1   # embedding 的默认 TP size
+
   # 默认并行策略配置（PD分离-三层结构）
   # parallel_defaults: 混部/通用场景（stage=hybrid）
   # parallel_defaults.prefill: PD分离-prefill专用（stage=prefill）
@@ -59,19 +69,18 @@ generic:
   # 继承规则：模型定义了某stage → 使用模型的；模型未定义 → 使用generic的同名stage
   # 注意：generic只定义parallel_defaults，prefill/decode由具体模型定义
   parallel_defaults:
-    embedding: TP
+    embedding: TP_EMBEDDING
     attention:
       q_proj.weight: TP
       k_proj.weight: TP
       v_proj.weight: TP
-      o_proj.weight: TP
+      o_proj.weight: TP_O_PROJ
       q_b_proj.weight: TP
       kv_b_proj.weight: TP
-      o_proj.weight: TP
     ffn_moe:
       experts: EP
-    ffn_dense: TP
-    ffn_shared_expert: replicated
+    ffn_dense: TP_MLP
+    ffn_shared_expert: TP_SHARED_EXPERT
     norm: replicated
     others: replicated
 
@@ -206,7 +215,7 @@ Kimi-K2.5:
 
   # 混部/通用场景的并行策略（继承generic，仅覆盖ffn_shared_expert）
   parallel_defaults:
-    ffn_shared_expert: TP
+    ffn_shared_expert: TP_SHARED_EXPERT
 
   # PD分离-decode专用
   parallel_defaults.decode:
@@ -215,7 +224,7 @@ Kimi-K2.5:
       q_proj.weight: replicated
       k_proj.weight: replicated
       v_proj.weight: replicated
-      o_proj.weight: TP
+      o_proj.weight: TP_O_PROJ
       q_b_proj.weight: replicated
       kv_b_proj.weight: replicated
 

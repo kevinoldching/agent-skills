@@ -148,6 +148,118 @@ computation_rules:
 
 ---
 
+## TP 变体配置（TP Variants）
+
+### 概述
+
+`tp_variants` 用于定义可引用的 TP（Tensor Parallel）变体及其默认大小。这些变体在 `parallel_defaults` 中被引用，允许对不同权重组使用不同的 TP size。
+
+### 适用场景
+
+当需要对不同权重组使用不同的 TP 并行度时使用，例如：
+- `o_proj.weight` 使用 TP=8
+- `gate_proj.weight` 使用 TP=2
+- `shared_experts` 使用 TP=4
+
+### 字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `tp_variants` | dict[string, int] | 否 | 变体名称到 TP size 的映射 |
+
+### 变体命名规范
+
+变体名称格式：`TP_XXX`，其中 `XXX` 表示该变体应用的权重组。目前支持的变体：
+
+| 变体名称 | 默认 TP Size | 说明 |
+|---------|-------------|------|
+| `TP_O_PROJ` | 8 | o_proj.weight 的 TP size |
+| `TP_MLP` | 8 | FFN 权重的 TP size |
+| `TP_SHARED_EXPERT` | 8 | 共享专家的 TP size |
+| `TP_EMBEDDING` | 1 | embedding 的 TP size |
+
+### CLI 覆盖
+
+可通过 CLI 参数覆盖 YAML 中的默认值：
+
+```bash
+--tp-o-proj 4          # 覆盖 TP_O_PROJ 的默认值
+--tp-mlp 2             # 覆盖 TP_MLP 的默认值
+--tp-shared-expert 4   # 覆盖 TP_SHARED_EXPERT 的默认值
+--tp-embedding 2       # 覆盖 TP_EMBEDDING 的默认值
+```
+
+### 示例
+
+```yaml
+generic:
+  # 定义 TP 变体及其默认值
+  tp_variants:
+    TP_O_PROJ: 8
+    TP_MLP: 8
+    TP_SHARED_EXPERT: 8
+    TP_EMBEDDING: 1
+
+  # 在 parallel_defaults 中引用变体
+  parallel_defaults:
+    embedding: TP_EMBEDDING
+    attention:
+      o_proj.weight: TP_O_PROJ
+    ffn_dense: TP_MLP
+    ffn_shared_expert: TP_SHARED_EXPERT
+```
+
+---
+
+## 并行策略配置（parallel_defaults）
+
+### 概述
+
+`parallel_defaults` 定义了不同模块类型的默认并行策略，用于在 YAML 配置中指定权重如何被切分到不同的并行维度。
+
+### 字段说明
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `<module_type>` | string 或 dict | 是 | 模块的并行策略 |
+
+### 并行策略类型
+
+| 策略 | 说明 |
+|------|------|
+| `TP` | Tensor Parallel，切分到 `tp` 维度 |
+| `EP` | Expert Parallel，切分到 `ep` 维度 |
+| `PP` | Pipeline Parallel，切分到 `pp` 维度 |
+| `DP` | Data Parallel，切分到 `dp` 维度 |
+| `replicated` | 完全复制，不切分 |
+| `TP_XXX` | 使用 `tp_variants` 中定义的 `TP_XXX` 变体的 TP size |
+
+### 子键匹配
+
+对于 `attention` 和 `ffn_moe` 等模块类型，`parallel_defaults` 支持按子键（权重名）指定不同的策略：
+
+```yaml
+parallel_defaults:
+  attention:
+    q_proj.weight: TP
+    o_proj.weight: TP_O_PROJ  # 使用变体指定的 TP size
+  ffn_moe:
+    experts: EP
+    gate_proj.weight: TP_MLP  # 使用变体指定的 TP size
+```
+
+### PD 分离支持
+
+`parallel_defaults` 支持三层结构：
+
+- `parallel_defaults`：混部/通用场景（stage=hybrid）
+- `parallel_defaults.prefill`：PD分离-prefill专用
+- `parallel_defaults.decode`：PD分离-decode专用
+
+继承规则：模型定义了某 stage → 使用模型的；模型未定义 → 使用 generic 的同名 stage。
+
+---
+
 ## 规则定义
 
 ### 基本格式

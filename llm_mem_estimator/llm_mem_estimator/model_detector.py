@@ -34,6 +34,9 @@ class WeightClassifier:
         # Parse three-level parallel defaults for PD separation support
         self._parallel_defaults_cache: Dict[str, Dict[str, Dict]] = {}
         self._resolve_parallel_defaults_inheritance()
+        # Parse tp_variants for TP variant support
+        self._tp_variants_cache: Dict[str, Dict[str, int]] = {}
+        self._resolve_tp_variants_inheritance()
 
     def _resolve_inheritance(self):
         """Resolve 'inherit' directives in rules"""
@@ -72,6 +75,65 @@ class WeightClassifier:
             # Use ConfigLoader's helper to parse the three-level structure
             parsed = ConfigLoader._parse_parallel_defaults(model_rules, generic_rules)
             self._parallel_defaults_cache[model_type] = parsed
+
+    def _resolve_tp_variants_inheritance(self):
+        """Resolve tp_variants inheritance
+
+        tp_variants: Dict[str, int] - maps variant name (e.g., 'TP_O_PROJ') to default TP size
+
+        Inheritance rule: model's tp_variants completely replaces (not merges) parent's
+        Falls back to 'generic' tp_variants if model doesn't define any.
+        """
+        for model_type, model_rules in self.rules.items():
+            if not isinstance(model_rules, dict):
+                self._tp_variants_cache[model_type] = {}
+                continue
+
+            # Check if model has tp_variants
+            if 'tp_variants' in model_rules:
+                self._tp_variants_cache[model_type] = dict(model_rules['tp_variants'])
+            elif model_type == 'generic':
+                # generic always has tp_variants
+                self._tp_variants_cache[model_type] = dict(model_rules.get('tp_variants', {}))
+            elif 'inherit' in model_rules:
+                # Inherit from parent (which should have been resolved already)
+                parent = model_rules['inherit']
+                if parent in self._tp_variants_cache:
+                    self._tp_variants_cache[model_type] = dict(self._tp_variants_cache[parent])
+                else:
+                    # Fall back to generic
+                    self._tp_variants_cache[model_type] = dict(self._tp_variants_cache.get('generic', {}))
+            else:
+                # No tp_variants and no inherit, fall back to generic
+                self._tp_variants_cache[model_type] = dict(self._tp_variants_cache.get('generic', {}))
+
+    def get_tp_variant_size(self, variant_name: str, model_type: Optional[str] = None) -> Optional[int]:
+        """Get the TP size for a given variant name
+
+        Args:
+            variant_name: The variant name (e.g., 'TP_O_PROJ', 'TP_MLP')
+            model_type: Optional model type for model-specific variants
+
+        Returns:
+            TP size for the variant, or None if variant not found
+        """
+        # Only look up if variant name starts with TP_ (it's a variant)
+        if not variant_name.startswith('TP_'):
+            return None
+
+        # Try model-specific first, then fall back to generic
+        if model_type and model_type in self._tp_variants_cache:
+            variants = self._tp_variants_cache[model_type]
+            if variant_name in variants:
+                return variants[variant_name]
+
+        # Fall back to generic
+        if 'generic' in self._tp_variants_cache:
+            variants = self._tp_variants_cache['generic']
+            if variant_name in variants:
+                return variants[variant_name]
+
+        return None
 
     def classify_weight(self, weight_name: str, model_name: Optional[str] = None,
                        model_type: Optional[str] = None) -> str:
