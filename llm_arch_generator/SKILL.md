@@ -1,39 +1,488 @@
 ---
 name: llm-arch-generator
-description: Generate professional LLM model architecture diagrams from HuggingFace models or YAML configs. Supports PNG/SVG/Mermaid output formats.
+description: Generate professional LLM model architecture diagrams from HuggingFace models or YAML configs. Supports PNG/SVG/Mermaid output formats with two detail levels.
 ---
 
 # LLM Architecture Generator
 
 ## Overview
 
-A Claude Code skill that generates professional model architecture diagrams from open-source models or user-defined configurations. Supports multiple output formats (PNG/SVG/Mermaid) for use in documentation, papers, and presentations.
+A Claude Code skill that generates professional multi-level model architecture diagrams from HuggingFace models, local model files, or user-defined configurations. The output uses Mermaid syntax with two detail levels:
+
+- **Level 1 (`-v`)**: Collapsed block view with left-right layout (graph LR), showing Attention/FFN/MoE/MLP modules grouped by layer count with dashed transformer block border
+- **Level 2 (`-vv`)**: Expanded module internals with top-down layout (graph TD), showing detailed projections (Q/K/V/O, gate/up/down, router/experts) via `==>` expansion arrows
+
+---
 
 ## Invocation Syntax
 
+### Standard CLI Invocation
+
 ```
-/llm-arch-generator <model> [--format png,svg,mmd] [--output /path/to/dir]
+/llm-arch-generator <model> [-v|-vv] [--format png,svg,mmd] [--output /path/to/dir]
 ```
+
+### Natural Language Invocation
+
+When users describe what they want in natural language, interpret as follows:
+
+| User says | Interpreted as |
+|-----------|----------------|
+| "Draw / generate / plot the architecture of {model}" | Standard generation with `-vv` (expanded) |
+| "Simple / high-level / macro / collapsed view" | `-v` (collapsed) |
+| "Detailed / expanded / with projections" | `-vv` (expanded) |
+| "Save to {path}" | `--output /path` |
+| "PNG / SVG / Mermaid format" | `--format` |
 
 ### Parameters
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `model` | HuggingFace model ID, local path to config.json, or YAML config | Required |
+| `-v` | Level 1: collapsed block structure with residual connections (graph LR) | — |
+| `-vv` | Level 2: expanded module internals via `==>` arrows (graph TD) | Default |
 | `--format` | Output formats (comma-separated) | png,svg,mmd |
 | `--output` | Output directory | Current working directory |
 
 ### Example Invocations
 
 ```bash
-# Generate diagram from HuggingFace model
-/llm-arch-generator meta-llama/Llama-3-8b
+# Default (-vv): expanded view
+/llm-arch-generator KimiML/kimi-k2-5
 
-# Generate PNG and SVG from local model
-/llm-arch-generator /path/to/local/model --format png,svg
+# Level 1 (-v): collapsed with residual connections
+/llm-arch-generator meta-llama/Llama-3-8b -v
 
-# Generate from YAML config with custom output
-/llm-arch-generator /path/to/model.yaml --output ./diagrams
+# Level 2 (-vv): explicit expanded view
+/llm-arch-generator Qwen/Qwen2-7B -vv
+
+# Natural language equivalents
+/llm-arch-generator Draw a detailed architecture diagram for Kimi-K2.5
+/llm-arch-generator Generate a simple macro view of LLaMA-3
+/llm-arch-generator Plot the architecture of Qwen2-7B and save to ./qwen_arch
+
+# With output format
+/llm-arch-generator Qwen/Qwen2-7B --format png --output ./diagrams
+
+# Local files
+/llm-arch-generator /path/to/local/model --output ./diagrams
+```
+
+---
+
+## Detail Levels
+
+### `-v` (Level 1: Collapsed Block Structure)
+
+Shows individual **Attention**, **FFN** (or **MoE**, **MLP**) modules visible in the flow, with a dashed box grouping them labeled `× N layers`. Residual connections are shown at this level using `-.->` arrows.
+
+**Key characteristics:**
+- Uses `graph LR` (left-right layout)
+- Transformer blocks shown with `style TB dashed` border
+- Attention and FFN/MoE modules visible inside (NOT hidden in black-box)
+- Residual `add` operations shown explicitly
+
+```
+Embed ──► Norm ──► Input ──► RMSNorm ──► [Attention] ──► [FFN] ──► Output
+                   │               │               │               │
+                   └───────┬──────┴───────┬───────┘               │
+                           │   add(pre)   │                       │
+                           └──────────────┘                       │
+                         ┌────────────────────────────────┐
+                         │    Transformer Block × 32        │  ← dashed box
+                         └────────────────────────────────┘
+                                           │
+                                     Norm ──► LM Head
+```
+
+### `-vv` (Level 2: Expanded Module Internals)
+
+Top-down layout. Level 1 shows one transformer layer path (left/top). Complex modules (Attention, MoE/FFN) expand to detailed views (right/bottom) via `==>` arrows.
+
+**Key characteristics:**
+- Uses `graph TD` (top-down layout)
+- Complex modules expanded via `==>` arrows (solid bold)
+- Projection layers visible (Q_proj, K_proj, V_proj, O_proj, gate_proj, etc.)
+- MoE shows Router + Expert Pool with shared/routed experts
+
+---
+
+## Information Extraction
+
+### Shape Inference: config.json + model.py Combined
+
+Shape inference **must combine** both sources — not config.json alone. The model.py contains full tensor definitions that enable precise shape calculation.
+
+**From config.json:**
+- `hidden_size` (H)
+- `num_hidden_layers`
+- `intermediate_size` (I)
+- `num_attention_heads`
+- `num_key_value_heads` (for GQA)
+- `head_dim` = H / num_attention_heads
+
+**From model.py:**
+
+model.py contains **full tensor definitions** that enable precise shape calculation:
+
+```python
+# Example from modeling_llama.py
+class LlamaAttention(nn.Module):
+    def __init__(self, config):
+        self.hidden_size = config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.head_dim = config.hidden_size // config.num_attention_heads
+
+        # These are the actual tensor shapes defined in code:
+        self.q_proj = nn.Linear(H, H)           # [H, H]
+        self.k_proj = nn.Linear(H, kvH * head_dim)  # [H, kvH * head_dim]
+        self.v_proj = nn.Linear(H, kvH * head_dim)  # [H, kvH * head_dim]
+        self.o_proj = nn.Linear(H, H)            # [H, H]
+```
+
+**Correct shape annotations:**
+
+| Layer | Shape |
+|-------|-------|
+| Q_proj weight | `[H, H]` or `[H, num_heads × head_dim]` |
+| K_proj weight | `[H, num_key_value_heads × head_dim]` |
+| V_proj weight | `[H, num_key_value_heads × head_dim]` |
+| O_proj weight | `[H, num_heads × head_dim]` |
+| Attention output (after softmax) | `[B, num_heads, S, head_dim]` |
+| FFN gate/up | `[H, intermediate_size]` |
+| FFN down | `[intermediate_size, H]` |
+
+### Residual Connection Detection from model.py
+
+Residual connections must be derived from **actual code analysis**, not assumptions. AI must read the actual `forward()` method and identify:
+- Which tensor flows into which module
+- Where `add` / `+` / `subtract` operations occur
+- Which tensors are added together (residual source and destination)
+- Conditional branches (training vs inference paths)
+
+**Pre-norm pattern (LLaMA, Qwen, Kimi):**
+
+```python
+# Identified from model.py forward():
+input = layer_norm(input)
+output = attention(input)
+input = input + output          # residual add here
+output = mlp(input)
+input = input + output          # residual add here
+input = layer_norm(input)
+```
+
+**Post-norm pattern (GLM, some GPT variants):**
+
+```python
+# Identified from model.py forward():
+output = attention(input)
+input = norm(input + output)    # residual then norm
+```
+
+---
+
+## Mermaid Syntax Generation
+
+### Level 1: Block Structure with Residual Connections (graph LR)
+
+```mermaid
+graph LR
+    E["Embedding"] --> LN1["RMSNorm"]
+    LN1 --> Input["Input"]
+
+    subgraph TB["Transformer Block × 32"]
+        direction LR
+        style TB dashed
+        Input --> LN_a["RMSNorm"]
+        LN_a --> Attn["Attention"]
+        Input -.->|add| Add1["Add"]
+        Attn --> Add1
+
+        Add1 --> LN_b["RMSNorm"]
+        LN_b --> FFN["FFN"]
+        Add1 -.->|add| Add2["Add"]
+        FFN --> Add2
+        Add2 --> Out["Output"]
+    end
+
+    Out --> LN2["RMSNorm"]
+    LN2 --> LM["LM Head"]
+```
+
+**Key:** `subgraph TB` with `style TB dashed` shows the repeated modules with a dashed border. Attention and FFN are visible inside — NOT hidden in a black-box node.
+
+### Level 2: Module Expansion (graph TD)
+
+Level 1 structure (top-down), with complex modules (MoE, Attention) expanded on the right via `==>` relationship arrows.
+
+```mermaid
+graph TD
+    %% === Color Definitions ===
+    classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
+    classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px;
+    classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
+    classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
+    classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+
+    %% === Input Layer (Level 1) ===
+    subgraph Input_Stage ["Input Layer"]
+        direction TB
+        Tokens["Token IDs"] --> Embed["Embedding"]
+    end
+
+    %% === Layer N Structure (Level 1) ===
+    subgraph Transformer_Layer ["Transformer Layer N"]
+        direction TB
+
+        layer_in((h_l)):::norm --> ln1["RMSNorm"]:::norm
+        ln1 --> attn_module["MLA / Attention"]:::attention
+
+        attn_module --> add1((+)):::norm
+        layer_in -.-> |Residual 1| add1
+
+        add1 --> ln2["RMSNorm"]:::norm
+        ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
+
+        moe_module --> add2((+)):::norm
+        add1 -.-> |Residual 2| add2
+
+        add2 --> layer_out((h_l+1)):::norm
+    end
+
+    %% === MoE Expansion (Level 2) ===
+    subgraph MoE_Detail ["MoE Expansion"]
+        direction TB
+
+        router["Sigmoid Router"]:::moe
+
+        subgraph Expert_Pool ["Expert Pool (Shared + 8 Routed)"]
+            shared["Shared Expert"]:::shared_expert
+            routed_1["Routed Expert 1"]:::moe
+            routed_2["Routed Expert 2"]:::moe
+            routed_x["..." ]:::moe
+            routed_n["Routed Expert N"]:::moe
+        end
+
+        router --> |Top-8| routed_1
+        router --> |Top-8| routed_2
+        router --> |Top-8| routed_n
+        shared -.-> |always add| MoE_out
+        routed_1 -.-> |if selected| MoE_out
+        routed_2 -.-> |if selected| MoE_out
+        routed_n -.-> |if selected| MoE_out
+    end
+
+    subgraph Attention_Detail ["Attention Expansion"]
+        direction TB
+
+        attn_in["Input<br/>[B,S,H]"] --> q_proj["Q_proj<br/>H×H"]:::attention
+        attn_in --> k_proj["K_proj<br/>H×kvH·head"]:::attention
+        attn_in --> v_proj["V_proj<br/>H×kvH·head"]:::attention
+
+        q_proj --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
+        k_proj --> softmax
+
+        softmax --> o_proj["O_proj<br/>hH×H"]:::attention
+        o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
+    end
+
+    %% === Output Layer ===
+    subgraph Output_Stage ["Output Layer"]
+        direction TB
+        final_norm["Final RMSNorm"]:::norm
+        Head["LM Head"]:::output_stage
+    end
+
+    %% === Global Connections ===
+    Embed --> layer_in
+    layer_out --> final_norm
+    final_norm --> Head
+
+    %% === Expansion Relations (Level 1 ==> Level 2) ===
+    moe_module ==> router
+    attn_module ==> attn_in
+```
+
+---
+
+## Color Conventions
+
+Mermaid `classDef` style definitions used in diagrams:
+
+```mermaid
+classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
+classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px;
+classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
+classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
+classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+```
+
+| Module Type | Fill | Border | Usage |
+|-------------|------|--------|-------|
+| Attention | #e1f5ff | #01579b | MLA, Q/K/V/O projections, Softmax |
+| MoE | #fff3e0 | #e65100 | Router, Routed Experts |
+| Shared Expert | #b2dfdb | #00695c | Shared Expert (always active) |
+| FFN / MLP | #fff4e1 | #333 | gate/up/down_proj |
+| Norm | #f1f8e9 | #33691e | RMSNorm, LayerNorm |
+| Input/Output | #f3e5f5 | #4a148c | Embedding, LM Head |
+| Residual | dashed | #999 | `-.->` arrows |
+| Expand relation | solid bold | — | `==>` arrows (Level 1 to Level 2) |
+
+---
+
+## Components
+
+### AI-Generated Components (SKILL.md instructs AI)
+
+| Component | Responsibility |
+|-----------|----------------|
+| **Parser** | AI reads config.json, extracts H, I, num_heads, kv_heads, layers |
+| **Model Analyzer** | AI reads model.py, builds module tree, traces forward path |
+| **Residual Detector** | AI reads forward() method, identifies add/shortcut operations |
+| **Shape Calculator** | AI computes shapes from model.py weight definitions × config.json params |
+| **Mermaid Generator** | AI generates left-right syntax per detail level |
+| **Auto-completion** | AI fills missing info based on model family conventions |
+
+### Script-Tool Components
+
+| Component | File | Language | Purpose |
+|-----------|------|----------|---------|
+| **Downloader** | `scripts/download_model.py` | Python | Download config.json + model.py from HuggingFace |
+| **Renderer** | `scripts/render_mermaid.sh` | Bash | Render .mmd to PNG/SVG via mermaid-cli |
+
+### download_model.py
+
+```python
+#!/usr/bin/env python3
+"""Download config.json and model.py from HuggingFace with caching.
+
+model.py can be anywhere in the repo tree. This script uses list_repo_files()
+to scan the entire repository (all subdirectories) and locate the modeling file.
+"""
+
+import argparse
+import os
+from pathlib import Path
+from huggingface_hub import hf_hub_download, list_repo_files
+
+CACHE_DIR = Path.home() / ".cache" / "llm_arch_generator"
+
+def get_cache_path(model_id: str, filename: str) -> Path:
+    """Get local cache path for a downloaded file."""
+    safe_id = model_id.replace('/', '_').replace('-', '_')
+    return CACHE_DIR / safe_id / filename
+
+def find_modeling_file(model_id: str) -> str | None:
+    """
+    Find the modeling file by scanning the entire repository.
+
+    Uses list_repo_files() to get all files recursively, then matches:
+      - model.py
+      - modeling.py
+      - modeling_<anything>.py
+
+    This handles any directory layout (src/, inference/, flash_attention/, etc.).
+    Returns the full path in the repo if found, None otherwise.
+    """
+    try:
+        all_files = list_repo_files(model_id)
+    except Exception:
+        return None
+
+    modeling_patterns = [
+        'model.py',
+        'modeling.py',
+    ]
+
+    for f in all_files:
+        filename = os.path.basename(f)
+        if filename in modeling_patterns:
+            return f
+        if filename.startswith('modeling_') and filename.endswith('.py'):
+            return f
+
+    return None
+
+def download_model(
+    model_id: str,
+    output_dir: str = None,
+    use_cache: bool = True
+) -> tuple[str, str | None]:
+    """
+    Download config.json and model.py from HuggingFace.
+
+    Caches to ~/.cache/llm_arch_generator/{model_id}/
+    Clear cache by deleting that directory.
+    """
+    if output_dir is None:
+        out_path = CACHE_DIR / model_id.replace('/', '_').replace('-', '_')
+    else:
+        out_path = Path(output_dir)
+
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # 1. Download config.json
+    config_cache = get_cache_path(model_id, "config.json")
+    if use_cache and config_cache.exists():
+        import shutil
+        dest = out_path / "config.json"
+        shutil.copy(config_cache, dest)
+        config_path = str(dest)
+    else:
+        config_path = hf_hub_download(
+            repo_id=model_id,
+            filename="config.json",
+            local_dir=str(out_path)
+        )
+        config_cache.parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+        shutil.copy(config_path, str(config_cache))
+
+    # 2. Find and download modeling file
+    modeling_filename = find_modeling_file(model_id)
+
+    model_path = None
+    if modeling_filename:
+        model_cache = get_cache_path(model_id, modeling_filename.replace('/', '_'))
+        if use_cache and model_cache.exists():
+            import shutil
+            dest = out_path / os.path.basename(modeling_filename)
+            shutil.copy(model_cache, dest)
+            model_path = str(dest)
+        else:
+            try:
+                model_path = hf_hub_download(
+                    repo_id=model_id,
+                    filename=modeling_filename,
+                    local_dir=str(out_path)
+                )
+                model_cache.parent.mkdir(parents=True, exist_ok=True)
+                import shutil
+                shutil.copy(model_path, str(model_cache))
+            except Exception:
+                model_path = None
+
+    return config_path, model_path
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Download model files from HuggingFace")
+    parser.add_argument("model_id", help="e.g., meta-llama/Llama-3-8b")
+    parser.add_argument("--output-dir", default=None, help="Output directory (default: cache)")
+    parser.add_argument("--no-cache", action="store_true", help="Bypass cache")
+    args = parser.parse_args()
+
+    config, model = download_model(
+        args.model_id,
+        args.output_dir,
+        use_cache=not args.no_cache
+    )
+    print(f"config.json: {config}")
+    print(f"modeling_*.py: {model}")
 ```
 
 ---
@@ -44,10 +493,11 @@ A Claude Code skill that generates professional model architecture diagrams from
 
 When a HuggingFace model ID is provided (e.g., `meta-llama/Llama-3-8b`):
 
-1. Download `config.json` from HuggingFace Hub using the model ID
-2. Cache the config to `templates/{family}/{model_name}.yaml`
+1. Download `config.json` from HuggingFace Hub using the model ID (via `scripts/download_model.py`)
+2. Cache the config to `~/.cache/llm_arch_generator/{model_id}/`
 3. Parse the config.json to extract model parameters
-4. Match against known model family templates
+4. Download model.py using `list_repo_files()` to scan the entire repository
+5. Match against known model family templates
 
 **Extracted parameters from config.json:**
 - `hidden_size`
@@ -112,7 +562,7 @@ norm: rmsnorm
 
 ---
 
-## Template Matching Logic
+## Template Matching
 
 ### Supported Model Families
 
@@ -185,7 +635,7 @@ When config.json provides partial information, AI auto-fills missing details bas
 | num_key_value_heads | config.json | num_attention_heads (no GQA) |
 | Norm type | Model type knowledge | RMSNorm |
 | Activation function | config.json or model type | SiLU for LLaMA, GELU for GPT |
-| Residual connection type | Model type knowledge | pre-norm |
+| Residual connection type | Model type knowledge (from forward() analysis) | pre-norm |
 | Module connections | Model type knowledge | Standard transformer flow |
 
 ### Default Norm Types by Family
@@ -241,101 +691,63 @@ Output Head: hidden_size → vocab_size
 
 ---
 
-## Mermaid Syntax Generation
+## Workflow
 
-### Key Formatting Rules
-
-1. Use `graph TB` for top-to-bottom layout
-2. Keep labels simple: `Attention`, `MLP / FFN`, `Layer Normalization`
-3. Show layer count in Transformer Stack: `Transformer Stack<br/>N Layers`
-4. Use `-.->|Repeat N|` to indicate layer repetition
-5. Apply distinct styling to distinguish module types
-6. For GQA: show `h=num_attention_heads, kv=num_key_value_heads` in Attention label
-7. Optional: expand specific layer internals when users request detail
-
-### Reference Example: 2-Layer LLaMA-style Model
-
-```mermaid
-graph TB
-    Input[Token IDs] --> Embed[Embedding Layer]
-    Embed --> TransformerStack[Transformer Stack<br/>N Layers]
-
-    TransformerStack --> Layer1[Layer 1]
-    Layer1 --> Attention1[Attention]
-    Attention1 --> MLP1[MLP / FFN]
-    MLP1 --> Layer2[Layer 2]
-    Layer2 -.->|Repeat N| Attention1
-
-    TransformerStack --> Norm[Layer Normalization]
-    Norm --> LMHead[LM Head / Output Proj]
-    LMHead --> Output[Logits]
-
-    style TransformerStack fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Attention1 fill:#e1f5ff
-    style MLP1 fill:#fff4e1
+```
+1. User invokes /llm-arch-generator <model> [options]
+            │
+            ▼
+2. Parse invocation (standard CLI or natural language)
+            │
+            ▼
+3. (If HuggingFace) Script: download_model.py
+   - config.json → parse H, I, num_heads, kv_heads, layers
+   - model.py → scan repo with list_repo_files() to locate, then download
+            │
+            ▼
+4. AI: Read model.py
+   - Build module tree (Attention, FFN/MoE/MLP, projections)
+   - Trace forward() path and residual connections
+            │
+            ▼
+5. AI: Calculate shapes
+   - Weight shapes from model.py (Linear layers)
+   - Activation shapes from config.json (H, I, head_dim)
+   - Propagation: [B, S, H] through each op
+            │
+            ▼
+6. AI: Generate Mermaid syntax
+   - Level 1 (-v): graph LR with dashed transformer block
+   - Level 2 (-vv): graph TD with expanded projections
+   - Respects -v/-vv detail level
+            │
+            ▼
+7. Write {model_name}_arch.mmd
+            │
+            ▼
+8. (If --format includes png/svg) Script: render_mermaid.sh → PNG/SVG
+            │
+            ▼
+9. Output files to {output_dir}/
 ```
 
-### Example: LLaMA-3-8B with GQA
+### Fallback Path
 
-For LLaMA-3-8B where `num_attention_heads=32` and `num_key_value_heads=8`:
-
-```mermaid
-graph TB
-    Input[Token IDs] --> Embed[Embedding Layer]
-    Embed --> TransformerStack[Transformer Stack<br/>32 Layers]
-
-    TransformerStack --> Layer1[Layer 1]
-    Layer1 --> Attention1[Attention<br/>h=32, kv=8]
-    Attention1 --> MLP1[MLP / FFN]
-    MLP1 --> Layer2[Layer 2]
-    Layer2 -.->|Repeat N| Attention1
-
-    TransformerStack --> Norm[Layer Normalization]
-    Norm --> LMHead[LM Head<br/>vocab=128256]
-    LMHead --> Output[Logits]
-
-    style TransformerStack fill:#f9f9f9,stroke:#333,stroke-width:2px
-    style Attention1 fill:#e1f5ff
-    style MLP1 fill:#fff4e1
-```
-
-### Subgraph Style Conventions
-
-| Element | Fill Color | Border |
-|---------|-------------|--------|
-| Transformer Stack | #f9f9f9 (light gray) | #333 |
-| Attention | #e1f5ff (light blue) | #333 |
-| MLP / FFN | #fff4e1 (light orange) | #333 |
-| Layer Normalization | #f5f5f5 (very light gray) | #333 |
-
-### Layer Detail (Optional Expanded View)
-
-When users want to see layer internals:
-
-```mermaid
-graph TB
-    subgraph "Layer N"
-        direction TB
-        Input --> InputNorm[LayerNorm / RMSNorm]
-        InputNorm --> Attention[Attention]
-        Attention --> Post_Attn_Norm[LayerNorm / RMSNorm]
-        Post_Attn_Norm --> MLP[MLP / FFN]
-        MLP --> Output
-        Attention --> Add
-        InputNorm --> Add
-        Add --> Post_Attn_Norm
-    end
-```
+If model.py is not available (only weight files):
+- AI infers structure from config.json + model family template
+- Shape calculations use family conventions (H, I, head_dim relationships)
+- Residual patterns use family defaults (pre-norm for LLaMA, post-norm for GLM)
+- Note: precision reduced, model.py analysis preferred
 
 ---
 
-## Output File Naming Convention
+## Output Files
 
 ```
 {output_dir}/
-├── {model_name}_arch.png    # Raster image
-├── {model_name}_arch.svg    # Vector image
-└── {model_name}_arch.mmd    # Mermaid source
+├── {model_name}_arch.png    # Rendered raster image
+├── {model_name}_arch.svg    # Rendered vector image
+└── {model_name}_arch.mmd    # Mermaid source (always generated)
 ```
 
 - `model_name`: Sanitized model name (slashes replaced with `-`)
@@ -344,7 +756,7 @@ graph TB
 
 ---
 
-## Mermaid CLI Rendering Instructions
+## Mermaid CLI Rendering
 
 ### Prerequisites
 
@@ -391,27 +803,6 @@ cd scripts
 
 **Note:** On Windows, use backslashes in paths or PowerShell will interpret them correctly with tab completion.
 
-### Rendering Commands
-
-```bash
-# Render PNG (default)
-/llm-arch-generator meta-llama/Llama-3-8b --format png
-
-# Render PNG and SVG
-/llm-arch-generator meta-llama/Llama-3-8b --format png,svg
-
-# Output to specific directory
-/llm-arch-generator meta-llama/Llama-3-8b --output ./diagrams
-```
-
-### Manual Rendering (if needed)
-
-```bash
-# Using mermaid-cli directly
-mmdc -i model_diagram.mmd -o model_diagram.png -b transparent -w 1920
-mmdc -i model_diagram.mmd -o model_diagram.svg -b transparent -w 1920 -f svg
-```
-
 ### Rendering Options
 
 | Option | Description | Default |
@@ -426,61 +817,42 @@ mmdc -i model_diagram.mmd -o model_diagram.svg -b transparent -w 1920 -f svg
 ## File Structure
 
 ```
-create_model_arch_diagram/
-├── SKILL.md                     # This file - Skill main entry
-├── docs/
-│   └── superpowers/
-│       ├── specs/
-│       │   └── 2026-03-21-create_model_arch_diagram-design.md
-│       └── plans/
-│           └── 2026-03-21-create_model_arch_diagram-implementation-plan.md
-├── templates/                    # Model structure templates
-│   ├── llama/
-│   ├── mistral/
-│   ├── qwen/
-│   ├── glm/
-│   ├── baichuan/
-│   ├── mimo/
-│   ├── kimi/
-│   ├── minimax/
-│   └── gpt-oss/
-└── scripts/
-    ├── render_mermaid.sh        # Bash helper script for CLI rendering (Linux/macOS)
-    └── render_mermaid.ps1      # PowerShell helper script for CLI rendering (Windows)
+llm-arch-generator/
+├── SKILL.md                         # AI instructions (main entry)
+├── docs/superpowers/
+│   └── specs/
+│       └── 2026-03-26-llm_arch_generator-design.md
+├── scripts/
+│   ├── download_model.py            # HuggingFace file downloader (with repo scanning)
+│   ├── render_mermaid.sh            # Mermaid CLI renderer (Linux/macOS)
+│   └── render_mermaid.ps1          # Mermaid CLI renderer (Windows)
+└── templates/                       # Model family templates
+    ├── llama/common.yaml
+    ├── mistral/common.yaml
+    ├── qwen/common.yaml
+    ├── glm/common.yaml
+    ├── baichuan/common.yaml
+    ├── mimo/common.yaml
+    ├── kimi/common.yaml
+    ├── minimax/common.yaml
+    └── gpt-oss/common.yaml
 ```
 
 ---
 
-## Complete Workflow
+## Summary: AI vs Script Responsibilities
 
-```
-1. User invokes: /llm-arch-generator <model> [--format ...] [--output ...]
-2. Parse input:
-   - HuggingFace ID: Download config.json
-   - Local path: Read config.json or YAML
-   - YAML config: Use directly
-3. Match against model family template
-4. Auto-fill missing parameters using AI knowledge
-5. Calculate shapes and generate Mermaid syntax
-6. Create Mermaid source file (.mmd)
-7. Render to PNG/SVG if requested (via mermaid-cli)
-8. Output files to specified directory
-```
-
----
-
-## Example Complete Invocations
-
-```bash
-# Basic usage with HuggingFace model
-/llm-arch-generator meta-llama/Llama-3-8b
-
-# Multi-format output
-/llm-arch-generator mistralai/Mistral-7B-v0.3 --format png,svg,mmd
-
-# Local model with custom output
-/llm-arch-generator /home/user/models/my-llama --output ./output
-
-# Custom YAML config
-/llm-arch-generator /path/to/model.yaml --format png
-```
+| Task | Responsibility |
+|------|----------------|
+| Parse config.json | **AI** |
+| Locate model.py in repo (scan with list_repo_files) | **Script** |
+| Read model.py | **AI** (directly reads file) |
+| Analyze module hierarchy | **AI** |
+| Trace forward path | **AI** |
+| Detect residual connections | **AI** (from model.py forward() analysis) |
+| Calculate tensor shapes | **AI** (from model.py weight definitions × config.json params) |
+| Generate Mermaid syntax | **AI** |
+| Interpret natural language | **AI** |
+| Download HuggingFace files | **Script** (Python) |
+| Render PNG/SVG | **Script** (Bash + mermaid-cli) |
+| Auto-fill missing parameters | **AI** (from model family knowledge) |
