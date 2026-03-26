@@ -1,0 +1,111 @@
+%%{init: {'theme':'base'}}%%
+graph TD
+    %% ============ Color Definitions ============
+    classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px
+    classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px
+    classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px
+    classDef vision fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef projector fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef layernorm fill:#f5f5f5,stroke:#666,stroke-width:1px
+
+    %% ============ Input ============
+    INPUT(["Input<br/>text + images"]):::input_stage
+
+    %% ============ Text Embedding ============
+    embed["Embedding<br/>vocab=163840 → hidden=7168"]:::input_stage
+
+    %% ============ Vision Tower (MoonViT3d) ============
+    subgraph vision_tower["Vision Tower (MoonViT3d)"]
+        direction TB
+        vit_patch["Patch Embed<br/>patch_size=14"]
+        vit_blocks["27× ViT Blocks<br/>hidden=1152<br/>heads=16"]
+        vit_pool["Spatial-Temporal Pool"]
+    end:::vision
+    INPUT -->|"images"| vision_tower
+
+    %% ============ Projector (PatchMergerMLP) ============
+    subgraph proj_sub["Projector (PatchMergerMLP)"]
+        direction LR
+        proj_ln["RMSNorm<br/>eps=1e-5"]
+        proj_mlp["MLP<br/>1152 → 4×288 → 7168"]
+    end:::projector
+    vision_tower --> proj_sub
+    proj_sub --> proj_out["(image tokens)"]
+
+    %% ============ Language Model (DeepSeek V3) ============
+    subgraph lm["Language Model (DeepSeek V3)"]
+        direction TB
+        align="center"
+
+        norm0["RMSNorm<br/>eps=1e-5"]:::layernorm
+
+        %% Layer 0 - Dense
+        subgraph layer0["Layer 0 (Dense)"]
+            direction TB
+            l0_attn["MLA Attention<br/>q_lora=1536, kv_lora=512<br/>qk_nope=128, qk_rope=64, v=128"]:::attention
+            l0_ffn["DeepseekV3MLP<br/>7168 → 2048 → 7168"]:::ffn
+            l0_norm1["RMSNorm"]:::layernorm
+            l0_norm2["RMSNorm"]:::layernorm
+        end
+
+        %% Layers 1-60 - MoE
+        subgraph layers_moe["Layers 1-60 (MoE) - 60 layers"]
+            direction TB
+            ln1["RMSNorm"]:::layernorm
+            attn1["MLA Attention"]:::attention
+            moe["DeepseekV3MoE<br/>384 routed experts<br/>1 shared expert<br/>top-8 selection"]:::moe
+            norm1["RMSNorm"]:::layernorm
+            norm2["RMSNorm"]:::layernorm
+        end
+
+        %% MoE Internal Expansion
+        moe ==> moe_detail{{"MoE Internals"}}
+        moe_detail -.-> gate["MoEGate<br/>sigmoid → top-8"]
+        moe_detail -.-> shared["Shared Expert<br/>MLP(2048)"]:::shared_expert
+        moe_detail -.-> routed["384× Routed Expert<br/>MLP(2048) each"]:::moe
+
+        gate -->|"Top-8"| shared
+        gate -->|"Top-8"| routed
+
+        final_norm["Final RMSNorm"]:::layernorm
+    end
+
+    %% ============ Output ============
+    lm_head["LM Head<br/>7168 → 163840"]:::output_stage
+    OUTPUT(["Output"]):::output_stage
+
+    %% ============ Connections ============
+    INPUT -->|"text"| embed
+    embed --> embed_out["(text tokens)"]
+    proj_out --> merge["Merge text + image tokens"]
+    embed_out --> merge
+
+    merge --> norm0
+    norm0 --> layer0
+
+    layer0 --> l0_norm1
+    l0_norm1 --> l0_attn
+    l0_attn --> l0_norm2
+    l0_norm2 --> l0_ffn
+    l0_ffn -.->|"residual"| layers_moe
+
+    layers_moe --> ln1
+    ln1 --> attn1
+    attn1 --> norm1
+    norm1 --> moe
+    moe -.->|"residual"| norm2
+    norm2 --> final_norm
+    final_norm --> lm_head
+    lm_head --> OUTPUT
+
+    norm0 -.->|"residual"| l0_norm2
+
+    %% ============ Style ============
+    style vision_tower fill:#e8f5e9,stroke:#2e7d32,stroke-dasharray:3 3
+    style proj_sub fill:#fce4ec,stroke:#c2185b,stroke-dasharray:3 3
+    style layer0 fill:#fff8e1,stroke:#ffc107,stroke-dasharray:3 3
+    style layers_moe fill:#fff3e0,stroke:#ff9800,stroke-dasharray:3 3

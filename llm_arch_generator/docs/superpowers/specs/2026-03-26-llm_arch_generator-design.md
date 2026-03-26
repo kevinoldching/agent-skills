@@ -285,7 +285,7 @@ graph TD
 
     %% === 展开关系 (Level 1 ==> Level 2) ===
     moe_module ==> router
-    attn_module ==> q_proj
+    attn_module ==> attn_in
 ```
 
 ### Color Conventions

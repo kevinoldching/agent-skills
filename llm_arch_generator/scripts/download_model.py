@@ -17,23 +17,30 @@ def get_cache_path(model_id: str, filename: str) -> Path:
     safe_id = model_id.replace('/', '_').replace('-', '_')
     return CACHE_DIR / safe_id / filename
 
-def find_modeling_file(model_id: str) -> str | None:
-    """Find the modeling file by scanning the entire repository."""
+def find_modeling_files(model_id: str) -> list[str]:
+    """Find ALL modeling files by scanning the entire repository.
+
+    Returns a list of all matching file paths, sorted alphabetically.
+    The caller (SKILL.md) is responsible for selecting the correct one
+    based on config.json model_type / auto_map.
+    """
     try:
         all_files = list_repo_files(model_id)
     except Exception:
-        return None
+        return []
 
-    modeling_patterns = ['model.py', 'modeling.py']
+    modeling_candidates = []
     for f in all_files:
         filename = os.path.basename(f)
-        if filename in modeling_patterns:
-            return f
-        if filename.startswith('modeling_') and filename.endswith('.py'):
-            return f
-    return None
+        if filename in ('model.py', 'modeling.py'):
+            modeling_candidates.append(f)
+        elif filename.startswith('modeling_') and filename.endswith('.py'):
+            modeling_candidates.append(f)
 
-def download_model(model_id: str, output_dir: str = None, use_cache: bool = True) -> tuple[str, str | None]:
+    modeling_candidates.sort(key=lambda x: x.split('/')[-1])
+    return modeling_candidates
+
+def download_model(model_id: str, output_dir: str = None, use_cache: bool = True) -> tuple[str, list[str]]:
     """Download config.json and model.py from HuggingFace."""
     if output_dir is None:
         out_path = CACHE_DIR / model_id.replace('/', '_').replace('-', '_')
@@ -57,27 +64,27 @@ def download_model(model_id: str, output_dir: str = None, use_cache: bool = True
             shutil.copy(config_path, str(config_cache))
         config_path = str(dest)
 
-    # Find and download modeling file
-    modeling_filename = find_modeling_file(model_id)
-    model_path = None
-    if modeling_filename:
+    # Find and download ALL modeling files
+    modeling_filenames = find_modeling_files(model_id)
+    model_paths = []
+    for modeling_filename in modeling_filenames:
         model_cache = get_cache_path(model_id, modeling_filename.replace('/', '_'))
         dest = out_path / os.path.basename(modeling_filename)
         if use_cache and model_cache.exists():
             if model_cache.resolve() != dest.resolve():
                 shutil.copy(model_cache, dest)
-            model_path = str(dest)
+            model_paths.append(str(dest))
         else:
             try:
-                model_path = hf_hub_download(repo_id=model_id, filename=modeling_filename, local_dir=str(out_path))
+                downloaded = hf_hub_download(repo_id=model_id, filename=modeling_filename, local_dir=str(out_path))
                 # If downloaded to same location as cache, skip copy
-                if Path(model_path).resolve() != model_cache.resolve():
+                if Path(downloaded).resolve() != model_cache.resolve():
                     model_cache.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy(model_path, str(model_cache))
-                model_path = str(dest)
+                    shutil.copy(downloaded, str(model_cache))
+                model_paths.append(str(dest))
             except Exception:
-                model_path = None
-    return config_path, model_path
+                pass
+    return config_path, model_paths
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download model files from HuggingFace")
@@ -85,6 +92,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", default=None, help="Output directory (default: cache)")
     parser.add_argument("--no-cache", action="store_true", help="Bypass cache")
     args = parser.parse_args()
-    config, model = download_model(args.model_id, args.output_dir, use_cache=not args.no_cache)
+    config, model_paths = download_model(args.model_id, args.output_dir, use_cache=not args.no_cache)
     print(f"config.json: {config}")
-    print(f"modeling_*.py: {model}")
+    for p in model_paths:
+        print(f"modeling_*.py: {p}")
