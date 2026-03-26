@@ -65,7 +65,52 @@ llm_mem_estimator/
 | CP | Context Parallel（序列切分） | `--cp` |
 | EP | Expert Parallel（MoE 专家切分） | `--ep` |
 
-### 3. 并行策略约束
+### 3. TP 变体（TP Variants）
+
+TP 变体允许不同的权重组使用不同的 TP size，提供更灵活的并行策略配置。
+
+#### TP 变体类型
+
+| 变体 | 说明 | CLI 参数 |
+|------|------|----------|
+| TP_O_PROJ | o_proj 权重的 TP size | `--tp-o-proj` |
+| TP_MLP | FFN 权重的 TP size | `--tp-mlp` |
+| TP_SHARED_EXPERT | 共享专家的 TP size | `--tp-shared-expert` |
+| TP_EMBEDDING | embedding 的 TP size | `--tp-embedding` |
+
+#### 配置位置
+
+TP 变体定义在 `configs/weight_mapping_rules.yaml` 的 `tp_variants` 区块：
+
+```yaml
+tp_variants:
+  TP_O_PROJ: 8      # o_proj.weight 的默认 TP size
+  TP_MLP: 8         # FFN 权重的默认 TP size
+  TP_SHARED_EXPERT: 8  # 共享专家的默认 TP size
+  TP_EMBEDDING: 8   # embedding 的默认 TP size
+```
+
+#### 使用方式
+
+**使用 YAML 默认值**：
+```bash
+python scripts/calculate_mem.py --config configs/models/Kimi-K2.5.yaml --tp 4
+```
+
+**覆盖 TP 变体**：
+```bash
+python scripts/calculate_mem.py --config configs/models/Kimi-K2.5.yaml --tp 4 --tp-o-proj 4 --tp-mlp 8 --tp-shared-expert 4 --tp-embedding 2
+```
+
+#### 与并行策略表结合
+
+| 配置 | 说明 |
+|------|------|
+| TP=8 | 全局 TP size |
+| TP=8, --tp-o-proj 4 | o_proj 使用 TP=4，MLP 使用 TP=8 |
+| TP=8, --tp-embedding 1 | embedding 使用 TP=1（replicated） |
+
+### 4. 并行策略约束（续）
 
 使用并行策略时必须满足以下约束：
 
@@ -118,7 +163,7 @@ TP=8, DP=16, EP=128
 - 总卡数：`Total GPUs = TP × DP = EP = 8 × 2 = 16`
 - 每张卡的显存：`Memory per GPU = Total Memory / Total GPUs`
 
-### 4. PD 分离场景
+### 5. PD 分离场景
 
 **Prefill 阶段**：处理输入 prompt
 - 使用 `has_prefill` 系数（1.25）
@@ -130,7 +175,7 @@ TP=8, DP=16, EP=128
 
 **固定 activation 峰值**：使用 `--activation-peak` 直接指定激活值
 
-### 5. 硬件支持
+### 6. 硬件支持
 
 `configs/chips.json` 支持的芯片：
 - NVIDIA: H100-80GB, H100-141GB, A100-80GB, A100-40GB, RTX-4090, RTX-3090
@@ -286,7 +331,7 @@ python scripts/calculate_mem.py \
    - 使用 `--chip` 指定芯片名称（如 `H100-80GB` 或 `nvidia/H100-80GB`）
 
 4. **设置并行策略**：
-   - 根据需要调整 `--tp`、`--pp`、`--dp`、`--cp`、`--ep`
+   - 根据需要调整 `--tp`、`--pp`、`--dp`、`--cp`、`--ep`、`--tp-o-proj`、`--tp-mlp`、`--tp-shared-expert`、`--tp-embedding` 等tp_variant参数
 
 5. **可选：固定 activation 峰值**：
    - 使用 `--activation-peak` 直接指定激活值（单位：GB）
