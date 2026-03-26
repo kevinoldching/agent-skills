@@ -203,6 +203,7 @@ graph TD
     %% === 颜色定义 ===
     classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
     classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px;
     classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
     classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
     classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
@@ -240,7 +241,7 @@ graph TD
         router["Sigmoid Router"]:::moe
 
         subgraph Expert_Pool ["专家池 (Shared + 8 Routed)"]
-            shared["Shared Expert"]:::moe
+            shared["Shared Expert"]:::shared_expert
             routed_1["Routed Expert 1"]:::moe
             routed_2["Routed Expert 2"]:::moe
             routed_x["..." ]:::moe
@@ -294,6 +295,7 @@ Mermaid `classDef` style definitions used in diagrams:
 ```mermaid
 classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
 classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px;
 classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
 classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
 classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
@@ -303,7 +305,8 @@ classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
 | Module Type | Fill | Border | Usage |
 |-------------|------|--------|-------|
 | Attention | #e1f5ff | #01579b | MLA, Q/K/V/O projections, Softmax |
-| MoE | #fff3e0 | #e65100 | Router, Expert Pool |
+| MoE | #fff3e0 | #e65100 | Router, Routed Experts |
+| Shared Expert | #b2dfdb | #00695c | Shared Expert (always active) |
 | FFN / MLP | #fff4e1 | #333 | gate/up/down_proj |
 | Norm | #f1f8e9 | #33691e | RMSNorm, LayerNorm |
 | Input/Output | #f3e5f5 | #4a148c | Embedding, LM Head |
