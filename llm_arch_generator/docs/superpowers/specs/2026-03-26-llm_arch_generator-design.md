@@ -71,23 +71,18 @@ Embed ──► Norm ──► Input ──► RMSNorm ──► [Attention] ─
 
 ### `-vv` (Expanded, Level 2)
 
-Left side shows the Level 1 structure with cross-reference arrows. Right side shows expanded module internals (projection layers with shapes).
+Top-down layout. Level 1 shows one transformer layer path (left/top). Complex modules (Attention, MoE/FFN) expand to detailed views (right/bottom) via `==>` arrows.
 
 ```
-┌────────────────────────────────────┬──────────────────────────────────────────┐
-│          LEVEL 1 (-v)              │           LEVEL 2 (-vv)                   │
-│                                    │                                           │
-│  Embed ──► Norm ──► ┌─────────┐   │    Attention (h=32, kv=8):                │
-│                    │ TB × 32 │   │      Input[B,S,H]                          │
-│                    └────┬────┘   │        ├─► Q[H×H]                          │
-│                         │        │        ├─► K[H×kvH·head]                    │
-│                    RMSNorm       │        ├─► V[H×kvH·head]                    │
-│                         │        │        └─► O[hH×H] → Output[B,S,H]         │
-│                    LM Head       │                                           │
-│                                    │    FFN (H=4096, I=14336):                  │
-│  Cross-ref:                       │      Input ──► gate[H×I]                    │
-│  TB ───────────────────────────► │      Input ──► up[H×I] ──► SiLU ──► down  │
-└────────────────────────────────────┴──────────────────────────────────────────┘
+Level 1 (Left/Top):
+  Embed ──► RMSNorm ──► [Attention] ──► [FFN/MoE] ──► RMSNorm ──► LM Head
+                              ↑              ↑
+                         Residual 1      Residual 2
+
+Level 2 (展开 via ==>)：
+  Attention ──► Q_proj, K_proj, V_proj, O_proj + Softmax
+  MoE ──► Router + Expert Pool (Shared + Routed)
+  FFN ──► gate_proj, up_proj, down_proj + activation
 ```
 
 ---
@@ -182,19 +177,18 @@ graph LR
         direction LR
         style TB dashed
         Input --> LN_a["RMSNorm"]
-        LN_a --> Attn["Attention<br/>h=32, kv=8"]
+        LN_a --> Attn["Attention]
         Input -.->|"add"| Add1["Add"]
         Attn --> Add1
 
         Add1 --> LN_b["RMSNorm"]
-        LN_b --> FFN["FFN<br/>H→I→H"]
+        LN_b --> FFN["FFN"]
         Add1 -.->|"add"| Add2["Add"]
         FFN --> Add2
         Add2 --> Out["Output"]
     end
 
-    TB --> LN2["RMSNorm"]
-    TB -.->|"residual"| LN2
+    Out --> LN2["RMSNorm"]
     LN2 --> LM["LM Head"]
 ```
 
@@ -202,54 +196,119 @@ graph LR
 
 ### Level 2: Module Expansion
 
-Level 1 structure on the left, with cross-refs pointing to expanded module details on the right:
+Level 1 structure (top-down), with complex modules (MoE, Attention) expanded on the right via `==>` relationship arrows.
 
 ```mermaid
-graph LR
-    subgraph L1["LEVEL 1"]
-        direction LR
-        E["Embedding"] --> LN1["RMSNorm"]
-        LN1 --> Input["Input"]
-        Input --> Attn1["Attention<br/>h=32, kv=8"]
-        Attn1 --> FFN1["FFN<br/>H→I→H"]
-        style L1 dashed
+graph TD
+    %% === 颜色定义 ===
+    classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
+    classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
+    classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
+    classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+
+    %% === 输入层 (Level 1) ===
+    subgraph Input_Stage ["输入层"]
+        direction TB
+        Tokens["Token IDs"] --> Embed["Embedding"]
     end
 
-    L1 -->|"expand"| Attn[" "]
-    L1 -->|"expand"| FFN[" "]
+    %% === Layer N 结构 (Level 1) ===
+    subgraph Transformer_Layer ["Transformer Layer N"]
+        direction TB
 
-    subgraph Attn["Attention (h=32, kv=8)"]
-        direction LR
-        In["Input<br/>[B,S,H]"] --> Q["Q_proj<br/>H×H"]
-        In --> K["K_proj<br/>H×kvH·head"]
-        In --> V["V_proj<br/>H×kvH·head"]
-        Q --> Soft["Softmax<br/>[B,h,S,head]"]
-        K --> Soft
-        Soft --> O["O_proj<br/>hH×H"]
-        O --> Out["Output<br/>[B,S,H]"]
+        layer_in((h_l)):::norm --> ln1["RMSNorm"]:::norm
+        ln1 --> attn_module["MLA / Attention"]:::attention
+
+        attn_module --> add1((+)):::norm
+        layer_in -.-> |"Residual 1"| add1
+
+        add1 --> ln2["RMSNorm"]:::norm
+        ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
+
+        moe_module --> add2((+)):::norm
+        add1 -.-> |"Residual 2"| add2
+
+        add2 --> layer_out((h_l+1)):::norm
     end
 
-    subgraph FFN["FFN (H=4096, I=14336)"]
-        direction LR
-        Fin["Input"] --> Gate["gate_proj<br/>H×I"]
-        Fin --> Up["up_proj<br/>H×I"]
-        Gate --> Mul["SiLU"]
-        Up --> Mul
-        Mul --> Down["down_proj<br/>I×H"]
-        Down --> Fout["Output"]
+    %% === MoE 展开 (Level 2) ===
+    subgraph MoE_Detail ["MoE 展开"]
+        direction TB
+
+        router["Sigmoid Router"]:::moe
+
+        subgraph Expert_Pool ["专家池 (Shared + 8 Routed)"]
+            shared["Shared Expert"]:::moe
+            routed_1["Routed Expert 1"]:::moe
+            routed_2["Routed Expert 2"]:::moe
+            routed_x["..." ]:::moe
+            routed_n["Routed Expert N"]:::moe
+        end
+
+        router --> |"Top-8"| routed_1
+        router --> |"Top-8"| routed_2
+        router --> |"Top-8"| routed_n
+        shared -.-> |"always add"| MoE_out
+        routed_1 -.-> |"if selected"| MoE_out
+        routed_2 -.-> |"if selected"| MoE_out
+        routed_n -.-> |"if selected"| MoE_out
     end
+
+    subgraph Attention_Detail ["Attention 展开"]
+        direction TB
+
+        attn_in["Input<br/>[B,S,H]"] --> q_proj["Q_proj<br/>H×H"]:::attention
+        attn_in --> k_proj["K_proj<br/>H×kvH·head"]:::attention
+        attn_in --> v_proj["V_proj<br/>H×kvH·head"]:::attention
+
+        q_proj --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
+        k_proj --> softmax
+
+        softmax --> o_proj["O_proj<br/>hH×H"]:::attention
+        o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
+    end
+
+    %% === 输出层 ===
+    subgraph Output_Stage ["输出层"]
+        direction TB
+        final_norm["Final RMSNorm"]:::norm
+        Head["LM Head"]:::output_stage
+    end
+
+    %% === 全局连接 ===
+    Embed --> layer_in
+    layer_out --> final_norm
+    final_norm --> Head
+
+    %% === 展开关系 (Level 1 ==> Level 2) ===
+    moe_module ==> router
+    attn_module ==> q_proj
 ```
 
 ### Color Conventions
 
-| Module Type | Fill | Border |
-|-------------|------|--------|
-| Transformer Block | #f9f9f9 | #333 |
-| Attention | #e1f5ff | #333 |
-| FFN / MLP | #fff4e1 | #333 |
-| MoE | #f0e6ff | #333 |
-| Norm (RMS/Layer) | #f5f5f5 | #333 |
-| Residual (dashed) | — | #999 (dashed) |
+Mermaid `classDef` style definitions used in diagrams:
+
+```mermaid
+classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
+classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
+classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
+classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+```
+
+| Module Type | Fill | Border | Usage |
+|-------------|------|--------|-------|
+| Attention | #e1f5ff | #01579b | MLA, Q/K/V/O projections, Softmax |
+| MoE | #fff3e0 | #e65100 | Router, Expert Pool |
+| FFN / MLP | #fff4e1 | #333 | gate/up/down_proj |
+| Norm | #f1f8e9 | #33691e | RMSNorm, LayerNorm |
+| Input/Output | #f3e5f5 | #4a148c | Embedding, LM Head |
+| Residual | dashed | #999 | `-.->` arrows |
+| Expand relation | solid bold | — | `==>` arrows (Level 1 → Level 2) |
 
 ---
 
