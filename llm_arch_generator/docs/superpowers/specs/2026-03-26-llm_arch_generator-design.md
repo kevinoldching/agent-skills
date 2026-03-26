@@ -177,13 +177,13 @@ graph LR
         direction LR
         style TB dashed
         Input --> LN_a["RMSNorm"]
-        LN_a --> Attn["Attention]
-        Input -.->|"add"| Add1["Add"]
+        LN_a --> Attn["Attention"]
+        Input -.->|add| Add1["Add"]
         Attn --> Add1
 
         Add1 --> LN_b["RMSNorm"]
         LN_b --> FFN["FFN"]
-        Add1 -.->|"add"| Add2["Add"]
+        Add1 -.->|add| Add2["Add"]
         FFN --> Add2
         Add2 --> Out["Output"]
     end
@@ -222,13 +222,13 @@ graph TD
         ln1 --> attn_module["MLA / Attention"]:::attention
 
         attn_module --> add1((+)):::norm
-        layer_in -.-> |"Residual 1"| add1
+        layer_in -.-> |Residual 1| add1
 
         add1 --> ln2["RMSNorm"]:::norm
         ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
 
         moe_module --> add2((+)):::norm
-        add1 -.-> |"Residual 2"| add2
+        add1 -.-> |Residual 2| add2
 
         add2 --> layer_out((h_l+1)):::norm
     end
@@ -247,13 +247,13 @@ graph TD
             routed_n["Routed Expert N"]:::moe
         end
 
-        router --> |"Top-8"| routed_1
-        router --> |"Top-8"| routed_2
-        router --> |"Top-8"| routed_n
-        shared -.-> |"always add"| MoE_out
-        routed_1 -.-> |"if selected"| MoE_out
-        routed_2 -.-> |"if selected"| MoE_out
-        routed_n -.-> |"if selected"| MoE_out
+        router --> |Top-8| routed_1
+        router --> |Top-8| routed_2
+        router --> |Top-8| routed_n
+        shared -.-> |always add| MoE_out
+        routed_1 -.-> |if selected| MoE_out
+        routed_2 -.-> |if selected| MoE_out
+        routed_n -.-> |if selected| MoE_out
     end
 
     subgraph Attention_Detail ["Attention 展开"]
