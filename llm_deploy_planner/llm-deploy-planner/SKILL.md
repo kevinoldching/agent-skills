@@ -152,7 +152,20 @@ imbalance >= 0.7 → 分离
 
 ## 第三步：遍历并行策略组合
 
-在约束条件下，遍历所有可能的 TP/EP/DP 组合，对每个组合调用 `llm-mem-estimator` 验证显存是否满足要求。
+在约束条件下，遍历所有可能的 TP/EP/DP 组合，对每个组合(TP, EP, DP) 调用 `llm-mem-estimator` 验证显存是否满足要求。
+
+### 调用方式
+
+```
+模型: <模型名称>
+芯片: <芯片型号，如 H100-80GB、A100-80GB、Ascend-910B-64GB、Ascend-910B-32GB、Ascend-910C-64GB等>
+并行策略: TP=<TP值>, EP=<EP值>, DP=<DP值>
+batch_size: <目标batch_size>, 没有提供则为自动反推
+输入长度: <输入token数>
+输出长度: <输出token数>
+stage: <不传此参数/prefill/decode>
+```
+注意：**不要**自己去网上搜索模型参数（如参数量、层数、hidden_size等），由`llm-mem-estimator`负责处理
 
 ### 约束条件
 
@@ -202,24 +215,11 @@ imbalance >= 0.7 → 分离
 4. 最终得到所有 (max_batch_size, TP, EP, DP) 候选配置
 5. **必须验证所有有效 TP 值，不得在找到第一个通过的配置后停止**
 
-### 调用方式
-
-使用 Skill tool 调用 `llm-mem-estimator`，每次调用传入不同的 (TP, EP, DP) 组合：
-
-```
-模型: <模型名称>
-芯片: <芯片型号，如 H100-80GB、A100-80GB>
-并行策略: TP=<TP值>, EP=<EP值>, DP=<DP值>
-batch_size: <目标batch_size>
-输入长度: <输入token数>
-```
-注意：**不要**自己去网上搜索模型参数（如参数量、层数、hidden_size等），由`llm-mem-estimator`负责处理
-
 ### PD 分离场景
 
 Prefill 和 Decode 阶段分别遍历和验证：
-- **Prefill**：compute-bound，batch_size 较大，激活值是主要瓶颈
-- **Decode**：memory-bound，KV Cache 是主要瓶颈
+- **Prefill**：compute-bound，batch_size 较大，激活值是主要瓶颈，调用`llm-mem-estimator`时指定 `--stage prefill`
+- **Decode**：memory-bound，KV Cache 是主要瓶颈，调用`llm-mem-estimator`时指定 `--stage decode`
 
 ### 收集结果
 
@@ -273,7 +273,7 @@ Decode TPS = batch_size / TPOT
 ### xPyD 计算（仅 PD 分离场景）
 
 **关键约束**：
-- **y = 1（固定，不可更改）** - Decode 实例数只能为 1
+- **y = 1（固定，不可更改）** - Decode 实例数只能为 1，但输入长度>>输出长度时，可适当考虑增加Prefill 实例数x以满足性能需求
 - Prefill每实例卡数 = TP_prefill × DP_prefill
 - Decode每实例卡数 = TP_decode × DP_decode
 - **Prefill总卡数 = Decode总卡数**（即 x × TP_prefill × DP_prefill = y × TP_decode × DP_decode）
@@ -345,10 +345,21 @@ Decode TPS = batch_size / TPOT
 | 总卡数 | [X] |
 | Tensor Parallel | [X] |
 | Expert Parallel | [X]（仅MoE模型）|
+| 单卡权重 | [X] GB |
 | Data Parallel | [X] |
 | 预估吞吐量 | [X] tokens/s |
 | 预估TTFT | [X] ms |
 | 预估TPOT | [X] ms |
+
+#### 权重详细分解
+
+将最终选定的 TP/EP/DP 配置调用 `llm-mem-estimator` 后，返回报告中的 **Detailed Breakdown** 部分复制到此处。
+
+此表格展示每个权重模块（q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj 等）的：
+- 内存占用（GB）和占比
+- 模块权重占用总计
+- 数据类型
+- 并行策略和 world size
 
 ---
 
@@ -366,6 +377,7 @@ Decode TPS = batch_size / TPOT
 | Tensor Parallel | [X] |
 | Expert Parallel | [X]（仅MoE模型）|
 | Data Parallel | [X] |
+| 单卡权重 | [X] GB |
 | 预估吞吐量 | [X] tokens/s |
 
 #### Decode 阶段
@@ -377,9 +389,20 @@ Decode TPS = batch_size / TPOT
 | Tensor Parallel | [X] |
 | Expert Parallel | [X]（仅MoE模型）|
 | Data Parallel | [X] |
+| 单卡权重 | [X] GB |
 | 预估吞吐量 | [X] tokens/s |
 
 **总卡数: [X]**
+
+#### 权重详细分解
+
+将最终选定的 TP/EP/DP 配置调用 `llm-mem-estimator` 后，返回报告中的 **Detailed Breakdown** 部分复制到此处。
+
+此表格展示每个权重模块（q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj 等）的：
+- 内存占用（GB）和占比
+- 模块权重占用总计
+- 数据类型
+- 并行策略和 world size
 
 ## 5. 实现注意事项
 - [具体配置建议和注意事项]
