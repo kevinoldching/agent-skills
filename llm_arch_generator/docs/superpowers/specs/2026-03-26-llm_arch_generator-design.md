@@ -198,7 +198,6 @@ graph LR
     end
 
     TB --> LN2["RMSNorm"]
-    TB -.->|"residual"| LN2
     LN2 --> LM["LM Head"]
 ```
 
@@ -279,13 +278,8 @@ graph LR
 #!/usr/bin/env python3
 """Download config.json and model.py from HuggingFace with caching.
 
-model.py location is not fixed — it may be:
-  - model.py
-  - modeling.py
-  - modeling_<name>.py
-  - In a subdirectory: inference/model.py, src/modeling_llama.py, etc.
-
-This script scans the repo to locate the modeling file.
+model.py can be anywhere in the repo tree. This script uses list_repo_files()
+to scan the entire repository (all subdirectories) and locate the modeling file.
 """
 
 import argparse
@@ -302,17 +296,15 @@ def get_cache_path(model_id: str, filename: str) -> Path:
 
 def find_modeling_file(model_id: str) -> str | None:
     """
-    Find the modeling file in a HuggingFace repo.
+    Find the modeling file by scanning the entire repository.
 
-    model.py can be anywhere in the repo tree. Common patterns:
+    Uses list_repo_files() to get all files recursively, then matches:
       - model.py
       - modeling.py
-      - modeling_llama.py
-      - src/modeling_llama.py
-      - inference/model.py
-      - flash_attention/model.py
+      - modeling_<anything>.py
 
-    Returns the filename if found, None otherwise.
+    This handles any directory layout (src/, inference/, flash_attention/, etc.).
+    Returns the full path in the repo if found, None otherwise.
     """
     # Get all files in the repo
     try:
