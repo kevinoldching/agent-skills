@@ -59,7 +59,7 @@ generic:
     TP_O_PROJ: 8      # o_proj.weight 的默认 TP size
     TP_MLP: 8         # FFN 权重的默认 TP size
     TP_SHARED_EXPERT: 8  # 共享专家的默认 TP size
-    TP_EMBEDDING: 1   # embedding 的默认 TP size
+    TP_EMBEDDING: 8   # embedding 的默认 TP size
 
   # 默认并行策略配置（PD分离-三层结构）
   # parallel_defaults: 混部/通用场景（stage=hybrid）
@@ -220,6 +220,7 @@ Kimi-K2.5:
   # PD分离-decode专用
   parallel_defaults.decode:
     embedding: TP_EMBEDDING
+    ffn_shared_expert: TP_O_PROJ
     attention:
       o_proj.weight: TP_O_PROJ
 
