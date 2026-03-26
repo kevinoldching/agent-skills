@@ -74,7 +74,15 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --ou
 | `--dp` | Data Parallel (DP) 并行度 | 1 |
 | `--cp` | Context Parallel (CP) 并行度 | 1 |
 | `--ep` | Expert Parallel (EP) 并行度 | 1 |
+| `--tp-o-proj` | TP_O_PROJ 变体的 TP size（用于 o_proj.weight） | YAML 默认值 |
+| `--tp-mlp` | TP_MLP 变体的 TP size（用于 FFN 权重） | YAML 默认值 |
+| `--tp-shared-expert` | TP_SHARED_EXPERT 变体的 TP size（用于共享专家） | YAML 默认值 |
+| `--tp-embedding` | TP_EMBEDDING 变体的 TP size（用于 embedding） | YAML 默认值 |
 | `--stage` | PD分离阶段 | None（混部/通用并行配置） |
+
+### TP 变体说明
+
+TP 变体允许对不同权重组使用不同的 TP size。变体值在 `weight_mapping_rules.yaml` 的 `tp_variants` 中定义，CLI 参数可覆盖默认值。
 
 `--stage` 选项：
 - 不指定：`parallel_defaults.hybrid`（混部/通用场景）
@@ -100,6 +108,20 @@ python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4
 # PD分离场景
 python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage prefill
 python scripts/calculate_mem.py --model Kimi-K2.5 --tp 4 --stage decode
+```
+
+### 示例：使用 TP 变体
+
+```bash
+# 使用 YAML 中定义的 TP 变体默认值
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 1 --stage decode
+
+# 覆盖 TP_O_PROJ 变体的值为 4
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 1 --stage decode --tp-o-proj 4
+
+# 同时覆盖多个变体
+python scripts/calculate_mem.py --model Kimi-K2.5 --tp 1 --stage decode \
+    --tp-o-proj 4 --tp-mlp 2 --tp-shared-expert 8
 ```
 
 ## 硬件配置
@@ -279,6 +301,9 @@ usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
                        [--kv-dtype KV_DTYPE] [--activation-dtype ACTIVATION_DTYPE]
                        [--activation-peak ACTIVATION_PEAK]
                        [--tp TP] [--pp PP] [--dp DP] [--cp CP] [--ep EP]
+                       [--tp-o-proj TP_O_PROJ] [--tp-mlp TP_MLP]
+                       [--tp-shared-expert TP_SHARED_EXPERT] [--tp-embedding TP_EMBEDDING]
+                       [--stage {prefill,decode}]
                        [--chip CHIP] [--find-max-seq-len]
                        [--system-reserved SYSTEM_RESERVED]
                        [--output OUTPUT]
