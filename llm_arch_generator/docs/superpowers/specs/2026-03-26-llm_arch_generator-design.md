@@ -196,10 +196,10 @@ graph LR
 
 ### Level 2: Module Expansion
 
-Level 1 structure on the left, with complex modules (MoE, Attention) expanded on the right via `==>` relationship arrows.
+Level 1 structure (top-down), with complex modules (MoE, Attention) expanded on the right via `==>` relationship arrows.
 
 ```mermaid
-graph LR
+graph TD
     %% === 颜色定义 ===
     classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
     classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
@@ -208,55 +208,83 @@ graph LR
     classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
     classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
 
-    subgraph L1 ["Level 1"]
-        direction LR
-        Embed["Embedding"] --> ln1["RMSNorm"]
+    %% === 输入层 (Level 1) ===
+    subgraph Input_Stage ["输入层"]
+        direction TB
+        Tokens["Token IDs"] --> Embed["Embedding"]
+    end
+
+    %% === Layer N 结构 (Level 1) ===
+    subgraph Transformer_Layer ["Transformer Layer N"]
+        direction TB
+
+        layer_in((h_l)):::norm --> ln1["RMSNorm"]:::norm
         ln1 --> attn_module["MLA / Attention"]:::attention
 
-        attn_module --> add1["(+)"]:::norm
-        ln1 -.-> |Residual 1| add1
+        attn_module --> add1((+)):::norm
+        layer_in -.-> |Residual 1| add1
 
         add1 --> ln2["RMSNorm"]:::norm
         ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
 
-        moe_module --> add2["(+)"]:::norm
+        moe_module --> add2((+)):::norm
         add1 -.-> |Residual 2| add2
 
-        add2 --> layer_out["h_l+1"]
+        add2 --> layer_out((h_l+1)):::norm
     end
 
-    %% === Attention 展开 (右侧) ===
-    subgraph Attn_Expand ["Attention 展开"]
-        direction LR
-        attn_in["Input"] --> q_proj["Q_proj<br/>H×H"]:::attention
-        attn_in --> k_proj["K_proj<br/>H×kvH·head"]:::attention
-        attn_in --> v_proj["V_proj<br/>H×kvH·head"]:::attention
+    %% === MoE 展开 (Level 2) ===
+    subgraph MoE_Detail ["MoE 展开"]
+        direction TB
 
-        q_proj --> softmax["Softmax"]:::attention
-        k_proj --> softmax
-
-        softmax --> o_proj["O_proj<br/>hH×H"]:::attention
-        o_proj --> attn_out["Output"]
-    end
-
-    %% === MoE 展开 (右侧) ===
-    subgraph MoE_Expand ["MoE 展开"]
-        direction LR
         router["Sigmoid Router"]:::moe
 
-        shared["Shared Expert"]:::moe
-        routed_1["Routed Expert 1"]:::moe
-        routed_2["Routed Expert 2"]:::moe
-        routed_n["Routed Expert N"]:::moe
+        subgraph Expert_Pool ["专家池 (Shared + 8 Routed)"]
+            shared["Shared Expert"]:::moe
+            routed_1["Routed Expert 1"]:::moe
+            routed_2["Routed Expert 2"]:::moe
+            routed_x["..." ]:::moe
+            routed_n["Routed Expert N"]:::moe
+        end
 
         router --> |Top-8| routed_1
         router --> |Top-8| routed_2
         router --> |Top-8| routed_n
+        shared -.-> |always add| MoE_out
+        routed_1 -.-> |if selected| MoE_out
+        routed_2 -.-> |if selected| MoE_out
+        routed_n -.-> |if selected| MoE_out
     end
 
+    subgraph Attention_Detail ["Attention 展开"]
+        direction TB
+
+        attn_in["Input<br/>[B,S,H]"] --> q_proj["Q_proj<br/>H×H"]:::attention
+        attn_in --> k_proj["K_proj<br/>H×kvH·head"]:::attention
+        attn_in --> v_proj["V_proj<br/>H×kvH·head"]:::attention
+
+        q_proj --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
+        k_proj --> softmax
+
+        softmax --> o_proj["O_proj<br/>hH×H"]:::attention
+        o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
+    end
+
+    %% === 输出层 ===
+    subgraph Output_Stage ["输出层"]
+        direction TB
+        final_norm["Final RMSNorm"]:::norm
+        Head["LM Head"]:::output_stage
+    end
+
+    %% === 全局连接 ===
+    Embed --> layer_in
+    layer_out --> final_norm
+    final_norm --> Head
+
     %% === 展开关系 (Level 1 ==> Level 2) ===
-    attn_module ==> attn_in
     moe_module ==> router
+    attn_module ==> q_proj
 ```
 
 ### Color Conventions
