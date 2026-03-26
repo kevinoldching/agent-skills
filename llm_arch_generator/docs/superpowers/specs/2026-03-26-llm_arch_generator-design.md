@@ -52,27 +52,22 @@ Two levels only. Level 1 shows the block structure with residual connections; Le
 
 ### `-v` (Collapsed, Level 1)
 
-Shows individual **Attention**, **FFN** (or **MoE**, **MLP**) modules grouped inside a **Transformer Block** box labeled `× N layers`. Residual connections are shown at this level.
+Shows individual **Attention**, **FFN** (or **MoE**, **MLP**) modules visible in the flow, with a dashed box grouping them labeled `× N layers`. Residual connections are shown at this level.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              LLaMA-3-8B                                     │
-│                                                                             │
-│  Embed ──► Norm ──► ┌─────────────────────────────────────────────────┐   │
-│                    │         Transformer Block  (× 32 layers)          │   │
-│                    │                                                   │   │
-│                    │   Input ──► RMSNorm ──► [Attention] ──► [FFN]    │   │
-│                    │                    │                 │               │   │
-│                    │              ┌─────┴─────┐    ┌────┴────┐          │   │
-│                    │              │ add (pre) │    │ add(pre)│          │   │
-│                    │              └───────────┘    └─────────┘          │   │
-│                    └─────────────────────────────────────────────────┘   │
-│                               │                                                      │
-│                         RMSNorm ──► LM Head                                          │
-└─────────────────────────────────────────────────────────────────────────────┘
+Embed ──► Norm ──► Input ──► RMSNorm ──► [Attention] ──► [FFN] ──► Output
+                   │               │               │               │
+                   └───────┬──────┴───────┬───────┘               │
+                           │   add(pre)   │                       │
+                           └──────────────┘                       │
+                         ┌────────────────────────────────┐
+                         │    Transformer Block × 32        │  ← dashed box
+                         └────────────────────────────────┘
+                                           │
+                                     Norm ──► LM Head
 ```
 
-**Key:** Level 1 directly exposes Attention/FFN/MoE/MLP modules inside the Transformer Block, enabling accurate residual connection visualization. NOT a black-box "Stack".
+**Key:** Level 1 directly shows Attention/FFN/MoE/MLP modules in the flow (not a black-box "Stack"), with a dashed border indicating they repeat N times. Residual add paths are visible.
 
 ### `-vv` (Expanded, Level 2)
 
@@ -181,11 +176,12 @@ AI must read the actual `forward()` method and identify:
 ```mermaid
 graph LR
     E["Embedding"] --> LN1["RMSNorm"]
-    LN1 --> TB["Transformer Block × 32"]
+    LN1 --> Input["Input"]
 
-    subgraph TB[" "]
+    subgraph TB["Transformer Block × 32"]
         direction LR
-        Input["Input"] --> LN_a["RMSNorm"]
+        style TB dashed
+        Input --> LN_a["RMSNorm"]
         LN_a --> Attn["Attention<br/>h=32, kv=8"]
         Input -.->|"add"| Add1["Add"]
         Attn --> Add1
@@ -198,22 +194,29 @@ graph LR
     end
 
     TB --> LN2["RMSNorm"]
+    TB -.->|"residual"| LN2
     LN2 --> LM["LM Head"]
 ```
 
+**Key:** `subgraph TB` with `style TB dashed` shows the repeated modules with a dashed border. Attention and FFN are visible inside — NOT hidden in a black-box node.
+
 ### Level 2: Module Expansion
+
+Level 1 structure on the left, with cross-refs pointing to expanded module details on the right:
 
 ```mermaid
 graph LR
     subgraph L1["LEVEL 1"]
         direction LR
         E["Embedding"] --> LN1["RMSNorm"]
-        LN1 --> TB["Transformer Block × 32"]
-        TB --> LN2["RMSNorm"]
-        LN2 --> LM["LM Head"]
+        LN1 --> Input["Input"]
+        Input --> Attn1["Attention<br/>h=32, kv=8"]
+        Attn1 --> FFN1["FFN<br/>H→I→H"]
+        style L1 dashed
     end
 
-    TB -->|"expand"| Attn[" "]
+    L1 -->|"expand"| Attn[" "]
+    L1 -->|"expand"| FFN[" "]
 
     subgraph Attn["Attention (h=32, kv=8)"]
         direction LR
@@ -225,8 +228,6 @@ graph LR
         Soft --> O["O_proj<br/>hH×H"]
         O --> Out["Output<br/>[B,S,H]"]
     end
-
-    TB -->|"expand"| FFN[" "]
 
     subgraph FFN["FFN (H=4096, I=14336)"]
         direction LR
