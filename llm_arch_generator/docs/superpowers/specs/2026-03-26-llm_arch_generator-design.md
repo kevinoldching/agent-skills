@@ -190,62 +190,70 @@ AI must read the actual `forward()` method and identify:
 
 ### Left-Right Layout
 
-The diagram uses `graph LR` (left-to-right) for the top-level layout.
+The diagram uses `graph LR` (left-to-right) for the top-level layout. Subgraphs use `direction LR` to maintain left-right orientation throughout.
 
 **Macro-Micro cross-reference:**
 
 ```mermaid
 graph LR
-    subgraph L[" "]
-        direction TB
+    subgraph L["MACRO VIEW"]
+        direction LR
         E["Embedding"] --> N1["RMSNorm"]
         N1 --> ST["Transformer Stack<br/>32 Layers"]
         ST --> N2["RMSNorm"]
         N2 --> LM["LM Head"]
-        ST -."residual".-> N2
+        ST -.->|"residual"| N2
     end
 
-    ST -->|"expand attention/ffn"| R[" "]
+    ST -->|"expand"| R
 
-    subgraph R[" "]
-        direction TB
-        subgraph Attn["Attention (h=32, kv=8)"]
-            direction LR
-            In["Input<br/>[B,S,H]"] --> Q["Q_proj<br/>[H,H]"]
-            In --> K["K_proj<br/>[H,kvH·head]"]
-            In --> V["V_proj<br/>[H,kvH·head]"]
-            Q --> Soft["Softmax<br/>[B,h,S,head]"]
-            K --> Soft
-            Soft --> O["O_proj<br/>[hH,H]"]
-            O --> Out["Output<br/>[B,S,H]"]
-        end
-
-        subgraph FFN["FFN (H=4096, I=14336)"]
-            direction LR
-            Fin["Input"] --> Gate["gate_proj<br/>[H,I]"]
-            Fin --> Up["up_proj<br/>[H,I]"]
-            Gate --> Mul["SiLU"]
-            Up --> Mul
-            Mul --> Down["down_proj<br/>[I,H]"]
-            Down --> Fout["Output"]
-        end
+    subgraph Attn["Attention (h=32, kv=8)"]
+        direction LR
+        In["Input<br/>[B,S,H]"] --> Q["Q_proj<br/>H×H"]
+        In --> K["K_proj<br/>H×kvH·head"]
+        In --> V["V_proj<br/>H×kvH·head"]
+        Q --> Soft["Softmax<br/>[B,h,S,head]"]
+        K --> Soft
+        Soft --> O["O_proj<br/>hH×H"]
+        O --> Out["Output<br/>[B,S,H]"]
     end
+
+    subgraph FFN["FFN (H=4096, I=14336)"]
+        direction LR
+        Fin["Input"] --> Gate["gate_proj<br/>H×I"]
+        Fin --> Up["up_proj<br/>H×I"]
+        Gate --> Mul["SiLU"]
+        Up --> Mul
+        Mul --> Down["down_proj<br/>I×H"]
+        Down --> Fout["Output"]
+    end
+
+    ST -.->|"residual"| Attn
+    ST -.->|"residual"| FFN
 ```
+
+**Key:** Both macro and micro views use `direction LR` to preserve left-right flow. Cross-references from Stack to micro modules use dashed arrows.
 
 ### Residual Connection Display
 
-Residual connections are rendered as **dashed edges** with annotations describing the relationship:
+Residual connections are rendered as **dashed edges** with labels describing the relationship:
 
 ```mermaid
-    %% Pre-norm residual (from model.py analysis)
-    N1["RMSNorm"] -.->|"input + attention(input)"| Add1["Add"]
-    Attn --> Add1
+graph LR
+    %% Pre-norm pattern
+    Input1["Input"] --> LN1["RMSNorm"]
+    LN1 --> Attn1["Attention"]
+    Input1 -.->|"add"| Add1["Add"]
+    Attn1 --> Add1
 
-    %% Post-norm residual
-    Add2["Add"] -.->|"norm(input + sublayer(input))"| N2["RMSNorm"]
+    %% Post-norm pattern
+    Input2["Input"] --> Attn2["Attention"]
+    Input2 --> Add2["Add"]
+    Attn2 --> Add2
+    Add2 --> LN2["RMSNorm"]
 ```
 
-**Key principle:** The exact residual pattern (pre-norm, post-norm, shortcut) is determined by reading model.py, not by assumption.
+**Key principle:** The exact residual pattern (pre-norm, post-norm, shortcut) is determined by reading model.py forward() method, not by assumption. Dashed lines indicate the residual/add path.
 
 ### Color Conventions
 
@@ -283,15 +291,26 @@ Residual connections are rendered as **dashed edges** with annotations describin
 
 ```python
 #!/usr/bin/env python3
-"""Download config.json and model.py from HuggingFace."""
+"""Download config.json and model.py from HuggingFace with caching."""
 
 import argparse
 import os
+from pathlib import Path
 from huggingface_hub import hf_hub_download
 
-def download_model(model_id: str, output_dir: str = ".") -> tuple[str, str | None]:
+CACHE_DIR = Path.home() / ".cache" / "llm_arch_generator"
+
+def get_cache_path(model_id: str, filename: str) -> Path:
+    """Get local cache path for a downloaded file."""
+    safe_id = model_id.replace('/', '_').replace('-', '_')
+    return CACHE_DIR / safe_id / filename
+
+def download_model(model_id: str, output_dir: str = None, use_cache: bool = True) -> tuple[str, str | None]:
     """
-    Download config.json and modeling_*.py from HuggingFace.
+    Download config.json and model.py from HuggingFace.
+
+    Caches to ~/.cache/llm_arch_generator/{model_id}/
+    Clear cache by deleting that directory.
 
     modeling_*.py naming pattern: modeling_<model_name>.py
     Examples:
@@ -299,18 +318,48 @@ def download_model(model_id: str, output_dir: str = ".") -> tuple[str, str | Non
       - KimiML/kimi-k2-5 → modeling_kimi_k2_5.py
       - Qwen/Qwen2-7B → modeling_qwen2_7b.py
     """
+    # Determine output directory (use cache if not specified)
+    if output_dir is None:
+        output_dir = CACHE_DIR / model_id.replace('/', '_').replace('-', '_')
+    else:
+        output_dir = Path(output_dir)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     # 1. Download config.json
-    config_path = hf_hub_download(repo_id=model_id, filename="config.json", local_dir=output_dir)
+    config_cache = get_cache_path(model_id, "config.json")
+    if use_cache and config_cache.exists():
+        # Copy from cache to output_dir
+        import shutil
+        dest = output_dir / "config.json"
+        shutil.copy(config_cache, dest)
+        config_path = str(dest)
+    else:
+        config_path = hf_hub_download(repo_id=model_id, filename="config.json", local_dir=str(output_dir))
+        # Populate cache
+        config_cache.parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+        shutil.copy(config_path, str(config_cache))
 
     # 2. Try to find modeling file (pattern: modeling_<name>.py)
     sanitized = model_id.lower().replace('/', '_').replace('-', '_').replace('.', '_')
     modeling_filename = f"modeling_{sanitized}.py"
 
     model_path = None
-    # Try exact name first, then fallbacks
+    model_cache = get_cache_path(model_id, modeling_filename)
     for filename in [modeling_filename, "modeling.py", "modeling_llama.py"]:
+        cache_file = get_cache_path(model_id, filename)
+        if use_cache and cache_file.exists():
+            # Copy from cache to output_dir
+            import shutil
+            dest = output_dir / filename
+            shutil.copy(cache_file, dest)
+            model_path = str(dest)
+            break
         try:
-            model_path = hf_hub_download(repo_id=model_id, filename=filename, local_dir=output_dir)
+            model_path = hf_hub_download(repo_id=model_id, filename=filename, local_dir=str(output_dir))
+            # Populate cache
+            shutil.copy(model_path, str(cache_file))
             break
         except Exception:
             continue
@@ -320,10 +369,11 @@ def download_model(model_id: str, output_dir: str = ".") -> tuple[str, str | Non
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download model files from HuggingFace")
     parser.add_argument("model_id", help="e.g., meta-llama/Llama-3-8b")
-    parser.add_argument("--output-dir", default="./downloaded")
+    parser.add_argument("--output-dir", default=None, help="Output directory (default: cache)")
+    parser.add_argument("--no-cache", action="store_true", help="Bypass cache")
     args = parser.parse_args()
 
-    config, model = download_model(args.model_id, args.output_dir)
+    config, model = download_model(args.model_id, args.output_dir, use_cache=not args.no_cache)
     print(f"config.json: {config}")
     print(f"modeling_*.py: {model}")
 ```
