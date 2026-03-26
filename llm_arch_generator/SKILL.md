@@ -540,37 +540,49 @@ When config.json provides partial information, AI auto-fills missing details bas
 
 ---
 
-## Shape Calculation Rules
+## Shape Inference: Dynamic Calculation from model.py
 
-### Attention Weights
+Shape inference **must combine** config.json and model.py — not config.json alone.
 
-```
-q_proj: [hidden_size, hidden_size]       # or [hidden_size, num_attention_heads × head_dim]
-k_proj: [hidden_size, num_key_value_heads × head_dim]
-v_proj: [hidden_size, num_key_value_heads × head_dim]
-o_proj: [num_attention_heads × head_dim, hidden_size]
+### How to Infer Shapes
+
+1. **From config.json**: Extract `hidden_size` (H), `intermediate_size` (I), `num_attention_heads`, `num_key_value_heads`, `head_dim`
+
+2. **From model.py**: Read the actual `nn.Linear()` definitions to find exact tensor shapes:
+
+```python
+# Example: reading model.py
+class LlamaAttention(nn.Module):
+    def __init__(self, config):
+        self.q_proj = nn.Linear(H, H)                    # shape: [H, H]
+        self.k_proj = nn.Linear(H, kvH * head_dim)       # shape: [H, kvH·head_dim]
+        self.v_proj = nn.Linear(H, kvH * head_dim)       # shape: [H, kvH·head_dim]
+        self.o_proj = nn.Linear(H, H)                    # shape: [H, H]
 ```
 
-### FFN Weights
+3. **Calculate shapes dynamically** based on actual code, not assumptions:
 
-```
-gate_proj: [hidden_size, intermediate_size]
-up_proj:   [hidden_size, intermediate_size]
-down_proj: [intermediate_size, hidden_size]
-```
+| Layer | Shape Formula |
+|-------|---------------|
+| Q_proj | `[H, H]` or `[H, num_heads × head_dim]` |
+| K_proj | `[H, num_key_value_heads × head_dim]` |
+| V_proj | `[H, num_key_value_heads × head_dim]` |
+| O_proj | `[H, num_heads × head_dim]` or `[H, H]` |
+| FFN gate/up | `[H, intermediate_size]` |
+| FFN down | `[intermediate_size, H]` |
 
 ### Shape Display Format
 
 ```
-Attention:   input_hidden → output_hidden [h=num_attention_heads kv=num_kv_heads]
-FFN:         input_hidden → intermediate → output_hidden
-Embedding:   vocab_size → hidden_size
-Output Head: hidden_size → vocab_size
+Attention:   input → [B, S, H] → output [h=num_heads kv=num_kv_heads]
+FFN:         [B, S, H] → [B, S, I] → [B, S, H]
+Embedding:   [B, S] → [B, S, H]
+Output Head: [B, S, H] → [B, S, vocab_size]
 ```
 
-### GQA (Grouped Query Attention) Handling
+### GQA (Grouped Query Attention)
 
-- If `num_key_value_heads < num_attention_heads`: Render with separate kv_heads count
+- If `num_key_value_heads < num_attention_heads`: Show separate kv_heads count
 - If `num_key_value_heads == num_attention_heads`: Omit kv display (standard MHA)
 
 ---
