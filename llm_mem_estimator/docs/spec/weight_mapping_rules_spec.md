@@ -178,6 +178,10 @@ computation_rules:
 | `TP_SHARED_EXPERT` | 8 | 共享专家的 TP size |
 | `TP_EMBEDDING` | 1 | embedding 的 TP size |
 
+### 变体继承
+
+`tp_variants` 支持模型覆盖。子模型的 `tp_variants` 会**完全替换**（replace）父的，不是合并。
+
 ### CLI 覆盖
 
 可通过 CLI 参数覆盖 YAML 中的默认值：
@@ -256,7 +260,48 @@ parallel_defaults:
 - `parallel_defaults.prefill`：PD分离-prefill专用
 - `parallel_defaults.decode`：PD分离-decode专用
 
-继承规则：模型定义了某 stage → 使用模型的；模型未定义 → 使用 generic 的同名 stage。
+### 继承规则（按优先级从高到低）
+
+**hybrid 场景：**
+1. `model.parallel_defaults`（最高优先级）
+2. `generic.parallel_defaults`
+
+**prefill 场景：**
+1. `model.parallel_defaults.prefill`
+2. `model.parallel_defaults`（hybrid）
+3. `generic.parallel_defaults.prefill`
+4. `generic.parallel_defaults`
+
+**decode 场景：**
+1. `model.parallel_defaults.decode`（最高优先级）
+2. `model.parallel_defaults`（hybrid）
+3. `generic.parallel_defaults.decode`
+4. `generic.parallel_defaults.prefill`
+5. `generic.parallel_defaults`
+
+### 模型 YAML 配置生成
+
+生成模型 YAML 配置文件时，使用 `stage=hybrid` 的 `parallel_defaults`（不区分 prefill/decode）。因此模型 YAML 中记录的 `parallel_strategy` 是 hybrid 场景的策略。
+
+运行显存计算时，会根据 `--stage` 参数应用对应的策略。
+
+### PD 分离配置示例
+
+```yaml
+Kimi-K2.5:
+  inherit: generic
+
+  # 混部/通用场景的并行策略
+  parallel_defaults:
+    ffn_shared_expert: TP_SHARED_EXPERT
+
+  # PD分离-decode专用（会覆盖上面的 ffn_shared_expert）
+  parallel_defaults.decode:
+    embedding: TP_EMBEDDING
+    ffn_shared_expert: TP_O_PROJ    # 覆盖 hybrid 的 TP_SHARED_EXPERT
+    attention:
+      o_proj.weight: TP_O_PROJ
+```
 
 ---
 
