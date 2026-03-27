@@ -1,0 +1,19 @@
+# Mistral-7B-v0.1
+# Source: mistralai/Mistral-7B-v0.1
+model_type: mistral
+family: mistral
+model_name: Mistral-7B-v0.1
+source: mistralai/Mistral-7B-v0.1
+
+config:
+  hidden_size: 4096
+  num_hidden_layers: 32
+  intermediate_size: 14336
+  num_attention_heads: 32
+  num_key_value_heads: 8
+  vocab_size: 32000
+  head_dim: 128
+  sliding_window: 4096
+
+attention_type: swa
+template: mistral/common.yaml

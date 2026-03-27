@@ -24,4 +24,10 @@ activation: silu
 input: embed_tokens
 output: lm_head
 
+# Mistral uses GQA with sliding window attention
 kv_heads_key: num_key_value_heads
+
+# Sliding window attention
+attention_impl: sliding_window
+sliding_window_key: sliding_window
+attention_type: swa
