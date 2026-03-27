@@ -217,27 +217,27 @@ graph TD
     subgraph Transformer_Layer ["Transformer Layer N"]
         direction TB
 
-        ln1["RMSNorm"]:::norm --> attn_module["MLA / Attention"]:::attention
+        ln1["RMSNorm"]:::norm --> attn_module["Attention"]:::attention
 
         attn_module --> add1((+)):::norm
         %% Residual 1：来自输入
         ln1 -.-> |Residual 1 - skip input| add1
 
         add1 --> ln2["RMSNorm"]:::norm
-        ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
+        ln2 --> moe_module["MoE"]:::moe
 
         moe_module --> add2((+)):::norm
         %% Residual 2：来自 attention 输出
         add1 -.-> |Residual 2| add2
     end
 
-    %% === MoE 展开 ===
+    %% === MoE 展开（顶层子图） ===
     subgraph MoE_Detail ["MoE 展开"]
         direction TB
 
-        router["Sigmoid Router"]:::moe
+        router["Router"]:::moe
 
-        subgraph Expert_Pool ["专家池 (Shared + 8 Routed)"]
+        subgraph Expert_Pool ["专家池 (Shared + N Routed)"]
             shared["Shared Expert"]:::shared_expert
             routed_1["Routed Expert 1"]:::moe
             routed_2["Routed Expert 2"]:::moe
@@ -245,28 +245,31 @@ graph TD
             routed_n["Routed Expert N"]:::moe
         end
 
-        router --> |Top-8| routed_1
-        router --> |Top-8| routed_2
-        router --> |Top-8| routed_n
+        router --> |Top-K| routed_1
+        router --> |Top-K| routed_2
+        router --> |Top-K| routed_n
         shared -.-> |always add| MoE_out["MoE Output"]
         routed_1 -.-> |if selected| MoE_out
         routed_2 -.-> |if selected| MoE_out
         routed_n -.-> |if selected| MoE_out
     end
 
-    %% === Attention 展开 ===
+    %% === Attention 展开（顶层子图） ===
     subgraph Attention_Detail ["Attention 展开"]
         direction TB
 
-        attn_in["Input<br/>[B,S,H]"] --> q_proj["Q_proj<br/>H×H"]:::attention
-        attn_in --> k_proj["K_proj<br/>H×kvH·head"]:::attention
-        attn_in --> v_proj["V_proj<br/>H×kvH·head"]:::attention
+        attn_in["Input<br/>[B,S,H]"] --> q_proj["Q_proj<br/>H→num_heads×head_dim"]:::attention
+        attn_in --> k_proj["K_proj<br/>H→kv_heads×head_dim"]:::attention
+        attn_in --> v_proj["V_proj<br/>H→kv_heads×head_dim"]:::attention
 
-        q_proj --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
+        q_proj --> rope["RoPE"]:::attention
+        k_proj --> rope
+
+        rope --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
         k_proj --> softmax
         v_proj --> softmax
 
-        softmax --> o_proj["O_proj<br/>hH×H"]:::attention
+        softmax --> o_proj["O_proj<br/>num_heads×head_dim→H"]:::attention
         o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
     end
 
@@ -284,10 +287,12 @@ graph TD
     add2 --> final_norm
     %% 注意：对于 MoE 模型，使用 Out_M1 --> Final_Norm 而不是 add2 --> final_norm
 
-    %% === 展开关系 ===
-    moe_module ==> router
-    attn_module ==> attn_in
+    %% === 展开关系（==>> 指向顶层子图容器） ===
+    moe_module ==> MoE_Detail
+    attn_module ==> Attention_Detail
 ```
+
+**重要：展开箭头的目标必须是子图容器的 ID（如 `MoE_Detail`、`Attention_Detail`），不能是子图内部的节点。**
 
 ### Attention 类型展开规则
 
@@ -304,7 +309,12 @@ graph TD
 
 **混合 attention 类型：**
 - `attention_hybrid_types` + `attention_hybrid_mode: parallel` → 展开并行结构（同层多个 attention，通过 `attention_merge_type` 合并输出：add/gate/concat）。读取 `attention_merge_type` 字段确定合并策略：`add`（逐元素相加）、`gate`（逐元素乘以可学习门）、`concat`（拼接后投影）。
-- `attention_hybrid_types` + `attention_hybrid_mode: alternating` → 使用 `layer_types_key` + `hybrid_ratio` 展开交替堆栈结构
+- `attention_hybrid_types` + `attention_hybrid_mode: alternating` → 展开交替堆栈结构：
+  1. 每个 attention 类型生成一个顶层 `Attention_Detail_{TYPE}` 子图（如 `Attention_Detail_SWA`、`Attention_Detail_Full`）
+  2. Layer 子图内的 attention 占位符命名为对应类型（如 `attn_swa`、`attn_full`）
+  3. 用展开箭头指向对应顶层子图：`attn_swa ==> Attention_Detail_SWA`、`attn_full ==> Attention_Detail_Full`
+  4. Layer 子图之间按 `hybrid_ratio` 连接（如 SWA 层 → Full 层 → SWA 层 → ...）
+  5. **注意**：交替层的 MoE 通常相同，MoE_Detail 只需一个顶层子图，所有层的 `moe_module ==> MoE_Detail`
 - `attention_hybrid_types` + `attention_hybrid_mode: chain` → 展开链式结构（第一个 attention 的输出馈入第二个 attention）
 
 **回退：** 如果只存在 `attention_impl`（已废弃），直接将其作为 `attention_type` 使用（向后兼容）。
@@ -333,16 +343,23 @@ Shared -.->|"always add"| MoE_Out  %% 仅当存在 shared expert 时
 - `activation: gelu` → Router 显示 "softmax → Top-K"
 - Expert 数量由 `num_experts_key` 决定，ExpertN 节点用 `...` 表示超出数量
 
-**每个 Expert 的内部结构（gate_proj → up_proj → down_proj）：**
+**每个 Expert 的内部结构（gate_proj → up_proj → down_proj，每个 Expert 有独立的 FFN stack）：**
 ```
-MoE --> Expert_FFN["Expert FFN Stack"]
-Expert_FFN --> gate["gate_proj"]:::ffn
-Expert_FFN --> up["up_proj"]:::ffn
-Expert_FFN --> down["down_proj"]:::ffn
-gate --> act["{activation}"]:::ffn
-up --> act
-act --> down
+Expert1["Expert 1"]:::moe --> Expert_FFN_1["Expert 1 FFN Stack"]:::ffn
+Expert_FFN_1 --> gate1["gate_proj"]:::ffn
+Expert_FFN_1 --> up1["up_proj"]:::ffn
+Expert_FFN_1 --> down1["down_proj"]:::ffn
+gate1 --> act1["{activation}"]:::ffn
+up1 --> act1
+act1 --> down1
+down1 --> MoE_Out
+
+Expert2["Expert 2"]:::moe --> Expert_FFN_2["Expert 2 FFN Stack"]:::ffn
+%% ... Expert3 ~ ExpertN-1 用 %% 注释掉，只保留 Expert1, Expert2, ExpertN
+ExpertN["Expert N"]:::moe --> Expert_FFN_N["Expert N FFN Stack"]:::ffn
 ```
+
+**简化表示法（Expert 数量多时）：** Expert pool 中的每个 expert 用简单的 `["Expert N"]` 节点表示即可，不展开 FFN 内部。如需展示单个 expert 的内部结构，用 `ExpertN ==> Expert_FFN_N` 展开箭头指向单独子图。
 
 ### Attention 展开（MLA / Standard Attention）
 
