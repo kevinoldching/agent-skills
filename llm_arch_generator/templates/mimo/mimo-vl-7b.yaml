@@ -1,0 +1,25 @@
+# MiMo-VL-7B (Vision-Language)
+# Source: XiaomiMiMo/MiMo-VL-7B-RL-2508
+model_type: mimo_vl
+family: mimo
+model_name: MiMo-VL-7B
+source: XiaomiMiMo/MiMo-VL-7B-RL-2508
+
+config:
+  hidden_size: 4096
+  num_hidden_layers: 32
+  intermediate_size: 14336
+  num_attention_heads: 32
+  num_key_value_heads: 8
+  vocab_size: 152576
+  head_dim: 128
+  rope_theta: 5000000.0
+  max_position_embeddings: 32768
+
+  # Vision encoder
+  vision_hidden_size: 1024
+  vision_num_layers: 24
+  vision_patch_size: 14
+
+attention_type: swa
+template: mimo/common.yaml
