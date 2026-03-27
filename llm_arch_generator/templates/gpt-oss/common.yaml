@@ -44,3 +44,4 @@ attention:
   kv_heads_key: num_key_value_heads
   head_dim: 64
   sliding_window_key: sliding_window
+attention_type: swa

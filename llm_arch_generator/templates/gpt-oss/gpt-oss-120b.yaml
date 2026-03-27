@@ -1,4 +1,11 @@
 model_name: GPT-OSS-120B
+# Hybrid Alternating: SWA layers + Full attention layers alternate
+attention_hybrid_types:
+  - swa
+  - full
+attention_hybrid_mode: alternating
+layer_types_key: layer_types
+hybrid_ratio: "1:1"  # 1 SWA layer : 1 Full layer alternating
 template: gpt-oss/common.yaml
 
 config:
