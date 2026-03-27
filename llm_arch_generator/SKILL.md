@@ -145,7 +145,7 @@ python scripts/verify_mermaid.py <output_file>.mmd --verbose
 
 **Expected false positives (ignore):**
 - `ORPHAN (no outgoing)` on nodes inside subgraphs — subgraph-internal nodes may appear orphaned because edges within subgraphs don't propagate through subgraph container IDs in the checker
-- `DEAD END` on expansion target subgraphs (`GQA_Detail`, `FFN_Detail`, `MoE_Pool`, `MLA_Detail`) — `==>` expand arrows are visual-only and don't count as outgoing edges
+- `DEAD END` on expansion target subgraphs (any node matching `*_Detail`, `Hybrid_*`, `DSA_*`, `Linear_*`, `Gated_*`) — `==>` expand arrows are visual-only and don't count as outgoing edges
 - `ORPHAN` / `ISOLATED` on subgraph container IDs (`Input_Stage`, `Transformer_Layer`, `Output_Stage`) — these are transparent containers; use subgraph-level connections (`Input_Stage --> Transformer_Layer`) for data flow
 
 #### 5c. Semantic Checks (Module Internals)
@@ -278,6 +278,26 @@ graph TD
     moe_module ==> router
     attn_module ==> attn_in
 ```
+
+### Attention Type Expansion Rules
+
+In Step 4 mermaid generation, after detecting attention type from template, use this branching logic:
+
+**Single attention types:**
+- `attention_type: standard` or `attention_type: mqa` or `attention_type: gqa` → expand GQA chain (Q_proj → K_proj → V_proj → Softmax → O_proj)
+- `attention_type: mla` → expand MLA chain (Q_A → Q_LN → Q_B → ConcatQ; KV_A → KV_LN → ConcatK/K_B → RoPE → Softmax → O_Proj)
+- `attention_type: dsa` → expand DSA chain (MLA framework + Indexer top-K → Softmax → O_Proj)
+- `attention_type: swa` → expand SWA chain (Q_proj → K_proj → V_proj → SWA_Mask → Softmax → O_proj)
+- `attention_type: linear` → expand Linear attention chain
+- `attention_type: gated_deltanet` → expand Gated DeltaNet chain
+- `attention_type: gated_attention` → expand Gated Attention chain
+
+**Hybrid attention types:**
+- `attention_hybrid_types` + `attention_hybrid_mode: parallel` → expand Parallel structure (same-layer multiple attention, outputs merged via `attention_merge_type`: add/gate/concat). Read `attention_merge_type` field to determine merge strategy: `add` (element-wise add), `gate` (element-wise multiply with learnable gate), `concat` (concatenate then project).
+- `attention_hybrid_types` + `attention_hybrid_mode: alternating` → expand Alternating stack structure using `layer_types_key` + `hybrid_ratio`
+- `attention_hybrid_types` + `attention_hybrid_mode: chain` → expand Chain structure (output of first attention feeds into second attention)
+
+**Fallback:** If only `attention_impl` is present (deprecated), use it as `attention_type` directly (backward compatible).
 
 ### Attention Expansion (for MLA/Standard Attention)
 
