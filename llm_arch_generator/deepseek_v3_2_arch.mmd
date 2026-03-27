@@ -1,0 +1,108 @@
+%% DeepSeek-V3.2 Architecture
+%% 61 Layers · 7168 Hidden · 256 Experts · MoE + DSA Attention
+%% Source: templates/deepseek/deepseek-v3.2.yaml
+
+graph TD
+    %% === Color Definitions ===
+    classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px;
+    classDef moe fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef shared_expert fill:#b2dfdb,stroke:#00695c,stroke-width:2px;
+    classDef ffn fill:#fff4e1,stroke:#333,stroke-width:2px;
+    classDef norm fill:#f1f8e9,stroke:#33691e,stroke-width:1px;
+    classDef residual dashed,stroke:#999,stroke-width:1px;
+
+    %% === Input Stage ===
+    subgraph Input_Stage ["Input"]
+        direction TB
+        Tokens["Token IDs<br/>[B,S]"] --> Embed["Embedding<br/>129280 → 7168"]:::input_stage
+        Embed --> Input_LN["Input RMSNorm"]:::norm
+    end
+
+    %% === Dense Layer (Layer 1-3) ===
+    subgraph Dense_Layer ["Dense Layer (1-3)"]
+        direction TB
+        LN1["RMSNorm"]:::norm --> ATTN1["DSA Attention"]:::attention
+        ATTN1 --> ADD1((+)):::norm
+        LN1 -.-> |Residual| ADD1
+        ADD1 --> LN2["RMSNorm"]:::norm
+        LN2 --> FFN1["Dense FFN<br/>gate/up/down → 18432"]:::ffn
+        FFN1 --> ADD2((+)):::norm
+        ADD1 -.-> |Residual| ADD2
+        ADD2 --> Out_D1["Output<br/>[B,S,7168]"]
+    end
+
+    %% === MoE Layer (Layer 4-61) ===
+    subgraph MoE_Layer ["MoE Layer (4-61)"]
+        direction TB
+        LN3["RMSNorm"]:::norm --> ATTN2["DSA Attention"]:::attention
+        ATTN2 --> ADD3((+)):::norm
+        LN3 -.-> |Residual| ADD3
+        ADD3 --> LN4["RMSNorm"]:::norm
+        LN4 --> MoE["MoE FFN<br/>256 Experts · Top-8 + Shared"]:::moe
+        MoE --> ADD4((+)):::norm
+        ADD3 -.-> |Residual| ADD4
+        ADD4 --> Out_M1["Output<br/>[B,S,7168]"]
+    end
+
+    %% === Output Stage ===
+    subgraph Output_Stage ["Output"]
+        direction TB
+        Out_M1 --> Final_Norm["Final RMSNorm"]:::norm
+        Final_Norm --> LM_Head["LM Head<br/>129280 ← 7168"]:::output_stage
+    end
+
+    %% === DSA Attention Detail (MLA + Indexer) ===
+    subgraph DSA_Detail ["DSA Attention Detail"]
+        direction TB
+
+        %% Q path (MLA style)
+        Q_A["Q_A_Proj<br/>7168 → 1536"]:::attention
+        Q_A --> Q_LN["Q RMSNorm"]:::attention
+        Q_LN --> Q_B["Q_B_Proj<br/>1536 → 7168"]:::attention
+        Q_B --> ConcatQ["Concat(Q_nope + Q_rope)"]:::attention
+
+        %% KV path (MLA style)
+        KV_A["KV_A_Proj<br/>7168 → 576"]:::attention
+        KV_A --> KV_LN["KV RMSNorm"]:::attention
+        KV_LN --> ConcatK["Concat(K_rope + K_nope)"]:::attention
+        KV_LN --> K_B["K_B_Proj<br/>512 → 16384"]:::attention
+        ConcatK --> RoPE["RoPE (YaRN)"]:::attention
+
+        %% Indexer (sparse top-K selection)
+        RoPE --> Indexer["Indexer<br/>top-K by block"]:::attention
+        ConcatQ --> Indexer
+        K_B --> Indexer
+        Indexer --> Softmax["Softmax(Q·Kᵀ/√d)"]:::attention
+        Softmax --> O_Proj["O_Proj<br/>16384 → 7168"]:::attention
+    end
+
+    %% === MoE Expert Pool Detail ===
+    subgraph MoE_Pool ["MoE Expert Pool"]
+        direction TB
+        Router["Sigmoid Router<br/>Top-8 Routing"]:::moe
+        Shared["Shared Expert<br/>MLP(2048)"]:::shared_expert
+        Expert1["Expert 1"]:::moe
+        Expert2["Expert 2"]:::moe
+        Expert256["Expert 256"]:::moe
+        Router --> |Top-8| Expert1
+        Router --> |Top-8| Expert2
+        Router --> |Top-8| Expert256
+        Shared -.-> |always add| MoE_Out
+        Expert1 -.-> |if selected| MoE_Out
+        Expert2 -.-> |if selected| MoE_Out
+        Expert256 -.-> |if selected| MoE_Out["MoE Output"]
+    end
+
+    %% === Global Connections ===
+    Tokens --> Input_Stage
+    Input_Stage --> Input_LN
+    Input_LN --> Dense_Layer
+    Dense_Layer --> MoE_Layer
+    MoE_Layer --> Output_Stage
+
+    %% === Expansion Relations ===
+    ATTN1 ==> DSA_Detail
+    ATTN2 ==> DSA_Detail
+    MoE ==> MoE_Pool
