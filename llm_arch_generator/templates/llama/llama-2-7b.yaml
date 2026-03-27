@@ -16,4 +16,6 @@ config:
   rope_theta: 10000.0
 
 # Template reference (inherits from common.yaml)
+attention_type: standard
+
 template: llama/common.yaml
