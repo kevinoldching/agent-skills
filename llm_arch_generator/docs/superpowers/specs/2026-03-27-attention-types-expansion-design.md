@@ -94,6 +94,21 @@ hybrid_ratio: <string>             # e.g., "5:1" (SWA:Global)
 template: <family>/<model-name>.yaml   # 指向自身（显式声明，不继承）
 ```
 
+### Schema迁移路径（attention_impl → attention_type + token_selection）
+
+现有模板使用 `attention_impl: <type>` 声明attention类型。新schema引入两个正交字段：
+
+| 旧字段 | 新字段 | 说明 |
+|---|---|---|
+| `attention_impl: sliding_window` | `attention_type: gqa` + `token_selection: swa` | 正交分解 |
+| `attention_impl: mla` | `attention_type: mla` + `token_selection: dense` | 投影+选择分离 |
+| `attention_impl: gqa` | `attention_type: gqa` + `token_selection: dense` | 同上 |
+
+**迁移规则：**
+- 新模板文件使用 `attention_type` + `token_selection` 双字段
+- `attention_impl` 字段保留但标记为deprecated，不在新模板中使用
+- SKILL.md生成逻辑：优先读 `attention_type` + `token_selection`，如不存在则回退到 `attention_impl`
+
 ### common.yaml的role变更
 
 common.yaml仅作为**默认值**，每个模型文件必须override自己的attention类型：
@@ -211,6 +226,12 @@ Softmax --> O_proj["O_proj"]:::attention
 
 #### 5. Hybrid SWA + Global (GPT-OSS, MiMo)
 
+**层交替逻辑：**
+- `layer_types_key` (e.g., `layer_types`) 声明每层的类型数组，如 `["sliding_attention", "full_attention", "sliding_attention", ...]`
+- `hybrid_ratio` (e.g., `"5:1"`) 声明SWA:Global的交替比例，用于验证和文档说明
+- 图中展开时，每个transformer layer根据其layer_types值选择对应attention展开
+- 实际生成mermaid时，stack pattern描述应包含层类型交替，如 `[swa_block] × 5, [global_block] × 1, ...`
+
 ```mermaid
 %% 混合模式：交替SWA层和全局层
 subgraph Hybrid_Attention ["Hybrid SWA + Global (5:1)"]
@@ -221,14 +242,7 @@ subgraph Hybrid_Attention ["Hybrid SWA + Global (5:1)"]
 end
 ```
 
-#### 6. GQA + SWA + DSA（未来扩展）
-
-```mermaid
-%% Q/K/V投影
-Q_proj --> RoPE --> SWA_Mask --> DSA_Select --> Softmax --> O_proj
-K_proj --> RoPE --> SWA_Mask --> DSA_Select
-V_proj --> SWA_Mask --> DSA_Select
-```
+（GQA+DSA组合暂无实际模型支撑，暂不展开。如未来有需要，按MLA+DSA的数据流逻辑扩展：Q/K/V投影 → RoPE → SWA_Mask → DSA_Select → Softmax → O_proj）
 
 ---
 
