@@ -23,3 +23,9 @@ norm: rmsnorm
 activation: silu
 input: embed_tokens
 output: lm_head
+
+# Attention type defaults for Baichuan family:
+# - Baichuan-13B: standard (MHA)
+# - Baichuan2-7B: standard (MHA)
+# - Baichuan-M3: gqa
+# Each model file must declare its own attention_type explicitly.

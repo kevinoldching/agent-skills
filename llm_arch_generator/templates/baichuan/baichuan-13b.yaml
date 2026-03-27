@@ -1,0 +1,18 @@
+# Baichuan-13B
+# Source: baichuan-inc/Baichuan-13B-Base
+model_type: baichuan
+family: baichuan
+model_name: Baichuan-13B
+source: baichuan-inc/Baichuan-13B-Base
+
+config:
+  hidden_size: 4096
+  num_hidden_layers: 40
+  intermediate_size: 11008
+  num_attention_heads: 32
+  vocab_size: 125696
+  head_dim: 128
+  max_position_embeddings: 4096
+
+attention_type: standard
+template: baichuan/common.yaml
