@@ -1,192 +1,192 @@
 ---
 name: llm-arch-generator
-description: Use when user asks to draw, plot, generate, or visualize LLM model architecture, or wants to understand how a model (like LLaMA, MoE, DeepSeek, GPT, Kimi, Qwen) is structured internally. Also use for comparing model architectures, explaining attention/FFN/MoE modules, or generating architecture diagrams for documentation. This skill ALWAYS generates expanded (-vv) detailed diagrams by default.
+description: 当用户要求绘制、展示、生成或可视化 LLM 模型架构时使用，或当用户想了解模型（如 LLaMA、MoE、DeepSeek、GPT、Kimi、Qwen）的内部结构。也用于比较模型架构、解释 attention/FFN/MoE 模块，或生成文档架构图。此 skill 默认始终生成扩展（-vv）详细图。
 ---
 
-# LLM Architecture Generator
+# LLM 架构生成器
 
-## Invocation
+## 调用方式
 
 ```
 /llm-arch-generator <model> [-v|-vv] [--format png,svg,mmd] [--output /path/to/dir]
 ```
 
-**IMPORTANT: This skill ALWAYS uses `-vv` (expanded view) by default.** The expanded view shows detailed internal structure including projection layers, router mechanisms, and expert pools. Do NOT use `-v` unless the user explicitly requests a simple/collapsed view.
+**重要：此 skill 默认始终使用 `-vv`（扩展视图）。** 扩展视图展示详细内部结构，包括投影层、路由机制和专家池。除非用户明确要求，否则不要使用 `-v`。
 
-**Natural language mapping:**
+**自然语言映射：**
 
-| User says | Interpreted as |
-|-----------|---------------|
-| "Draw/plot/generate architecture of {model}" | `-vv` (expanded, detailed) |
-| "Simple/high-level/macro/collapsed view" | `-v` (collapsed) — only if explicitly requested |
-| "Detailed/expanded/with projections" | `-vv` (expanded, detailed) |
-| "Save to {path}" | `--output /path` |
+| 用户说法 | 解析为 |
+|---------|--------|
+| "绘制/展示/生成 {model} 的架构" | `-vv`（扩展、详细） |
+| "简单/高层/宏观/折叠视图" | `-v`（折叠）— 仅当明确要求时 |
+| "详细/扩展/带投影" | `-vv`（扩展、详细） |
+| "保存到 {路径}" | `--output /path` |
 
-**Parameters:**
+**参数：**
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `model` | HuggingFace ID, local path, or YAML config | Required |
-| `-vv` | Level 2: **EXPANDED** detailed view with all internals | **ALWAYS DEFAULT** |
-| `-v` | Level 1: collapsed blocks (only if user explicitly asks) | — |
-| `--format` | Output formats | png,svg,mmd |
-| `--output` | Output directory | CWD |
+| 参数 | 描述 | 默认值 |
+|------|------|--------|
+| `model` | HuggingFace ID、本地路径或 YAML 配置 | 必填 |
+| `-vv` | Level 2：**EXPANDED** 详细视图，包含所有内部结构 | **始终默认** |
+| `-v` | Level 1：折叠块（仅当用户明确要求时使用） | — |
+| `--format` | 输出格式 | png,svg,mmd |
+| `--output` | 输出目录 | CWD |
 
-### Examples
+### 示例
 
 ```bash
-# ALWAYS expanded detailed view by default
+# 默认始终生成扩展详细视图
 /llm-arch-generator moonshotai/Kimi-K2.5
 
-# Expanded view for DeepSeek V3 (MoE architecture)
+# DeepSeek V3（MoE 架构）的扩展视图
 /llm-arch-generator deepseek-ai/DeepSeek-V3-Base -vv
 
-# Only use collapsed view if explicitly requested
+# 仅当明确要求时才使用折叠视图
 /llm-arch-generator gpt2 -v
 
-# With PNG output
+# 指定 PNG 输出
 /llm-arch-generator Qwen/Qwen2-7B --format png --output ./diagrams
 
-# Natural language
+# 自然语言
 /llm-arch-generator Draw the architecture of LLaMA-3 and show me the projections
 ```
 
 ---
 
-## Workflow
+## 工作流程
 
-### Step 0: Choose Data Source
-**Always ask the user to choose how to obtain the model configuration** before proceeding:
+### Step 0: 选择数据源
+**在继续之前，始终询问用户选择如何获取模型配置：**
 
-1. **HuggingFace** — Search and download model config from HuggingFace Hub (requires network, most accurate — analyzes actual model.py code)
-2. **Built-in Templates** — Match model name to `templates/{family}/` YAML files (no network needed, fast fallback)
+1. **HuggingFace** — 从 HuggingFace Hub 搜索并下载模型配置（需要网络，最准确 — 分析实际的 model.py 代码）
+2. **内置模板** — 将模型名称匹配到 `templates/{family}/` YAML 文件（无需网络，快速回退）
 
-> **Built-in Templates** (`templates/` directory): Contains pre-built YAML configs for 10 model families (llama, qwen, deepseek, kimi, glm, baichuan, mistral, minimax, mimo, gpt-oss) covering 37+ models. If a specific model is not found, the AI uses `common.yaml` to infer structure from family conventions.
+> **内置模板**（`templates/` 目录）：包含 10 个模型系列（llama、qwen、deepseek、kimi、glm、baichuan、mistral、minimax、mimo、gpt-oss）的预构建 YAML 配置，覆盖 37+ 模型。如果找不到特定模型，AI 使用 `common.yaml` 从系列约定推断结构。
 
-### Step 1: Resolve Model ID
-If user provides a model name (e.g., "Kimi-K2.5", "LLaMA-3", "DeepSeek V3"), search for the HuggingFace model ID first:
-- Use web search to find the official HuggingFace repository
-- Common patterns: `moonshotai/Kimi-K2.5`, `meta-llama/Llama-3-8b`, `deepseek-ai/DeepSeek-V3`, `Qwen/Qwen2-7B`
-- If multiple matches exist, use the official/original model
+### Step 1: 解析模型 ID
+如果用户提供模型名称（如 "Kimi-K2.5"、"LLaMA-3"、"DeepSeek V3"），首先搜索 HuggingFace 模型 ID：
+- 使用网络搜索找到官方 HuggingFace 仓库
+- 常见模式：`moonshotai/Kimi-K2.5`、`meta-llama/Llama-3-8b`、`deepseek-ai/DeepSeek-V3`、`Qwen/Qwen2-7B`
+- 如果存在多个匹配，使用官方/原始模型
 
-### Step 2: Download Model Files
-Once resolved, download via `scripts/download_model.py`:
+### Step 2: 下载模型文件
+解析后，通过 `scripts/download_model.py` 下载：
 ```bash
 python scripts/download_model.py <model_id>
 ```
-- Scans repo with `list_repo_files()` to find ALL `modeling_*.py` files
-- Caches to `~/.cache/llm_arch_generator/{model_id}/`
-- **Select the correct modeling file**: Read `config.json` → get `auto_map["AutoModel"]` (e.g., `"modeling_kimi_k25.KimiK25ForConditionalGeneration"`). Extract the file prefix before the `.` (e.g., `modeling_kimi_k25`). Pick the `modeling_*.py` whose filename contains this prefix (case-insensitive). If none match, fall back to the first file.
+- 使用 `list_repo_files()` 扫描仓库以找到所有 `modeling_*.py` 文件
+- 缓存到 `~/.cache/llm_arch_generator/{model_id}/`
+- **选择正确的模型文件**：读取 `config.json` → 获取 `auto_map["AutoModel"]`（如 `"modeling_kimi_k25.KimiK25ForConditionalGeneration"`）。提取 `.` 前的文件前缀（如 `modeling_kimi_k25`）。选择文件名包含此前缀的 `modeling_*.py`（大小写不敏感）。如果没有匹配，回退到第一个文件。
 
-### Step 3: Analyze Model Structure
+### Step 3: 分析模型结构
 
-**Branch A — HuggingFace (from Step 1/2):**
-Read model.py to build the module tree and trace the forward() path:
-- Identify all major modules (attention, FFN, MoE, router, norms)
-- Detect residual connections from actual code analysis (look for `residual = hidden_states`, `hidden_states + residual`, `hidden_states = hidden_states + other`)
-- Calculate tensor shapes from config.json + weight definitions
+**分支 A — HuggingFace（来自 Step 1/2）：**
+读取 model.py 构建模块树并追踪 forward() 路径：
+- 识别所有主要模块（attention、FFN、MoE、router、norms）
+- 从实际代码分析中检测残差连接（查找 `residual = hidden_states`、`hidden_states + residual`、`hidden_states = hidden_states + other`）
+- 根据 config.json + 权重定义计算张量形状
 
-**Branch B — Built-in Templates:**
-1. **Match model to template**: Extract model family from name (e.g., "Qwen3-32B" → `qwen/`). Try exact match: `templates/{family}/{model-name}.yaml`. Fall back to scanning `templates/*/common.yaml` for matching `model_type`.
-2. **Read template**: Load matched YAML + its `common.yaml`. Merge configs (model YAML overrides common.yaml).
-3. **Parse architecture**: Extract `hidden_size`, `num_layers`, `attention_type`/`attention_impl`, `ffn_type`/`moe`, `kv_heads_key`, `vision` config, etc.
-4. **Infer internals**: Use `block` definitions from common.yaml (attention components: q_proj/k_proj/v_proj/o_proj; ffn components: gate_proj/up_proj/down_proj) combined with `config` values to determine tensor shapes.
+**分支 B — 内置模板：**
+1. **匹配模型到模板**：从名称提取模型系列（如 "Qwen3-32B" → `qwen/`）。尝试精确匹配：`templates/{family}/{model-name}.yaml`。回退到扫描 `templates/*/common.yaml` 查找匹配的 `model_type`。
+2. **读取模板**：加载匹配的 YAML 及其 `common.yaml`。合并配置（模型 YAML 覆盖 common.yaml）。
+3. **解析架构**：提取 `hidden_size`、`num_layers`、`attention_type`/`attention_impl`、`ffn_type`/`moe`、`kv_heads_key`、`vision` 配置等。
+4. **推断内部结构**：使用 common.yaml 中的 `block` 定义（attention 组件：q_proj/k_proj/v_proj/o_proj；ffn 组件：gate_proj/up_proj/down_proj）结合 `config` 值确定张量形状。
 
-### Step 4: Generate Mermaid Diagram (Level 2 Expanded)
-**ALWAYS generate expanded view (`graph TD`) with maximum detail.** The diagram must show:
+### Step 4: 生成 Mermaid 图（Level 2 扩展）
+**始终生成扩展视图（`graph TD`）并包含最大细节。** 图必须展示：
 
-**Required elements for expanded view:**
-1. **Embedding layer** with vocab size and hidden dimension
-2. **Input RMSNorm** (if present before first layer)
-3. **Attention internals**: Q/K/V projections, rotary embedding (RoPE), softmax, O projection
-4. **MLP/FFN internals**: gate_proj, up_proj, down_proj (or DeepseekV3MLP structure)
-5. **MoE internals**: Router (with activation function and top-K), Shared Expert, Routed Expert Pool
-6. **All residual connections** shown as dashed `-.->` arrows with labels
-7. **Final RMSNorm and LM Head**
-8. **For multimodal models**: Vision encoder, Projector
+**扩展视图必需元素：**
+1. **Embedding 层**，包含词表大小和隐藏维度
+2. **输入 RMSNorm**（如果首层之前存在）
+3. **Attention 内部结构**：Q/K/V 投影、旋转位置编码（RoPE）、softmax、O 投影
+4. **MLP/FFN 内部结构**：gate_proj、up_proj、down_proj（或 DeepseekV3MLP 结构）
+5. **MoE 内部结构**：Router（带激活函数和 top-K）、Shared Expert、Routed Expert Pool
+6. **所有残差连接**，显示为虚线 `-.->` 箭头并带标签
+7. **最终 RMSNorm 和 LM Head**
+8. **多模态模型**：Vision encoder、Projector
 
-**Graph structure rules:**
-- Use `graph TD` (top-down) layout
-- Use `==>` for expansion arrows (show "internals" of a module)
-- Use `-.->` for residual connections (dashed arrows)
-- Use `subgraph` with `direction TB` for module groupings
-- Apply color classes from the Color Conventions section
-- **DO NOT include a legend** — colors are self-explanatory via node labels
-- **DO NOT use layer-index markers as nodes** (e.g., `Out_L`, `h_l`, `layer_out`) — these are comments, not graph nodes. Use subgraph-level connections (e.g., `Input_Stage --> Transformer_Layer`) to show data flow between stages
+**图结构规则：**
+- 使用 `graph TD`（自上而下）布局
+- 使用 `==>` 表示展开箭头（展示模块的"内部结构"）
+- 使用 `-.->` 表示残差连接（虚线箭头）
+- 使用 `subgraph` + `direction TB` 进行模块分组
+- 应用 Color Conventions 部分的颜色类
+- **不要包含图例** — 颜色通过节点标签自解释
+- **不要使用层索引标记作为节点**（如 `Out_L`、`h_l`、`layer_out`）— 这些是注释，不是图节点。使用子图级连接（如 `Input_Stage --> Transformer_Layer`）展示阶段间的数据流
 
-### Step 5: Verify Mermaid Diagram (Syntax + Semantic)
+### Step 5: 验证 Mermaid 图（语法 + 语义）
 
-**After generating the `.mmd` file, you MUST run both syntax and semantic checks.**
+**生成 `.mmd` 文件后，必须运行语法和语义检查。**
 
-#### 5a. Syntax Checks
+#### 5a. 语法检查
 
-Run the mermaid CLI to catch parse errors:
+运行 mermaid CLI 捕获解析错误：
 ```bash
 bash scripts/render_mermaid.sh <output_file>.mmd 2>&1
-# Parse error → fix syntax issues before proceeding
+# 解析错误 → 修复语法问题后再继续
 ```
 
-Then verify manually:
-1. **No duplicate node IDs** — each ID must be unique within the diagram
-2. **All referenced nodes defined** — every node after `-->` / `==>` / `-.->` must have a corresponding definition
-3. **Subgraph labels quoted** — labels with special chars must use `"label"` format
-4. **classDef names match** — every `:::className` must have a corresponding `classDef className`
+然后手动验证：
+1. **无重复节点 ID** — 每个 ID 在图内必须唯一
+2. **所有引用的节点都已定义** — 每个 `-->` / `==>` / `-.->` 后的节点必须有相应定义
+3. **子图标签加引号** — 带特殊字符的标签必须使用 `"label"` 格式
+4. **classDef 名称匹配** — 每个 `:::className` 必须有相应的 `classDef className`
 
-#### 5b. Connectivity Verification
+#### 5b. 连通性验证
 
-Run the connectivity checker to detect undefined references, orphan nodes, and broken paths:
+运行连通性检查器以检测未定义引用、孤立节点和断开的路径：
 ```bash
 python scripts/verify_mermaid.py <output_file>.mmd --verbose
 ```
 
-**Real issues to fix:**
-- `UNDEFINED (node used but not defined)` — a node ID is referenced in an edge but never defined
-- `DEAD PATH: 'X' is not reachable from Input_Stage` — output stage cannot be reached from input
+**需要修复的真实问题：**
+- `UNDEFINED (node used but not defined)` — 节点在边中被引用但从未定义
+- `DEAD PATH: 'X' is not reachable from Input_Stage` — 输出阶段无法从输入到达
 
-**Expected false positives (ignore):**
-- `ORPHAN (no outgoing)` on nodes inside subgraphs — subgraph-internal nodes may appear orphaned because edges within subgraphs don't propagate through subgraph container IDs in the checker
-- `DEAD END` on expansion target subgraphs (any node matching `*_Detail`, `Hybrid_*`, `DSA_*`, `Linear_*`, `Gated_*`) — `==>` expand arrows are visual-only and don't count as outgoing edges
-- `ORPHAN` / `ISOLATED` on subgraph container IDs (`Input_Stage`, `Transformer_Layer`, `Output_Stage`) — these are transparent containers; use subgraph-level connections (`Input_Stage --> Transformer_Layer`) for data flow
+**可忽略的预期误报：**
+- 子图内部节点的 `ORPHAN (no outgoing)` — 子图内部边的边缘不通过子图容器 ID 传播
+- 展开目标子图（任何匹配 `*_Detail`、`Hybrid_*`、`DSA_*`、`Linear_*`、`Gated_*` 的节点）的 `DEAD END` — `==>` 展开箭头是纯视觉的，不计为出边
+- 子图容器 ID（`Input_Stage`、`Transformer_Layer`、`Output_Stage`）的 `ORPHAN` / `ISOLATED` — 这些是透明容器；使用子图级连接（`Input_Stage --> Transformer_Layer`）实现数据流
 
-#### 5c. Semantic Checks (Module Internals)
+#### 5c. 语义检查（模块内部）
 
-After connectivity is clean, verify each expanded module is **fully connected**:
+连通性清洁后，验证每个展开模块**完全连通**：
 
-**FFN / Dense MLP:**
-- `gate_proj` and `up_proj` must **BOTH** connect to the activation (e.g., SiLU/GELU)
-- The activation output must connect to `down_proj`
-- FFN without both gate+up connections is incomplete (common bug)
+**FFN / Dense MLP：**
+- `gate_proj` 和 `up_proj` 必须**同时**连接到激活函数（如 SiLU/GELU）
+- 激活函数输出必须连接到 `down_proj`
+- 如果 FFN 没有 gate+up 双连接则不完整（常见 bug）
 
-**MoE Expert Pool:**
-- `Router` must connect to **every** expert in the pool (including the ellipsis `...` node if present)
-- `Shared Expert` must have a **dashed** `-.-> |always add|` connection to the merge point
-- Each `Routed Expert` must have a dashed `-.-> |if selected|` connection
+**MoE Expert Pool：**
+- `Router` 必须连接到池中**每个** expert（包括省略号 `...` 节点如果有）
+- `Shared Expert` 必须有一条**虚线** `-.-> |always add|` 连接到合并点
+- 每个 `Routed Expert` 必须有一条虚线 `-.-> |if selected|` 连接
 
-**Attention (Standard / GQA / MLA):**
-- `Q_proj`, `K_proj`, `V_proj` must **ALL** connect to `Softmax`
-- `O_proj` must receive output from `Softmax`
-- For MLA: `Q_A_Proj` → `Q_RMSNorm` → `Q_B_Proj` chain must be complete; `KV_A_Proj` → `KV_RMSNorm` → `KV_B_Proj` chain must be complete
+**Attention（Standard / GQA / MLA）：**
+- `Q_proj`、`K_proj`、`V_proj` 必须**全部**连接到 `Softmax`
+- `O_proj` 必须接收来自 `Softmax` 的输出
+- 对于 MLA：`Q_A_Proj` → `Q_RMSNorm` → `Q_B_Proj` 链必须完整；`KV_A_Proj` → `KV_RMSNorm` → `KV_B_Proj` 链必须完整
 
-**Residual Connections:**
-- Each transformer layer must have **two** residual paths: one from input to post-attention add (`-.-> |Residual| Add1`), one from post-attention output to post-FFN add (`-.-> |Residual| Add2`)
+**残差连接：**
+- 每个 transformer 层必须有**两条**残差路径：一条从输入到注意力后加法（`-.-> |Residual| Add1`），一条从注意力输出到 FFN 后加法（`-.-> |Residual| Add2`）
 
-**If a semantic error is found, fix it immediately and re-verify before claiming completion.**
+**如果发现语义错误，立即修复并在声称完成前重新验证。**
 
-### Step 6: Render Output (Optional)
-PNG/SVG rendering requires Chrome via `scripts/render_mermaid.sh`. If Chrome is unavailable, the `.mmd` file is still fully usable.
+### Step 6: 渲染输出（可选）
+PNG/SVG 渲染需要 Chrome（通过 `scripts/render_mermaid.sh`）。如果 Chrome 不可用，`.mmd` 文件仍然完全可用。
 
 ```bash
 bash scripts/render_mermaid.sh {model_name}_arch.mmd
 ```
-If Chrome is missing: notify the user the `.mmd` is ready and they can view it at [Mermaid Live Editor](https://mermaid.live/edit).
+如果 Chrome 缺失：通知用户 `.mmd` 已就绪，可在 [Mermaid Live Editor](https://mermaid.live/edit) 查看。
 
 ---
 
-## Expanded View Details
+## 扩展视图详情
 
-### Level 2 (-vv): Maximum Detail
+### Level 2 (-vv)：最大细节
 
-This is the **ALWAYS DEFAULT** view. It shows the complete internal structure:
+这是**始终默认**的视图。它展示完整的内部结构：
 
 ```mermaid
 graph TD
@@ -265,7 +265,7 @@ graph TD
     %% === 输出层 ===
     subgraph Output_Stage ["输出层"]
         direction TB
-        %% NOTE: The input to this stage (e.g. Out_M1 or add2) must come from the previous stage's output node, NOT just the subgraph container
+        %% 注意：此阶段的输入（如 Out_M1 或 add2）必须来自前一阶段的输出节点，而不是子图容器
         final_norm["Final RMSNorm"]:::norm
         Head["LM Head"]:::output_stage
         final_norm --> Head
@@ -274,36 +274,71 @@ graph TD
     %% === 全局连接 ===
     Embed --> ln1
     add2 --> final_norm
-    %% NOTE: For MoE models, use Out_M1 --> Final_Norm instead of add2 --> final_norm
+    %% 注意：对于 MoE 模型，使用 Out_M1 --> Final_Norm 而不是 add2 --> final_norm
 
     %% === 展开关系 ===
     moe_module ==> router
     attn_module ==> attn_in
 ```
 
-### Attention Type Expansion Rules
+### Attention 类型展开规则
 
-In Step 4 mermaid generation, after detecting attention type from template, use this branching logic:
+在 Step 4 mermaid 生成中，检测到模板中的 attention 类型后，使用此分支逻辑：
 
-**Single attention types:**
-- `attention_type: standard` or `attention_type: mqa` or `attention_type: gqa` → expand GQA chain (Q_proj → K_proj → V_proj → Softmax → O_proj)
-- `attention_type: mla` → expand MLA chain (Q_A → Q_LN → Q_B → ConcatQ; KV_A → KV_LN → ConcatK/K_B → RoPE → Softmax → O_Proj)
-- `attention_type: dsa` → expand DSA chain (MLA framework + Indexer top-K → Softmax → O_Proj)
-- `attention_type: swa` → expand SWA chain (Q_proj → K_proj → V_proj → SWA_Mask → Softmax → O_proj)
-- `attention_type: linear` → expand Linear attention chain
-- `attention_type: gated_deltanet` → expand Gated DeltaNet chain
-- `attention_type: gated_attention` → expand Gated Attention chain
+**单一 attention 类型：**
+- `attention_type: standard` 或 `attention_type: mqa` 或 `attention_type: gqa` → 展开 GQA 链（Q_proj → K_proj → V_proj → Softmax → O_proj）
+- `attention_type: mla` → 展开 MLA 链（Q_A → Q_LN → Q_B → ConcatQ；KV_A → KV_LN → ConcatK/K_B → RoPE → Softmax → O_Proj）
+- `attention_type: dsa` → 展开 DSA 链（MLA 框架 + Indexer top-K → Softmax → O_Proj）
+- `attention_type: swa` → 展开 SWA 链（Q_proj → K_proj → V_proj → SWA_Mask → Softmax → O_proj）
+- `attention_type: linear` → 展开 Linear attention 链
+- `attention_type: gated_deltanet` → 展开 Gated DeltaNet 链
+- `attention_type: gated_attention` → 展开 Gated Attention 链
 
-**Hybrid attention types:**
-- `attention_hybrid_types` + `attention_hybrid_mode: parallel` → expand Parallel structure (same-layer multiple attention, outputs merged via `attention_merge_type`: add/gate/concat). Read `attention_merge_type` field to determine merge strategy: `add` (element-wise add), `gate` (element-wise multiply with learnable gate), `concat` (concatenate then project).
-- `attention_hybrid_types` + `attention_hybrid_mode: alternating` → expand Alternating stack structure using `layer_types_key` + `hybrid_ratio`
-- `attention_hybrid_types` + `attention_hybrid_mode: chain` → expand Chain structure (output of first attention feeds into second attention)
+**混合 attention 类型：**
+- `attention_hybrid_types` + `attention_hybrid_mode: parallel` → 展开并行结构（同层多个 attention，通过 `attention_merge_type` 合并输出：add/gate/concat）。读取 `attention_merge_type` 字段确定合并策略：`add`（逐元素相加）、`gate`（逐元素乘以可学习门）、`concat`（拼接后投影）。
+- `attention_hybrid_types` + `attention_hybrid_mode: alternating` → 使用 `layer_types_key` + `hybrid_ratio` 展开交替堆栈结构
+- `attention_hybrid_types` + `attention_hybrid_mode: chain` → 展开链式结构（第一个 attention 的输出馈入第二个 attention）
 
-**Fallback:** If only `attention_impl` is present (deprecated), use it as `attention_type` directly (backward compatible).
+**回退：** 如果只存在 `attention_impl`（已废弃），直接将其作为 `attention_type` 使用（向后兼容）。
 
-### Attention Expansion (for MLA/Standard Attention)
+### MoE 展开（通用模板）
 
-Show Q/K/V/O projections separately, along with RoPE:
+所有 MoE 共享同一结构：**Router + Expert Pool（+ 可选的 Shared Expert）**。根据配置属性条件渲染：
+
+**通用结构：**
+```
+MoE --> Router["MoE Router<br/>{activation} → Top-{K}"]
+MoE --> Shared["Shared Expert<br/>(Always Active)"]:::shared_expert  %% 仅当存在 shared expert 时
+Router -->|"Top-{K} Selected"| Expert1["Expert 1"]:::moe
+Router -->|"Top-{K} Selected"| Expert2["Expert 2"]:::moe
+Router -->|"Top-{K} Selected"| ExpertN["..."]:::moe  %% 或省略此节点，用 %% 注释
+ExpertN -.->|"if selected"| MoE_Out  %% 仅当存在 ExpertN 节点时
+Expert1 -.->|"if selected"| MoE_Out
+Expert2 -.->|"if selected"| MoE_Out
+Shared -.->|"always add"| MoE_Out  %% 仅当存在 shared expert 时
+```
+
+**条件渲染规则：**
+- `shared_expert_key` 存在 → 渲染 Shared Expert 分支
+- `activation: sigmoid` → Router 显示 "sigmoid routing"
+- `activation: silu` → Router 显示 "softmax → Top-K"
+- `activation: gelu` → Router 显示 "softmax → Top-K"
+- Expert 数量由 `num_experts_key` 决定，ExpertN 节点用 `...` 表示超出数量
+
+**每个 Expert 的内部结构（gate_proj → up_proj → down_proj）：**
+```
+MoE --> Expert_FFN["Expert FFN Stack"]
+Expert_FFN --> gate["gate_proj"]:::ffn
+Expert_FFN --> up["up_proj"]:::ffn
+Expert_FFN --> down["down_proj"]:::ffn
+gate --> act["{activation}"]:::ffn
+up --> act
+act --> down
+```
+
+### Attention 展开（MLA / Standard Attention）
+
+分别展示 Q/K/V/O 投影和 RoPE：
 ```
 Input --> Q_proj["Q_proj<br/>H → num_heads×head_dim"]
 Input --> KV_proj["KV_proj<br/>H → kv_rank + rope_dim"]
@@ -315,27 +350,9 @@ KV_proj --> Softmax
 Softmax --> O_proj["O_proj<br/>num_heads×v_dim → H"]
 ```
 
-### MoE Expansion (DeepSeek V3 Style)
-
-Show router, shared expert, and routed expert pool:
-```
-MoE --> Router["MoEGate<br/>sigmoid routing"]
-MoE --> Shared["Shared Expert<br/>MLP(2048)"]:::shared_expert
-Router -->|"top-8"| Expert1["Expert 1"]:::moe
-Router -->|"top-8"| Expert2["Expert 2"]:::moe
-%% ... (ellipsis indicates additional experts, not a graph node)
-Router -->|"top-8"| ExpertN["...":::moe]
-ExpertN -.->|"if selected"| MoE_Out
-Shared -.->|"always add"| MoE_Out
-Expert1 -.->|"if selected"| MoE_Out
-Expert2 -.->|"if selected"| MoE_Out
-```
-
-**Important:** If using an ellipsis `["..."]` node to indicate additional experts, it must have outgoing edges (e.g., `-.->|"if selected"| MoE_Out`) or it will be flagged as an orphan. Alternatively, omit the ellipsis node entirely and use a `%%` comment instead.
-
 ---
 
-## Color Conventions
+## 颜色约定
 
 ```mermaid
 classDef attention fill:#e1f5ff,stroke:#01579b,stroke-width:2px
@@ -349,8 +366,8 @@ classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 ```
 
-| Module | Fill | Border |
-|--------|------|--------|
+| 模块 | 填充色 | 边框色 |
+|------|--------|--------|
 | Attention | #e1f5ff | #01579b |
 | MoE | #fff3e0 | #e65100 |
 | Shared Expert | #b2dfdb | #00695c |
@@ -364,17 +381,17 @@ classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 
 ---
 
-## Output Files
+## 输出文件
 
 ```
 {output_dir}/
-├── {model_name}_arch.png   (if Chrome available)
-├── {model_name}_arch.svg   (if Chrome available)
-└── {model_name}_arch.mmd   (always generated, syntax-verified)
+├── {model_name}_arch.png   (如果 Chrome 可用)
+├── {model_name}_arch.svg   (如果 Chrome 可用)
+└── {model_name}_arch.mmd   (始终生成，已验证语法)
 ```
 
 ---
 
-## Reference
+## 参考
 
-**Full details** (including complete mermaid syntax examples, shape inference methodology, residual detection patterns, and model family conventions): see the latest spec in `docs/superpowers/specs/`
+**完整详情**（包括完整的 mermaid 语法示例、形状推理方法、残差检测模式和模型系列约定）：参见 `docs/superpowers/specs/` 中的最新规格文档。

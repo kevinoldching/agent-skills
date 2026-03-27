@@ -62,6 +62,23 @@ Hybrid = **2个及以上attention类型同时作用于同一层或链式叠加**
 - `gqa + swa` (GPT-OSS) = **Hybrid Alternating**（因为不同层用不同类型，且有layer_types_key区分）
 - `gated_deltanet + gated_attention` (Qwen3-Next) = **Hybrid Parallel**（同层并行，输出merge）
 
+### 未来新类型处理原则
+
+出现新的attention类型时，按以下原则处理，无需修改schema或验证脚本：
+
+**1. Schema层（YAML）**
+- 新类型直接在`attention_type`字段填新字符串值，无需修改模板定义
+- 新Hybrid组合直接在`attention_hybrid_types`列表填新类型，无需预定义
+
+**2. Mermaid生成层（AI）**
+- AI根据新类型的计算图结构推断mermaid展开，不依赖预定义模板
+- 通用原则：找到Q/K/V投影 → 中间处理步骤 → Softmax → O_proj，按数据流顺序连接
+- 节点命名用`<Type>_<功能>`格式（如`Xxx_RoPE`、`Xxx_Index`）
+
+**3. 验证层（verify_mermaid.py）**
+- 只做通用结构验证（节点有定义、路径连通），不检查具体节点名
+- 新类型只要mermaid结构正确，自动合规，无需更新白名单
+
 ---
 
 ## Template Schema变更
