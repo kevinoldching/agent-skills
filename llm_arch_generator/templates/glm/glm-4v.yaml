@@ -1,0 +1,26 @@
+# GLM-4V — Vision-Language
+# Source: THUDM/GLM-4v-9b
+model_type: chatglm
+family: glm
+model_name: GLM-4V-9B
+source: THUDM/GLM-4v-9b
+
+config:
+  hidden_size: 4096
+  num_hidden_layers: 40
+  intermediate_size: 13696
+  num_attention_heads: 32
+  num_key_value_heads: 2
+  vocab_size: 151552
+  head_dim: 128
+  rope_ratio: 500.0
+  max_position_embeddings: 8192
+
+attention_type: gqa
+
+  # Vision encoder
+  vision_hidden_size: 1024
+  vision_num_layers: 32
+  vision_patch_size: 14
+
+template: glm/common.yaml

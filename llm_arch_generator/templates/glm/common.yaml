@@ -23,3 +23,7 @@ norm: layernorm
 activation: gelu
 input: embed_tokens
 output: lm_head
+
+# Attention defaults for GLM family
+attention_type: gqa
+kv_heads_key: num_key_value_heads
