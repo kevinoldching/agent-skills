@@ -265,8 +265,10 @@ graph TD
     %% === 输出层 ===
     subgraph Output_Stage ["输出层"]
         direction TB
+        %% NOTE: The input to this stage (e.g. Out_M1 or add2) must come from the previous stage's output node, NOT just the subgraph container
         final_norm["Final RMSNorm"]:::norm
         Head["LM Head"]:::output_stage
+        final_norm --> Head
     end
 
     %% === 全局连接 ===
@@ -321,13 +323,15 @@ MoE --> Router["MoEGate<br/>sigmoid routing"]
 MoE --> Shared["Shared Expert<br/>MLP(2048)"]:::shared_expert
 Router -->|"top-8"| Expert1["Expert 1"]:::moe
 Router -->|"top-8"| Expert2["Expert 2"]:::moe
-Router -->|"top-8"| ExpertN["..."]
-Router -->|"top-8"| Expert384["Expert 384"]:::moe
+%% ... (ellipsis indicates additional experts, not a graph node)
+Router -->|"top-8"| ExpertN["...":::moe]
+ExpertN -.->|"if selected"| MoE_Out
 Shared -.->|"always add"| MoE_Out
 Expert1 -.->|"if selected"| MoE_Out
 Expert2 -.->|"if selected"| MoE_Out
-Expert384 -.->|"if selected"| MoE_Out
 ```
+
+**Important:** If using an ellipsis `["..."]` node to indicate additional experts, it must have outgoing edges (e.g., `-.->|"if selected"| MoE_Out`) or it will be flagged as an orphan. Alternatively, omit the ellipsis node entirely and use a `%%` comment instead.
 
 ---
 
