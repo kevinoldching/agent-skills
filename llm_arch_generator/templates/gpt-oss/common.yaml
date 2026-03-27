@@ -8,18 +8,39 @@ block:
       - k_proj
       - v_proj
       - o_proj
-  - type: ffn
+    attention_impl: sliding_window
+    kv_heads_key: num_key_value_heads
+  - type: moe
     components:
       - gate_proj
       - up_proj
       - down_proj
+    router_type: softmax
+    activation: silu
+    top_k_key: experts_per_token
 
 stack:
   num_layers_key: num_hidden_layers
   pattern: "[block] × N"
+  layer_types_key: layer_types
+  # Alternating pattern: sliding_attention / full_attention (even=sliding, odd=full)
 
 residual: post-norm
-norm: layernorm
-activation: gelu
+norm: rmsnorm
+activation: silu
 input: embed_tokens
 output: lm_head
+
+rope:
+  rope_type: yarn
+  rope_theta: 150000
+
+moe:
+  num_experts_key: num_local_experts
+  experts_per_tok_key: experts_per_token
+  router_aux_loss_coef_key: router_aux_loss_coef
+
+attention:
+  kv_heads_key: num_key_value_heads
+  head_dim: 64
+  sliding_window_key: sliding_window

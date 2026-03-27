@@ -55,6 +55,14 @@ description: Use when user asks to draw, plot, generate, or visualize LLM model 
 
 ## Workflow
 
+### Step 0: Choose Data Source
+**Always ask the user to choose how to obtain the model configuration** before proceeding:
+
+1. **HuggingFace** — Search and download model config from HuggingFace Hub (requires network, most accurate — analyzes actual model.py code)
+2. **Built-in Templates** — Match model name to `templates/{family}/` YAML files (no network needed, fast fallback)
+
+> **Built-in Templates** (`templates/` directory): Contains pre-built YAML configs for 10 model families (llama, qwen, deepseek, kimi, glm, baichuan, mistral, minimax, mimo, gpt-oss) covering 37+ models. If a specific model is not found, the AI uses `common.yaml` to infer structure from family conventions.
+
 ### Step 1: Resolve Model ID
 If user provides a model name (e.g., "Kimi-K2.5", "LLaMA-3", "DeepSeek V3"), search for the HuggingFace model ID first:
 - Use web search to find the official HuggingFace repository
@@ -71,10 +79,18 @@ python scripts/download_model.py <model_id>
 - **Select the correct modeling file**: Read `config.json` → get `auto_map["AutoModel"]` (e.g., `"modeling_kimi_k25.KimiK25ForConditionalGeneration"`). Extract the file prefix before the `.` (e.g., `modeling_kimi_k25`). Pick the `modeling_*.py` whose filename contains this prefix (case-insensitive). If none match, fall back to the first file.
 
 ### Step 3: Analyze Model Structure
+
+**Branch A — HuggingFace (from Step 1/2):**
 Read model.py to build the module tree and trace the forward() path:
 - Identify all major modules (attention, FFN, MoE, router, norms)
 - Detect residual connections from actual code analysis (look for `residual = hidden_states`, `hidden_states + residual`, `hidden_states = hidden_states + other`)
 - Calculate tensor shapes from config.json + weight definitions
+
+**Branch B — Built-in Templates:**
+1. **Match model to template**: Extract model family from name (e.g., "Qwen3-32B" → `qwen/`). Try exact match: `templates/{family}/{model-name}.yaml`. Fall back to scanning `templates/*/common.yaml` for matching `model_type`.
+2. **Read template**: Load matched YAML + its `common.yaml`. Merge configs (model YAML overrides common.yaml).
+3. **Parse architecture**: Extract `hidden_size`, `num_layers`, `attention_type`/`attention_impl`, `ffn_type`/`moe`, `kv_heads_key`, `vision` config, etc.
+4. **Infer internals**: Use `block` definitions from common.yaml (attention components: q_proj/k_proj/v_proj/o_proj; ffn components: gate_proj/up_proj/down_proj) combined with `config` values to determine tensor shapes.
 
 ### Step 4: Generate Mermaid Diagram (Level 2 Expanded)
 **ALWAYS generate expanded view (`graph TD`) with maximum detail.** The diagram must show:
@@ -95,42 +111,74 @@ Read model.py to build the module tree and trace the forward() path:
 - Use `-.->` for residual connections (dashed arrows)
 - Use `subgraph` with `direction TB` for module groupings
 - Apply color classes from the Color Conventions section
+- **DO NOT include a legend** — colors are self-explanatory via node labels
+- **DO NOT use layer-index markers as nodes** (e.g., `Out_L`, `h_l`, `layer_out`) — these are comments, not graph nodes. Use subgraph-level connections (e.g., `Input_Stage --> Transformer_Layer`) to show data flow between stages
 
-### Step 5: Verify Mermaid Syntax
-**CRITICAL: After generating the Mermaid diagram, you MUST verify syntax.** Common issues:
+### Step 5: Verify Mermaid Diagram (Syntax + Semantic)
 
-1. **Check for balanced statements**: Every node definition (`A["text"]`) should have proper connections
-2. **Check for duplicate node IDs**: Each node ID must be unique within the diagram
-3. **Check subgraph naming**: Subgraph IDs must be unique, labels must be quoted if they contain special chars
-4. **Check arrow syntax**: `-->` for normal, `==>` for expansion, `-.->` for residual
-5. **Check classDef/class assignments**: Ensure all class names in `class X className` are defined in classDef
+**After generating the `.mmd` file, you MUST run both syntax and semantic checks.**
 
-**Verification command:**
+#### 5a. Syntax Checks
+
+Run the mermaid CLI to catch parse errors:
 ```bash
-# Try to render with mermaid CLI to catch syntax errors
 bash scripts/render_mermaid.sh <output_file>.mmd 2>&1
-# If rendering fails, examine the error:
-# - "Parse error" = syntax issue in .mmd file
-# - "Chrome not found" = rendering issue, but syntax may be OK (file is still usable)
+# Parse error → fix syntax issues before proceeding
 ```
 
-**If syntax errors found, fix them:**
-- Missing quotes on subgraph labels with special chars → add quotes
-- Duplicate node IDs → rename with unique suffixes (_1, _2, etc.)
-- Undefined class references → add classDef or remove class reference
-- Invalid arrow syntax → use correct arrow type
+Then verify manually:
+1. **No duplicate node IDs** — each ID must be unique within the diagram
+2. **All referenced nodes defined** — every node after `-->` / `==>` / `-.->` must have a corresponding definition
+3. **Subgraph labels quoted** — labels with special chars must use `"label"` format
+4. **classDef names match** — every `:::className` must have a corresponding `classDef className`
 
-### Step 6: Render Output
-Generate PNG/SVG via `scripts/render_mermaid.sh`:
+#### 5b. Connectivity Verification
+
+Run the connectivity checker to detect undefined references, orphan nodes, and broken paths:
+```bash
+python scripts/verify_mermaid.py <output_file>.mmd --verbose
+```
+
+**Real issues to fix:**
+- `UNDEFINED (node used but not defined)` — a node ID is referenced in an edge but never defined
+- `DEAD PATH: 'X' is not reachable from Input_Stage` — output stage cannot be reached from input
+
+**Expected false positives (ignore):**
+- `ORPHAN (no outgoing)` on nodes inside subgraphs — subgraph-internal nodes may appear orphaned because edges within subgraphs don't propagate through subgraph container IDs in the checker
+- `DEAD END` on expansion target subgraphs (`GQA_Detail`, `FFN_Detail`, `MoE_Pool`, `MLA_Detail`) — `==>` expand arrows are visual-only and don't count as outgoing edges
+- `ORPHAN` / `ISOLATED` on subgraph container IDs (`Input_Stage`, `Transformer_Layer`, `Output_Stage`) — these are transparent containers; use subgraph-level connections (`Input_Stage --> Transformer_Layer`) for data flow
+
+#### 5c. Semantic Checks (Module Internals)
+
+After connectivity is clean, verify each expanded module is **fully connected**:
+
+**FFN / Dense MLP:**
+- `gate_proj` and `up_proj` must **BOTH** connect to the activation (e.g., SiLU/GELU)
+- The activation output must connect to `down_proj`
+- FFN without both gate+up connections is incomplete (common bug)
+
+**MoE Expert Pool:**
+- `Router` must connect to **every** expert in the pool (including the ellipsis `...` node if present)
+- `Shared Expert` must have a **dashed** `-.-> |always add|` connection to the merge point
+- Each `Routed Expert` must have a dashed `-.-> |if selected|` connection
+
+**Attention (Standard / GQA / MLA):**
+- `Q_proj`, `K_proj`, `V_proj` must **ALL** connect to `Softmax`
+- `O_proj` must receive output from `Softmax`
+- For MLA: `Q_A_Proj` → `Q_RMSNorm` → `Q_B_Proj` chain must be complete; `KV_A_Proj` → `KV_RMSNorm` → `KV_B_Proj` chain must be complete
+
+**Residual Connections:**
+- Each transformer layer must have **two** residual paths: one from input to post-attention add (`-.-> |Residual| Add1`), one from post-attention output to post-FFN add (`-.-> |Residual| Add2`)
+
+**If a semantic error is found, fix it immediately and re-verify before claiming completion.**
+
+### Step 6: Render Output (Optional)
+PNG/SVG rendering requires Chrome via `scripts/render_mermaid.sh`. If Chrome is unavailable, the `.mmd` file is still fully usable.
+
 ```bash
 bash scripts/render_mermaid.sh {model_name}_arch.mmd
 ```
-
-**Fallback handling:**
-- Model name not recognized → Search web for HuggingFace ID, ask user to confirm if ambiguous
-- HuggingFace download fails → Use cached files if available, or try alternative approach
-- `modeling_*.py` not found → Still generate diagram from config.json + template, note precision reduced
-- Rendering fails (missing Chrome) → Still generate `.mmd` file, user can render manually via [Mermaid Live Editor](https://mermaid.live/edit)
+If Chrome is missing: notify the user the `.mmd` is ready and they can view it at [Mermaid Live Editor](https://mermaid.live/edit).
 
 ---
 
@@ -151,32 +199,31 @@ graph TD
     classDef input_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
     classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
 
-    %% === 输入层 (Level 1) ===
+    %% === 输入层 ===
     subgraph Input_Stage ["输入层"]
         direction TB
         Tokens["Token IDs"] --> Embed["Embedding"]
     end
 
-    %% === Layer N 结构 (Level 1) ===
+    %% === Transformer Layer ===
     subgraph Transformer_Layer ["Transformer Layer N"]
         direction TB
 
-        layer_in((h_l)):::norm --> ln1["RMSNorm"]:::norm
-        ln1 --> attn_module["MLA / Attention"]:::attention
+        ln1["RMSNorm"]:::norm --> attn_module["MLA / Attention"]:::attention
 
         attn_module --> add1((+)):::norm
-        layer_in -.-> |Residual 1| add1
+        %% Residual 1：来自输入
+        ln1 -.-> |Residual 1 - skip input| add1
 
         add1 --> ln2["RMSNorm"]:::norm
         ln2 --> moe_module["DeepSeekMoE / FFN"]:::moe
 
         moe_module --> add2((+)):::norm
+        %% Residual 2：来自 attention 输出
         add1 -.-> |Residual 2| add2
-
-        add2 --> layer_out((h_l+1)):::norm
     end
 
-    %% === MoE 展开 (Level 2) ===
+    %% === MoE 展开 ===
     subgraph MoE_Detail ["MoE 展开"]
         direction TB
 
@@ -193,12 +240,13 @@ graph TD
         router --> |Top-8| routed_1
         router --> |Top-8| routed_2
         router --> |Top-8| routed_n
-        shared -.-> |always add| MoE_out
+        shared -.-> |always add| MoE_out["MoE Output"]
         routed_1 -.-> |if selected| MoE_out
         routed_2 -.-> |if selected| MoE_out
         routed_n -.-> |if selected| MoE_out
     end
 
+    %% === Attention 展开 ===
     subgraph Attention_Detail ["Attention 展开"]
         direction TB
 
@@ -208,6 +256,7 @@ graph TD
 
         q_proj --> softmax["Softmax<br/>Q·Kᵀ/√d"]:::attention
         k_proj --> softmax
+        v_proj --> softmax
 
         softmax --> o_proj["O_proj<br/>hH×H"]:::attention
         o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
@@ -221,11 +270,11 @@ graph TD
     end
 
     %% === 全局连接 ===
-    Embed --> layer_in
-    layer_out --> final_norm
+    Embed --> ln1
+    add2 --> final_norm
     final_norm --> Head
 
-    %% === 展开关系 (Level 1 ==> Level 2) ===
+    %% === 展开关系 ===
     moe_module ==> router
     attn_module ==> attn_in
 ```
@@ -304,10 +353,4 @@ classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 
 ## Reference
 
-**Full details** (including complete mermaid syntax examples, shape inference methodology, residual detection patterns, and model family conventions): `docs/superpowers/specs/2026-03-26-llm_arch_generator-design.md`
-
-**When to read the spec:**
-- Need complete mermaid diagram examples → read spec lines 185-307
-- Implementing shape inference → read spec lines 92-153
-- Understanding residual patterns → read spec lines 155-181
-- Template matching → read spec lines 449-506
+**Full details** (including complete mermaid syntax examples, shape inference methodology, residual detection patterns, and model family conventions): see the latest spec in `docs/superpowers/specs/`
