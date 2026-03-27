@@ -1,0 +1,20 @@
+# Qwen3-4B
+# Source: Qwen/Qwen3-4B
+model_type: qwen3
+family: qwen
+model_name: Qwen3-4B
+source: Qwen/Qwen3-4B
+
+config:
+  hidden_size: 2560
+  num_hidden_layers: 36
+  intermediate_size: 9728
+  num_attention_heads: 32
+  num_key_value_heads: 8
+  vocab_size: 151936
+  head_dim: 128
+  rope_theta: 1000000.0
+  max_position_embeddings: 40960
+
+attention_type: gqa
+template: qwen/common.yaml

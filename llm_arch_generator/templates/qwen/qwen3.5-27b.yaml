@@ -1,0 +1,20 @@
+# Qwen3.5-27B — dense (not MoE)
+# Source: Qwen/Qwen3.5-27B-Instruct
+model_type: qwen3_5
+family: qwen
+model_name: Qwen3.5-27B
+source: Qwen/Qwen3.5-27B-Instruct
+
+config:
+  hidden_size: 5120
+  num_hidden_layers: 64
+  intermediate_size: 17408
+  num_attention_heads: 24
+  num_key_value_heads: 4
+  vocab_size: 248320
+  head_dim: 256
+  rope_theta: 10000000.0
+  max_position_embeddings: 262144
+
+attention_type: gqa
+template: qwen/common.yaml
