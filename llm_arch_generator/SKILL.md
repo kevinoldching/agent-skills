@@ -274,7 +274,7 @@ graph TD
     %% === 全局连接 ===
     Embed --> ln1
     add2 --> final_norm
-    final_norm --> Head
+    %% NOTE: For MoE models, use Out_M1 --> Final_Norm instead of add2 --> final_norm
 
     %% === 展开关系 ===
     moe_module ==> router
