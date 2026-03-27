@@ -17,35 +17,42 @@
 
 ## Attention类型分类体系
 
-### 按投影结构分类
+### 分类维度
 
-| attention_type | 说明 | KV Cache | 代表模型 |
+**维度一：按是否稀疏（压缩）**
+| 类别 | 说明 | 代表 |
+|---|---|---|
+| **Full attention** | 所有token都参与attention计算 | MHA, GQA, MQA, MLA |
+| **Sparse attention** | 只有部分token参与（取了子集或用近似） | SWA, DSA, Linear Attention, Gated DeltaNet |
+
+**维度二：按具体类型（单attention）**
+| attention_type | 说明 | 类别 | 代表模型 |
 |---|---|---|---|
 | `standard` | 标准MHA，每Q头独立K/V | Full | 旧模型 |
-| `mqa` | 所有Q头共享单一K/V头 | Minimal | 研究模型 |
-| `gqa` | Q头分组，每组共享K/V | Medium | Llama3, Qwen3, Mistral |
-| `mla` | K/V压缩到低秩潜空间 | Very small | DeepSeek V3, Kimi K2 |
+| `mqa` | 所有Q头共享单一K/V头 | Full | 研究模型 |
+| `gqa` | Q头分组，每组共享K/V | Full | Llama3, Qwen3, Mistral |
+| `mla` | K/V压缩到低秩潜空间 | Full | DeepSeek V3, Kimi K2 |
+| `swa` | Sliding Window Attention | Sparse | Mistral, Gemma 3 |
+| `dsa` | DeepSeek Sparse Attention（block索引top-K选择） | Sparse | DeepSeek V3.2, GLM-5 |
+| `linear` | Linear Attention（近似，O(n)复杂度） | Sparse | Kimi Lightning |
+| `gated_deltanet` | Gated DeltaNet | Sparse | Qwen3-Next |
+| `gated_attention` | Gated Attention | Full | Trinity 400B |
+| `...` | 任何未来出现的新类型 | — | — |
 
-### 按Token选择分类（可叠加）
+### Hybrid类型（组合）
 
-| token_selection | 说明 | 与投影类型关系 |
+**Hybrid = 2个及以上单attention类型的组合**，如：
+
+| 组合 | 例子 | 数据流 |
 |---|---|---|
-| `dense` | 注意力稠密，所有token参与 | 默认 |
-| `swa` (sliding_window) | 每token只attend到固定窗口 | 可叠加到任意投影类型 |
-| `dsa` (deepseek_sparse) | Block索引稀疏选择top-K KV token | 可叠加到MLA |
-| `hybrid_swa` | SWA层+全局注意力层交替 | 可叠加到任意投影类型 |
+| MLA + DSA | DeepSeek V3.2, GLM-5 | MLA投影 → DSA选择 → Softmax |
+| GQA + SWA | Mistral全系列, Gemma 3 | GQA投影 → SWA mask → Softmax |
+| GQA + SWA + Full | GPT-OSS, Step 3.5 | GQA投影 → 5:1 SWA/Full交替 |
+| Gated DeltaNet + Gated Attention | Qwen3-Next | 3:1 GatedDeltaNet/GatedAttn交替 |
+| MLA + Linear | Kimi Lightning | MLA投影 → Linear Attention |
+| MLA + DSA + SWA | 未来可能 | MLA → DSA → SWA链式 |
 
-### 混合Attention组合
-
-以下组合需要在mermaid图中展开连接关系：
-
-| 组合 | 例子 | 展开内容 |
-|---|---|---|
-| `mla + swa` | Mistral Large 3 | MLA投影 → SWA窗口限制 |
-| `mla + dsa` | DeepSeek V3.2, GLM-5 | MLA投影 → DSA稀疏选择 → Softmax |
-| `gqa + swa` | Gemma 3, MiMo-V2-Flash | GQA投影 → 滑动窗口 |
-| `gqa + swa + global` | GPT-OSS, Step 3.5 | GQA投影 → 5:1 SWA/Global交替 |
-| `mla + dsa + swa` | 未来可能 | MLA → DSA → SWA链式 |
+**核心规则**：Hybrid在mermaid图中**按数据流顺序串联**各组件节点。
 
 ---
 
@@ -64,11 +71,20 @@ config:
   num_hidden_layers: <int>
   # ... 其他config字段
 
-# === 必须显式声明 ===
-attention_type: <standard|mqa|gqa|mla>   # 投影结构类型
-token_selection: <dense|swa|dsa|hybrid_swa>  # token选择策略，可选
+# === Attention类型（必须显式声明） ===
+# 单一attention类型：直接声明
+attention_type: <standard|mqa|gqa|mla|swa|dsa|linear|gated_deltanet|gated_attention|...>
 
-# 如果是MLA，声明MLA参数
+# Hybrid（2个及以上类型组合）：列表声明
+# attention_hybrid_types:
+#   - <type1>
+#   - <type2>
+attention_hybrid_types:
+  - mla
+  - dsa
+
+# === 各类型的参数（按需声明）===
+# MLA参数
 mla:
   kv_lora_rank_key: <config-key>
   q_lora_rank_key: <config-key>
@@ -76,56 +92,56 @@ mla:
   qk_nope_head_dim_key: <config-key>
   v_head_dim_key: <config-key>
 
-# 如果是SWA，声明窗口大小
+# SWA参数
 sliding_window_key: <config-key>   # e.g., sliding_window
 
-# 如果是DSA，声明DSA参数
+# DSA参数
 dsa:
   sparse_topk_key: <config-key>     # top-K tokens selected
   block_size_key: <config-key>      # block indexing granularity
 
-# 如果是GQA/MQA，声明kv_heads
+# GQA/MQA参数
 kv_heads_key: <config-key>         # e.g., num_key_value_heads
 
-# 如果是混合SWA（交替层类型）
+# Hybrid交替模式（如果层类型交替）
 layer_types_key: <config-key>      # e.g., layer_types
-hybrid_ratio: <string>             # e.g., "5:1" (SWA:Global)
+hybrid_ratio: <string>             # e.g., "5:1" (SWA:Full)
 
 template: <family>/<model-name>.yaml   # 指向自身（显式声明，不继承）
 ```
 
-### Schema迁移路径（attention_impl → attention_type + token_selection）
+### Schema迁移路径（attention_impl → attention_type / attention_hybrid_types）
 
-现有模板使用 `attention_impl: <type>` 声明attention类型。新schema引入两个正交字段：
+现有模板使用 `attention_impl: <type>` 声明attention类型：
 
 | 旧字段 | 新字段 | 说明 |
 |---|---|---|
-| `attention_impl: sliding_window` | `attention_type: gqa` + `token_selection: swa` | 正交分解 |
-| `attention_impl: mla` | `attention_type: mla` + `token_selection: dense` | 投影+选择分离 |
-| `attention_impl: gqa` | `attention_type: gqa` + `token_selection: dense` | 同上 |
+| `attention_impl: mla` | `attention_type: mla` | 单MLA，无变化 |
+| `attention_impl: gqa` | `attention_type: gqa` | 单GQA，无变化 |
+| `attention_impl: sliding_window` | `attention_type: swa` | 重命名 |
+| 新增 | `attention_hybrid_types: [mla, dsa]` | DeepSeek V3.2等混合类型 |
 
 **迁移规则：**
-- 新模板文件使用 `attention_type` + `token_selection` 双字段
+- 新模板文件使用 `attention_type`（单一）或 `attention_hybrid_types`（组合）
 - `attention_impl` 字段保留但标记为deprecated，不在新模板中使用
-- SKILL.md生成逻辑：优先读 `attention_type` + `token_selection`，如不存在则回退到 `attention_impl`
+- SKILL.md生成逻辑：优先读 `attention_type` 或 `attention_hybrid_types`，如不存在则回退到 `attention_impl`
 
 ### common.yaml的role变更
 
-common.yaml仅作为**默认值**，每个模型文件必须override自己的attention类型：
+common.yaml仅作为**默认值参考**，每个模型文件必须override自己的attention类型：
 
 ```yaml
-# common.yaml — 仅提供默认值，不被模型文件隐式依赖
+# common.yaml — 仅提供家族默认值参考
 model_type: <family-model-type>
 family: <family-name>
 
-# 默认值（可被模型文件override）
-attention_type: gqa  # 家族默认
-token_selection: dense
+# 家族默认（可被模型文件override）
+attention_type: gqa
 
-# 默认MLA参数（可被override）
+# 家族默认MLA参数（可被override）
 mla: {...}
 
-# 默认MoE参数（可被override）
+# 家族默认MoE参数（可被override）
 moe: {...}
 ```
 
@@ -224,25 +240,26 @@ V_proj --> Softmax
 Softmax --> O_proj["O_proj"]:::attention
 ```
 
-#### 5. Hybrid SWA + Global (GPT-OSS, MiMo)
+#### 5. Hybrid Layer Alternation (GPT-OSS, MiMo, Qwen3-Next)
+
+当 `attention_hybrid_types` 包含层交替模式时（如 `[gqa, swa]` 或 `[gated_deltanet, gated_attention]`）：
 
 **层交替逻辑：**
-- `layer_types_key` (e.g., `layer_types`) 声明每层的类型数组，如 `["sliding_attention", "full_attention", "sliding_attention", ...]`
-- `hybrid_ratio` (e.g., `"5:1"`) 声明SWA:Global的交替比例，用于验证和文档说明
-- 图中展开时，每个transformer layer根据其layer_types值选择对应attention展开
-- 实际生成mermaid时，stack pattern描述应包含层类型交替，如 `[swa_block] × 5, [global_block] × 1, ...`
+- `layer_types_key`（如 `layer_types`）声明每层的类型数组，如 `["sliding_attention", "full_attention", ...]`
+- `hybrid_ratio`（如 `"5:1"`）声明交替比例，用于验证和文档说明
+- mermaid图中用stack pattern描述：`[swa_block] × 5, [global_block] × 1, ...`
 
 ```mermaid
-%% 混合模式：交替SWA层和全局层
-subgraph Hybrid_Attention ["Hybrid SWA + Global (5:1)"]
+%% 混合交替模式：GPT-OSS (1:1)、MiMo (5:1)
+subgraph Transformer_Stack ["[SWA] × N, [Full] × 1, ... (交替)"]
   direction TB
-  SWA_Layer["SWA Layer<br/>window=128"]:::attention
-  Global_Layer["Global Layer<br/>full attention"]:::attention
-  SWA_Layer --> Global_Layer
+  SWA_Block["SWA Block<br/>GQA + SWA"]:::attention
+  Full_Block["Full Block<br/>GQA + Full"]:::attention
+  SWA_Block --> Full_Block
 end
 ```
 
-（GQA+DSA组合暂无实际模型支撑，暂不展开。如未来有需要，按MLA+DSA的数据流逻辑扩展：Q/K/V投影 → RoPE → SWA_Mask → DSA_Select → Softmax → O_proj）
+**注意**：混合交替的展开是**层级式**的，不是链式串联（不像MLA→DSA是单层内的数据流串联）。
 
 ---
 
@@ -252,59 +269,59 @@ end
 
 | 文件 | 修改内容 |
 |---|---|
-| `templates/deepseek/common.yaml` | 保留MLA默认值，添加dsa section |
-| `templates/deepseek/deepseek-v3.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/deepseek/deepseek-v3.1.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/deepseek/deepseek-v3.2.yaml` | `attention_type: mla`, `token_selection: dsa` + dsa参数 |
-| `templates/deepseek/deepseek-v2.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/deepseek/deepseek-v2.5.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/deepseek/deepseek-r1.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/kimi/common.yaml` | 保留MLA默认值 |
-| `templates/kimi/kimi-k2.0.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/kimi/kimi-k2.5.yaml` | `attention_type: mla`, `token_selection: dense` |
-| `templates/qwen/common.yaml` | 保留gqa默认值，添加swa说明 |
-| `templates/qwen/qwen3-32b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3-8b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3-4b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3-1.7b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3-0.6b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3-vl-8b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3.5-397b-a17b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3.5-122b-a10b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3.5-35b-a3b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen3.5-27b.yaml` | `attention_type: gqa`, `token_selection: dense` |
-| `templates/qwen/qwen2.5-vl-7b.yaml` | `attention_type: gqa`, `token_selection: dense` |
+| `templates/deepseek/common.yaml` | 添加 `attention_type: mla` 默认值 |
+| `templates/deepseek/deepseek-v3.yaml` | `attention_type: mla` |
+| `templates/deepseek/deepseek-v3.1.yaml` | `attention_type: mla` |
+| `templates/deepseek/deepseek-v3.2.yaml` | `attention_hybrid_types: [mla, dsa]` + dsa参数 |
+| `templates/deepseek/deepseek-v2.yaml` | `attention_type: mla` |
+| `templates/deepseek/deepseek-v2.5.yaml` | `attention_type: mla` |
+| `templates/deepseek/deepseek-r1.yaml` | `attention_type: mla` |
+| `templates/kimi/common.yaml` | 添加 `attention_type: mla` 默认值 |
+| `templates/kimi/kimi-k2.0.yaml` | `attention_type: mla` |
+| `templates/kimi/kimi-k2.5.yaml` | `attention_type: mla` |
+| `templates/qwen/common.yaml` | 添加 `attention_type: gqa` 默认值 |
+| `templates/qwen/qwen3-32b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3-8b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3-4b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3-1.7b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3-0.6b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3-vl-8b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3.5-397b-a17b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3.5-122b-a10b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3.5-35b-a3b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen3.5-27b.yaml` | `attention_type: gqa` |
+| `templates/qwen/qwen2.5-vl-7b.yaml` | `attention_type: gqa` |
 | `templates/llama/common.yaml` | 保留默认值 |
-| `templates/llama/llama-2-7b.yaml` | `attention_type: standard` (MHA) |
+| `templates/llama/llama-2-7b.yaml` | `attention_type: standard` |
 | `templates/llama/llama-3-8b.yaml` | `attention_type: gqa` |
 | `templates/llama/llama-3.1-8b.yaml` | `attention_type: gqa` |
 | `templates/llama/llama-3.2-1b.yaml` | `attention_type: gqa` |
 | `templates/llama/llama-3.2-3b.yaml` | `attention_type: gqa` |
 | `templates/llama/llama-3.2-11b.yaml` | `attention_type: gqa` |
 | `templates/llama/llama-3.3-70b.yaml` | `attention_type: gqa` |
-| `templates/glm/common.yaml` | 添加 `attention_type: gqa` 声明 |
+| `templates/glm/common.yaml` | 添加 `attention_type: gqa` 默认值 |
 | `templates/glm/glm-4-9b.yaml` | `attention_type: gqa` |
 | `templates/glm/glm-4-28b.yaml` | `attention_type: gqa` |
 | `templates/glm/glm-4v.yaml` | `attention_type: gqa` |
-| `templates/glm/glm-5.yaml` | `attention_type: mla`, `token_selection: dsa` + DSA参数 |
+| `templates/glm/glm-5.yaml` | `attention_hybrid_types: [mla, dsa]` + DSA参数 |
 | `templates/baichuan/common.yaml` | 添加attention类型注释说明 |
 | `templates/baichuan/baichuan-13b.yaml` | `attention_type: standard` (MHA) |
 | `templates/baichuan/baichuan2-7b.yaml` | `attention_type: standard` (MHA) |
-| `templates/baichuan/baichuan-m3.yaml` | `attention_type: gqa` (基于Qwen3) |
-| `templates/mistral/common.yaml` | 保留gqa+swa默认值 |
-| `templates/mistral/mistral-7b-v0.1.yaml` | `attention_type: gqa`, `token_selection: swa` |
-| `templates/mistral/mistral-7b-v0.3.yaml` | `attention_type: gqa`, `token_selection: swa` |
-| `templates/mistral/mistral-nemo.yaml` | `attention_type: gqa`, `token_selection: swa` |
-| `templates/mistral/mistral-large.yaml` | `attention_type: gqa`, `token_selection: swa` |
-| `templates/minimax/common.yaml` | 保留gqa默认值 |
+| `templates/baichuan/baichuan-m3.yaml` | `attention_type: gqa` |
+| `templates/mistral/common.yaml` | 添加 `attention_type: gqa`, `attention_hybrid_types` 默认值 |
+| `templates/mistral/mistral-7b-v0.1.yaml` | `attention_hybrid_types: [gqa, swa]` |
+| `templates/mistral/mistral-7b-v0.3.yaml` | `attention_hybrid_types: [gqa, swa]` |
+| `templates/mistral/mistral-nemo.yaml` | `attention_hybrid_types: [gqa, swa]` |
+| `templates/mistral/mistral-large.yaml` | `attention_hybrid_types: [gqa, swa]` |
+| `templates/minimax/common.yaml` | 添加 `attention_type: gqa` 默认值 |
 | `templates/minimax/minimax-m2.yaml` | `attention_type: gqa` |
 | `templates/minimax/minimax-m2.5.yaml` | `attention_type: gqa` |
-| `templates/mimo/common.yaml` | 保留gqa+swa默认值 |
-| `templates/mimo/mimo-v2-flash.yaml` | `attention_type: gqa`, `token_selection: hybrid_swa`, `hybrid_ratio: "5:1"` |
-| `templates/mimo/mimo-vl-7b.yaml` | `attention_type: gqa`, `token_selection: swa` |
-| `templates/gpt-oss/common.yaml` | 保留hybrid_swa默认值 |
-| `templates/gpt-oss/gpt-oss-120b.yaml` | `attention_type: gqa`, `token_selection: hybrid_swa`, `hybrid_ratio: "1:1"` |
-| `templates/gpt-oss/gpt-oss-20b.yaml` | `attention_type: gqa`, `token_selection: hybrid_swa`, `hybrid_ratio: "1:1"` |
+| `templates/mimo/common.yaml` | 添加 `attention_type: gqa`, `attention_hybrid_types` 默认值 |
+| `templates/mimo/mimo-v2-flash.yaml` | `attention_hybrid_types: [gqa, swa]`, `hybrid_ratio: "5:1"` |
+| `templates/mimo/mimo-vl-7b.yaml` | `attention_hybrid_types: [gqa, swa]` |
+| `templates/gpt-oss/common.yaml` | 添加 `attention_type: gqa`, `attention_hybrid_types` 默认值 |
+| `templates/gpt-oss/gpt-oss-120b.yaml` | `attention_hybrid_types: [gqa, swa, full]`, `hybrid_ratio: "1:1"` |
+| `templates/gpt-oss/gpt-oss-20b.yaml` | `attention_hybrid_types: [gqa, swa, full]`, `hybrid_ratio: "1:1"` |
 
 ### SKILL.md变更
 
@@ -312,29 +329,55 @@ end
 
 ```
 Step 4生成逻辑：
-if attention_type == "mla":
-    if token_selection == "dsa":
-        展开MLA + DSA连接
-    elif token_selection == "swa":
-        展开MLA + SWA连接
-    else:
-        展开纯MLA
+if attention_hybrid_types 存在（2个及以上）:
+    # 按顺序串联各类型的展开结构
+    按列表顺序串联展开
+elif attention_type == "mla":
+    展开MLA链
 elif attention_type == "gqa":
-    if token_selection == "swa":
-        展开GQA + SWA
-    elif token_selection == "hybrid_swa":
-        展开Hybrid交替模式
-    else:
-        展开标准GQA
+    展开GQA链
 elif attention_type == "standard":
-    展开标准MHA
+    展开标准MHA链
+elif attention_type == "swa":
+    展开SWA链
+elif attention_type == "dsa":
+    展开DSA链
+...（其他单类型同理）
 ```
+
+### verify_mermaid.py 变更（可扩展性）
+
+**核心改动：只做结构验证，不依赖hardcode节点名**
+
+```python
+# 1. ALWAYS_ALONE_NODES 改为通用规则匹配
+ALWAYS_ALONE_NODES_REGEX = re.compile(
+    r'.*_[Dd]etail|'      # *_Detail 子图节点
+    r'Hybrid_|'            # Hybrid_* 子图节点
+    r'DSA_|'               # DSA_* 节点
+    r'Linear_|'           # Linear_* 节点
+    r'Gated_'             # Gated_* 节点
+)
+
+# 2. TERMINAL_NODES 改为通用规则
+TERMINAL_NODE_SUFFIXES = {'_proj', '_out', 'lm_head', 'final_norm',
+                          'softmax', '_head', 'o_proj'}
+
+# 3. 结构验证保持不变
+# - 所有节点引用有定义 ✓
+# - 路径从Input到Output连续 ✓
+# - 不检查节点叫什么名字（新类型自动合规）
+```
+
+**效果**：未来出现任何新attention类型（如`FlashAttention`、`StateSpace_Attn`等），只要mermaid结构正确，自动pass验证，无需更新白名单。
 
 ---
 
 ## 实现顺序
 
-1. **更新所有template YAML文件** — 显式声明attention类型
-2. **更新SKILL.md mermaid生成逻辑** — 增加混合attention判断
-3. **验证现有mermaid图** — 重新生成DeepSeek V3.2等关键模型的图确认正确
-4. **测试完整流程** — 用新模板生成各模型架构图
+1. **更新verify_mermaid.py** — 改为通用规则匹配，移除hardcode白名单
+2. **更新SKILL.md mermaid生成逻辑** — 支持attention_hybrid_types列表
+3. **更新所有template YAML文件** — 显式声明attention类型
+4. **更新SKILL.md"Expected false positives"段落** — 移除过时白名单描述
+5. **验证现有mermaid图** — 重新生成DeepSeek V3.2等关键模型的图确认正确
+6. **测试完整流程** — 用新模板生成各模型架构图
