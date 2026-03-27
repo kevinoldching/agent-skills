@@ -33,6 +33,10 @@ config:
   qk_nope_head_dim: 128
   v_head_dim: 128
 
+  # DSA (MLA + Indexer for sparse KV selection)
+  sparse_topk: 8
+  block_size: 4
+
 # DSA = MLA framework + indexer for top-K sparse KV selection
 attention_type: dsa
 dsa:

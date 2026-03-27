@@ -6,6 +6,7 @@ attention_hybrid_types:
 attention_hybrid_mode: alternating
 layer_types_key: layer_types
 hybrid_ratio: "1:1"  # 1 SWA layer : 1 Full layer alternating
+attention_type: null  # Override common.yaml: hybrid_types take precedence over top-level attention_type
 template: gpt-oss/common.yaml
 
 config:

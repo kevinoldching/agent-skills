@@ -23,4 +23,9 @@ vision_hidden_size: 1024
 vision_num_layers: 32
 vision_patch_size: 14
 
+# Multimodal projector (vision -> LLM hidden space)
+mm_projector: linear
+mm_hidden_size: 1024  # vision output
+mm_output_size: 4096   # LLM hidden_size
+
 template: glm/common.yaml
