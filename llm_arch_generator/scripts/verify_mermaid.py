@@ -18,37 +18,38 @@ import sys
 from collections import defaultdict
 
 
-TERMINAL_NODES = {
-    # Uppercase (main diagram nodes)
-    "Output", "LM_Head", "Final_Norm", "Final", "Head", "Out_L", "Out1", "Out2", "Out3", "Out61",
-    "Out_D1", "Out_M1", "Out", "Tokens", "Output_Stage", "Input_Stage", "Transformer_Layer",
-    "MoE_Out", "Attn_Out", "MoE_Module", "Attn_Module", "Down", "O", "O_Proj", "Proj", "EX", "SW",
-    "Input_LN", "Embed", "LN1", "LN2", "ADD1", "ADD2",
-    # Lowercase (SKILL.md template convention)
-    "output", "lm_head", "final_norm", "final", "head", "out_l", "out1", "out2", "out3", "out61",
-    "out_d1", "out_m1", "out", "tokens", "output_stage", "input_stage", "transformer_layer",
-    "moe_out", "attn_out", "moe_module", "attn_module", "down", "o", "o_proj", "proj", "ex", "sw",
-    "input_ln", "embed", "ln1", "ln2", "add1", "add2",
-    # SKILL.md detail nodes (lowercase)
-    "v_proj", "k_proj", "q_proj", "attn_in", "o_proj", "attn_out", "routed_1", "routed_2", "routed_n",
-    "routed_x", "router", "shared", "moe_out", "moe_out2", "MoE_out", "MoE_Out2",
-}
-ALWAYS_ALONE_NODES = {
-    # Uppercase subgraph containers and detail expansion targets
-    "Title", "ExpertX", "...", "FFN_Detail", "GQA_Detail", "MoE_Pool", "Attention_Detail",
-    "MoE_Detail", "MLA_Detail", "Expert_Pool", "Vision_Encoder", "MM_Projector",
-    "Input_Stage", "Output_Stage", "Transformer_Layer",
-    "MoE_Module", "Attn_Module", "Router", "Shared", "Sliding_Window", "Shared_Expert",
-    "ConcatQ", "ConcatK", "Q_A", "Q_B", "Q_LN", "KV_A", "KV_LN", "K_B", "RoPE", "Softmax",
-    "Q_Split", "K_Split", "V_Split",
-    # Lowercase
-    "title", "expertx", "...", "ffn_detail", "gqa_detail", "moe_pool", "attention_detail",
-    "moe_detail", "mla_detail", "expert_pool", "vision_encoder", "mm_projector",
-    "input_stage", "output_stage", "transformer_layer",
-    "moe_module", "attn_module", "router", "shared", "sliding_window", "shared_expert",
-    "concatq", "concatk", "q_a", "q_b", "q_ln", "kv_a", "kv_ln", "k_b", "rope", "softmax",
-    "q_split", "k_split", "v_split",
-}
+# Suffix-based terminal node detection — any node whose ID ends with these suffixes
+TERMINAL_NODE_SUFFIXES = frozenset({
+    '_proj', '_out', 'lm_head', 'final_norm', 'softmax', '_head', 'o_proj',
+    'tokens', 'output', 'output_stage', 'input_stage', 'embed', 'head',
+    'add1', 'add2', 'ln1', 'ln2', 'final', 'moe_out', 'attn_out',
+    'down', 'ex', 'sw', 'o', 'proj', 'out',
+    # Additional suffixes to cover original TERMINAL_NODES explicit entries
+    '_d1', '_m1', '_l', '_1', '_2', '_3', '_61', '_in', '_n', '_x', '_out2',
+})
+# Case-insensitive variants
+TERMINAL_NODE_SUFFIXES_LOWER = frozenset(s.lower() for s in TERMINAL_NODE_SUFFIXES)
+
+# Regex-based "always alone" node detection — subgraphs and detail expansion targets
+ALWAYS_ALONE_NODES_PATTERNS = re.compile(
+    r'.*_[Dd]etail|'       # *_Detail / *_detail subgraph containers
+    r'Hybrid_|'             # Hybrid_* subgraph containers
+    r'DSA_|'               # DSA_* detail expansion nodes
+    r'Linear_|'            # Linear_* detail expansion nodes
+    r'Gated_|'              # Gated_* detail expansion nodes
+    r'^(?:Title|ExpertX|\.\.\.|FFN_Detail|GQA_Detail|MoE_Pool|Attention_Detail|'
+    r'MoE_Detail|MLA_Detail|Expert_Pool|Vision_Encoder|MM_Projector|'
+    r'Input_Stage|Output_Stage|Transformer_Layer|'
+    r'MoE_Module|Attn_Module|Router|Shared|Sliding_Window|Shared_Expert|'
+    r'ConcatQ|ConcatK|Q_A|Q_B|Q_LN|KV_A|KV_LN|K_B|RoPE|Softmax|'
+    r'Q_Split|K_Split|V_Split)$|'  # Literal names
+    r'^(?:title|expertx|\.\.\.|ffn_detail|gqa_detail|moe_pool|attention_detail|'
+    r'mla_detail|expert_pool|vision_encoder|mm_projector|'
+    r'input_stage|output_stage|transformer_layer|'
+    r'moe_module|attn_module|router|shared|sliding_window|shared_expert|'
+    r'concatq|concatk|q_a|q_b|q_ln|kv_a|kv_ln|k_b|rope|softmax|'
+    r'q_split|k_split|v_split)$'
+)
 
 
 def parse_mermaid(path: str) -> tuple[set[str], list[tuple[str, str, str]], str]:
@@ -129,6 +130,10 @@ def check_connectivity(defined: set[str], edges: list[tuple[str, str, str]],
     """Check graph connectivity and return list of issues found."""
     issues = []
 
+    # Suffix and regex-based node classification
+    _is_terminal = lambda n: n.lower().endswith(tuple(TERMINAL_NODE_SUFFIXES_LOWER))
+    _is_always_alone = lambda n: ALWAYS_ALONE_NODES_PATTERNS.match(n)
+
     # Build adjacency lists
     outgoing = defaultdict(list)
     incoming = defaultdict(list)
@@ -141,7 +146,7 @@ def check_connectivity(defined: set[str], edges: list[tuple[str, str, str]],
 
     # 1. Check each defined node has outgoing edges (unless terminal)
     for node in sorted(defined):
-        if node in TERMINAL_NODES or node in ALWAYS_ALONE_NODES:
+        if _is_terminal(node) or _is_always_alone(node):
             continue
         if node not in outgoing:
             issues.append(f"ORPHAN (no outgoing): '{node}' is defined but has no connections leaving it")
@@ -155,7 +160,7 @@ def check_connectivity(defined: set[str], edges: list[tuple[str, str, str]],
 
     # 3. Check for dead-end nodes (nodes with incoming but no outgoing, not terminal)
     for node in sorted(all_nodes):
-        if node in TERMINAL_NODES or node in ALWAYS_ALONE_NODES:
+        if _is_terminal(node) or _is_always_alone(node):
             continue
         if node in outgoing or node in incoming:
             if node not in outgoing:
@@ -164,7 +169,7 @@ def check_connectivity(defined: set[str], edges: list[tuple[str, str, str]],
     # 4. Check for orphan nodes that are defined but neither send nor receive
     for node in sorted(defined):
         has_any = (node in outgoing) or (node in incoming)
-        if not has_any and node not in TERMINAL_NODES and node not in ALWAYS_ALONE_NODES:
+        if not has_any and not _is_terminal(node) and not _is_always_alone(node):
             issues.append(f"ISOLATED: '{node}' is defined but completely disconnected")
 
     # 5. Check for expand arrows (==>) — expansion targets are expected to have no outgoing
@@ -204,7 +209,7 @@ def check_connectivity(defined: set[str], edges: list[tuple[str, str, str]],
         if out in defined and out not in reachable_from_input:
             # Skip if out is inside a detail subgraph (only reachable via == expand arrow)
             sg = node_to_subgraph.get(out)
-            if sg and sg in ALWAYS_ALONE_NODES:
+            if sg and _is_always_alone(sg):
                 continue  # detail subgraph nodes are only reachable via == expand
             issues.append(f"DEAD PATH: '{out}' is not reachable from Input_Stage")
 
