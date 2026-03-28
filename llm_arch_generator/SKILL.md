@@ -93,7 +93,6 @@ python scripts/download_model.py <model_id>
 **选择 HuggingFace 时（来自 Step 1/2）：**
 读取 model.py 构建模块树并追踪 forward() 路径：
 - 识别所有主要模块（attention、FFN、MoE、router、norms）
-- 从实际代码分析中检测残差连接（查找 `residual = hidden_states`、`hidden_states + residual`、`hidden_states = hidden_states + other`）
 - 根据 config.json + 权重定义计算张量形状
 
 **选择内置模板时：**
@@ -109,14 +108,13 @@ python scripts/download_model.py <model_id>
 3. **Attention 内部结构**：Q/K/V 投影、旋转位置编码（RoPE）、softmax、O 投影
 4. **MLP/FFN 内部结构**：gate_proj、up_proj、down_proj（或 DeepseekV3MLP 结构）
 5. **MoE 内部结构**：Router（带激活函数和 top-K）、Shared Expert、Routed Expert Pool
-6. **所有残差连接**，显示为虚线 `-.->` 箭头并带标签
-7. **最终 RMSNorm 和 LM Head**
-8. **多模态模型**：Vision encoder、Projector
+6. **最终 RMSNorm 和 LM Head**
+7. **多模态模型**：Vision encoder、Projector
 
 **图结构规则：**
 - 使用 `graph TD`（自上而下）布局
 - 使用 `==>` 表示展开箭头（展示模块的"内部结构"）
-- 使用 `-.->` 表示残差连接（虚线箭头）
+- 使用 `-.->` 表示 MoE 聚合连接（虚线箭头）
 - 使用 `subgraph` + `direction TB` 进行模块分组
 - 应用 Color Conventions 部分的颜色类
 - **不要包含图例** — 颜色通过节点标签自解释
@@ -175,9 +173,6 @@ python scripts/verify_mermaid.py <output_file>.mmd --verbose
 - `O_proj` 必须接收来自 `Softmax` 的输出
 - 对于 MLA：`Q_A_Proj` → `Q_RMSNorm` → `Q_B_Proj` 链必须完整；`KV_A_Proj` → `KV_RMSNorm` → `KV_B_Proj` 链必须完整
 
-**残差连接：**
-- 每个 transformer 层必须有**两条**残差路径：一条从输入到注意力后加法（`-.-> |Residual| Add1`），一条从注意力输出到 FFN 后加法（`-.-> |Residual| Add2`）
-
 **如果发现语义错误，立即修复并在声称完成前重新验证。**
 
 ### Step 6: 渲染输出（可选）
@@ -222,20 +217,9 @@ graph TD
         direction TB
 
         ln1["RMSNorm"]:::norm --> attn_module["Attention"]:::attention
-
-        attn_module --> add1((+)):::norm
-        %% Residual 1：来自输入
-        ln1 -.-> |Residual 1 - skip input| add1
-
-        add1 --> ln2["RMSNorm"]:::norm
+        attn_module --> ln2["RMSNorm"]:::norm
         ln2 --> moe_module["MoE"]:::moe
-
-        moe_module --> add2((+)):::norm
-        %% Residual 2：来自 attention 输出
-        add1 -.-> |Residual 2| add2
-
-        %% 层输出节点
-        add2 --> Layer_Out["Output<br/>[B,S,H]"]
+        moe_module --> Layer_Out["Output<br/>[B,S,H]"]
     end
 
     %% === MoE 展开（顶层子图） ===
@@ -462,7 +446,7 @@ classDef output_stage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 | Vision Tower | #e8f5e9 | #2e7d32 |
 | Projector | #fce4ec | #c2185b |
 | Input/Output | #f3e5f5 | #4a148c |
-| Residual | dashed | #999 |
+| Aggregation `-.->` | dashed | #999 |
 | Expand `==>` | solid bold | — |
 
 ---
