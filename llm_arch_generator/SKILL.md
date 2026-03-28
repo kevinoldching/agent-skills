@@ -219,8 +219,10 @@ graph TD
         ln1["RMSNorm"]:::norm --> attn_module["Attention"]:::attention
         attn_module --> ln2["RMSNorm"]:::norm
         ln2 --> moe_module["MoE"]:::moe
-        moe_module --> Layer_Out["Output<br/>[B,S,H]"]
     end
+
+    %% 层输出节点（必须放在子图外部才能被外部连接）
+    Layer_Out["Output<br/>[B,S,H]"]
 
     %% === MoE 展开（顶层子图） ===
     subgraph MoE_Detail ["MoE 展开"]
@@ -272,6 +274,7 @@ graph TD
 
     %% === 全局连接 ===
     Input_Stage --> Transformer_Layer
+    Transformer_Layer --> Layer_Out
     Layer_Out --> final_norm
     final_norm --> Head
 
