@@ -196,7 +196,7 @@ bash scripts/render_mermaid.sh {model_name}_arch.mmd
 
 这是**始终默认**的视图。它展示完整的内部结构：
 
-**关键原则：子图内部的节点无法从外部引用。所有跨子图连接必须通过子图容器 ID 进行。**
+**核心原则：子图内部的节点无法从外部接收连接。需要被外部节点连接的节点，必须放在子图外部作为顶层节点。**
 
 ```mermaid
 graph TD
@@ -212,7 +212,9 @@ graph TD
     %% === 输入层 ===
     subgraph Input_Stage ["输入层"]
         direction TB
-        Tokens["Token IDs"] --> Embed["Embedding"]
+        Tokens["Token IDs"]
+        Embed["Embedding"]:::input_stage
+        Tokens --> Embed
     end
 
     %% === 单个 Transformer Layer（占位符） ===
@@ -232,7 +234,7 @@ graph TD
         %% Residual 2：来自 attention 输出
         add1 -.-> |Residual 2| add2
 
-        %% 层输出节点（供外部连接）
+        %% 层输出节点
         add2 --> Layer_Out["Output<br/>[B,S,H]"]
     end
 
@@ -278,17 +280,14 @@ graph TD
         o_proj --> attn_out["Output<br/>[B,S,H]"]:::attention
     end
 
-    %% === 输出层 ===
-    subgraph Output_Stage ["输出层"]
-        direction TB
-        final_norm["Final RMSNorm"]:::norm
-        Head["LM Head"]:::output_stage
-        final_norm --> Head
-    end
+    %% === Final Norm 和 Head（必须放在子图外部，才能被外部连接） ===
+    final_norm["Final RMSNorm"]:::norm
+    Head["LM Head"]:::output_stage
 
-    %% === 全局连接（子图容器级连接，不是内部节点） ===
+    %% === 全局连接 ===
     Input_Stage --> Transformer_Layer
-    Transformer_Layer --> Output_Stage
+    Layer_Out --> final_norm
+    final_norm --> Head
 
     %% === 展开关系（==>> 指向顶层子图容器） ===
     attn_module ==> Attention_Detail
@@ -296,9 +295,17 @@ graph TD
 ```
 
 **重要规则：**
-1. **展开箭头的目标必须是子图容器的 ID**（如 `MoE_Detail`、`Attention_Detail`），不能是子图内部的节点
-2. **跨子图连接必须使用子图容器 ID**（如 `Input_Stage --> Transformer_Layer`），不能引用子图内部的节点
-3. **每个子图必须有一个输出节点**（如 `Layer_Out`）供外部连接
+
+1. **边界节点必须放在子图外部**
+   - `final_norm`、`Head`、`Embed` 等需要被外部连接的节点，**必须**放在子图外部作为顶层节点
+   - 不能放在 `Output_Stage`、`Input_Stage` 等子图内部
+
+2. **展开箭头的目标必须是子图容器 ID**
+   - 如 `MoE_Detail`、`Attention_Detail`，不能是子图内部的节点
+
+3. **子图内部节点不能从外部接收连接**
+   - 即使通过 `==>>` 展开箭头展开，内部节点也无法接收来自其他子图的连接
+   - 只有顶层节点可以作为数据流的入口和出口
 
 ### 多层分组（可选优化）
 
@@ -315,6 +322,8 @@ end
 ```
 
 或者按层类型分组（适用于 MoE 前几层是 Dense FFN，后面的层是 MoE）：
+
+**注意：以下示例中 `final_norm` 必须放在子图外部，因为需要接收来自层的输出。**
 
 ```
 subgraph Dense_Layer ["Dense Layer (1-3)"]
@@ -335,8 +344,13 @@ subgraph MoE_Layer ["MoE Layer (4-61)"]
     MoE --> Out_M1["Output"]
 end
 
+%% final_norm 和 Head 放在子图外部
+final_norm["Final RMSNorm"]:::norm
+Head["LM Head"]:::output_stage
+
 Dense_Layer --> MoE_Layer
-MoE_Layer --> Output_Stage
+Out_M1 --> final_norm
+final_norm --> Head
 ```
 
 ### Attention 类型展开规则
