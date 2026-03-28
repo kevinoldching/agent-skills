@@ -254,10 +254,12 @@ graph TD
 
         router --> |Top-K| routed_1
         router --> |Top-K| routed_2
+        router --> |Top-K| routed_x
         router --> |Top-K| routed_n
         shared -.-> |always add| MoE_out["MoE Output"]
         routed_1 -.-> |if selected| MoE_out
         routed_2 -.-> |if selected| MoE_out
+        routed_x -.-> |if selected| MoE_out
         routed_n -.-> |if selected| MoE_out
     end
 
