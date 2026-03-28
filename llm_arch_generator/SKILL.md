@@ -196,6 +196,8 @@ bash scripts/render_mermaid.sh {model_name}_arch.mmd
 
 这是**始终默认**的视图。它展示完整的内部结构：
 
+**关键原则：子图内部的节点无法从外部引用。所有跨子图连接必须通过子图容器 ID 进行。**
+
 ```mermaid
 graph TD
     %% === 颜色定义 ===
@@ -213,7 +215,7 @@ graph TD
         Tokens["Token IDs"] --> Embed["Embedding"]
     end
 
-    %% === Transformer Layer ===
+    %% === 单个 Transformer Layer（占位符） ===
     subgraph Transformer_Layer ["Transformer Layer N"]
         direction TB
 
@@ -229,6 +231,9 @@ graph TD
         moe_module --> add2((+)):::norm
         %% Residual 2：来自 attention 输出
         add1 -.-> |Residual 2| add2
+
+        %% 层输出节点（供外部连接）
+        add2 --> Layer_Out["Output<br/>[B,S,H]"]
     end
 
     %% === MoE 展开（顶层子图） ===
@@ -276,23 +281,63 @@ graph TD
     %% === 输出层 ===
     subgraph Output_Stage ["输出层"]
         direction TB
-        %% 注意：此阶段的输入（如 Out_M1 或 add2）必须来自前一阶段的输出节点，而不是子图容器
         final_norm["Final RMSNorm"]:::norm
         Head["LM Head"]:::output_stage
         final_norm --> Head
     end
 
-    %% === 全局连接 ===
-    Embed --> ln1
-    add2 --> final_norm
-    %% 注意：对于 MoE 模型，使用 Out_M1 --> Final_Norm 而不是 add2 --> final_norm
+    %% === 全局连接（子图容器级连接，不是内部节点） ===
+    Input_Stage --> Transformer_Layer
+    Transformer_Layer --> Output_Stage
 
     %% === 展开关系（==>> 指向顶层子图容器） ===
-    moe_module ==> MoE_Detail
     attn_module ==> Attention_Detail
+    moe_module ==> MoE_Detail
 ```
 
-**重要：展开箭头的目标必须是子图容器的 ID（如 `MoE_Detail`、`Attention_Detail`），不能是子图内部的节点。**
+**重要规则：**
+1. **展开箭头的目标必须是子图容器的 ID**（如 `MoE_Detail`、`Attention_Detail`），不能是子图内部的节点
+2. **跨子图连接必须使用子图容器 ID**（如 `Input_Stage --> Transformer_Layer`），不能引用子图内部的节点
+3. **每个子图必须有一个输出节点**（如 `Layer_Out`）供外部连接
+
+### 多层分组（可选优化）
+
+对于有多层的模型，可以用分组方式简化表示，无需为每层都生成占位符：
+
+```
+subgraph Transformer ["Transformer (×N layers)"]
+    direction TB
+    Input["Input"] --> attn["Attention"]
+    attn --> add["Add"]
+    add --> ffn["FFN"]
+    ffn --> Output["Output"]
+end
+```
+
+或者按层类型分组（适用于 MoE 前几层是 Dense FFN，后面的层是 MoE）：
+
+```
+subgraph Dense_Layer ["Dense Layer (1-3)"]
+    direction TB
+    LN1["RMSNorm"] --> ATTN1["Attention"]
+    ATTN1 --> ADD1["Add"]
+    ADD1 --> LN2["RMSNorm"]
+    LN2 --> FFN1["FFN"]
+    FFN1 --> Out_D1["Output"]
+end
+
+subgraph MoE_Layer ["MoE Layer (4-61)"]
+    direction TB
+    LN3["RMSNorm"] --> ATTN2["Attention"]
+    ATTN2 --> ADD3["Add"]
+    ADD3 --> LN4["RMSNorm"]
+    LN4 --> MoE["MoE"]
+    MoE --> Out_M1["Output"]
+end
+
+Dense_Layer --> MoE_Layer
+MoE_Layer --> Output_Stage
+```
 
 ### Attention 类型展开规则
 

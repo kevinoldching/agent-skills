@@ -33,6 +33,16 @@ TERMINAL_NODES = {
     # SKILL.md detail nodes (lowercase)
     "v_proj", "k_proj", "q_proj", "attn_in", "o_proj", "attn_out", "routed_1", "routed_2", "routed_n",
     "routed_x", "router", "shared", "moe_out", "moe_out2", "MoE_out", "MoE_Out2",
+    # Attention detail output nodes (various attention types)
+    "attn_out_swa", "attn_out_full", "attn_out_mla", "attn_out_dsa",
+    "attn_in_swa", "attn_in_full", "attn_in_mla", "attn_in_dsa",
+    # MoE expert nodes (expert pool terminals)
+    "expert1", "expert2", "expert3", "expert4", "expert5", "expert6", "expert7", "expert8",
+    "expert128", "expert256", "expertN",
+    # MoE intermediate terminals
+    "moe_out_swa", "moe_out_full", "moe_out_mla", "moe_out_dense",
+    # Vision/language projection terminals
+    "vision_out", "mm_output",
 }
 
 # Suffix-based terminal node detection — any node whose ID ends with these suffixes
@@ -43,6 +53,10 @@ TERMINAL_NODE_SUFFIXES = frozenset({
     'down', 'ex', 'sw', 'proj', 'out',
     # Additional suffixes to cover original TERMINAL_NODES explicit entries
     '_d1', '_m1', '_l', '_1', '_2', '_3', '_61', '_in', '_n', '_x', '_out2',
+    # Attention type suffixes (swa, full, mla, dsa, etc.)
+    '_swa', '_full', '_mla', '_dsa', '_gqa',
+    # Expert pool suffixes
+    '_expert',
 })
 # Case-insensitive variants
 TERMINAL_NODE_SUFFIXES_LOWER = frozenset(s.lower() for s in TERMINAL_NODE_SUFFIXES)
@@ -63,6 +77,12 @@ ALWAYS_ALONE_NODES = {
     "moe_module", "attn_module", "router", "shared", "sliding_window", "shared_expert",
     "concatq", "concatk", "q_a", "q_b", "q_ln", "kv_a", "kv_ln", "k_b", "rope", "softmax",
     "q_split", "k_split", "v_split",
+    # Hybrid/Alternating layer subgraphs
+    "SWA_Layers", "Full_Layers", "Dense_Layers", "MoE_Layers",
+    "swa_layers", "full_layers", "dense_layers", "moe_layers",
+    # Attention detail variants
+    "Attention_Detail_SWA", "Attention_Detail_Full", "Attention_Detail_MLA", "Attention_Detail_DSA",
+    "attention_detail_swa", "attention_detail_full", "attention_detail_mla", "attention_detail_dsa",
 }
 
 # Regex-based "always alone" node detection — subgraphs and detail expansion targets
