@@ -29,6 +29,9 @@ config:
   # LoRA ranks for MLA
   kv_lora_rank: 512
   q_lora_rank: 1536
+  qk_rope_head_dim: 64
+  qk_nope_head_dim: 128
+  v_head_dim: 128
 
 attention_type: mla
 template: deepseek/common.yaml
