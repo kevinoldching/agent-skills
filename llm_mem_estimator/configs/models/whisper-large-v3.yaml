@@ -1,0 +1,76 @@
+model_identity:
+  name: whisper-large-v3
+  total_params: '1.54B'
+  num_layers: 32
+architecture_config:
+  hidden_size: 1280
+  num_layers: 32
+  attention_type: mha
+  ffn_type: dense
+  norm_type: layernorm
+  vocab_size: 51866
+  head_dim: 64
+  num_attention_heads: 20
+  intermediate_size: 5120
+modules:
+  others:
+    model.decoder.embed_positions.weight: {shape: [448, 1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.decoder.layer_norm.bias: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.decoder.layer_norm.weight: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.k_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.out_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.out_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.q_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.q_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.v_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn.v_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn_layer_norm.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.encoder_attn_layer_norm.weight: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.fc1.bias: {shape: [5120], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.fc1.weight: {shape: [5120, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.fc2.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.fc2.weight: {shape: [1280, 5120], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.final_layer_norm.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.final_layer_norm.weight: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn_layer_norm.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn_layer_norm.weight: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.conv1.bias: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.conv1.weight: {shape: [1280, 128, 3], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.conv2.bias: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.conv2.weight: {shape: [1280, 1280, 3], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.embed_positions.weight: {shape: [1500, 1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.layer_norm.bias: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.layer_norm.weight: {shape: [1280], dtype: F16, layers: 1, parallel_strategy: replicated}
+    model.encoder.layers.N.fc1.bias: {shape: [5120], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.fc1.weight: {shape: [5120, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.fc2.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.fc2.weight: {shape: [1280, 5120], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.final_layer_norm.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.final_layer_norm.weight: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn_layer_norm.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn_layer_norm.weight: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+  embedding:
+    model.decoder.embed_tokens.weight: {shape: [51866, 1280], dtype: F16, layers: 1, parallel_strategy: TP}
+  attention:
+    model.decoder.layers.N.self_attn.k_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+    model.decoder.layers.N.self_attn.out_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn.out_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn.q_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn.q_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+    model.decoder.layers.N.self_attn.v_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.decoder.layers.N.self_attn.v_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+    model.encoder.layers.N.self_attn.k_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+    model.encoder.layers.N.self_attn.out_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn.out_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn.q_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn.q_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+    model.encoder.layers.N.self_attn.v_proj.bias: {shape: [1280], dtype: F16, layers: 32, parallel_strategy: replicated}
+    model.encoder.layers.N.self_attn.v_proj.weight: {shape: [1280, 1280], dtype: F16, layers: 32, parallel_strategy: TP}
+computation_rules:
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: 2 * batch_size * seq_len * num_attention_heads * head_dim * num_layers / (tp_size * cp_size)
+  activation: batch_size * seq_len * hidden_size * recommended_capacity_factor / cp_size
+  system_reserved_gb: 2.0
+  gpu_util: 0.9

@@ -233,17 +233,22 @@ architecture_config:
   field_mappings:
     hidden_size:
       - "hidden_size"
+      - "d_model"  # Whisper
     head_dim:
       - "head_dim"
     num_layers:
       - "num_hidden_layers"
       - "n_layer"
       - "num_layers"
+      - "encoder_layers"  # Whisper
+      - "decoder_layers"   # Whisper
     vocab_size:
       - "vocab_size"
     num_attention_heads:
       - "num_attention_heads"
       - "n_heads"
+      - "decoder_attention_heads"  # Whisper
+      - "encoder_attention_heads"   # Whisper
     num_key_value_heads:
       - "num_key_value_heads"
       - "num_kv_heads"
@@ -251,6 +256,8 @@ architecture_config:
     intermediate_size:
       - "intermediate_size"
       - "ffn_hidden_size"
+      - "encoder_ffn_dim"  # Whisper
+      - "decoder_ffn_dim"   # Whisper
     num_experts:
       - "num_experts"
       - "n_routed_experts"
