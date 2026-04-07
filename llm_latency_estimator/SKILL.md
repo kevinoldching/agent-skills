@@ -29,20 +29,39 @@ Skill 会输出：
 
 ### 1. 模型结构解析
 
-AI 读取 vLLM 源码结构和 HuggingFace config.json，识别：
+**必须读取用户提供的源码**。使用 Read 工具读取 vLLM 模型目录下的源码文件：
+
+```
+必须执行的操作：
+1. 使用 Read 工具读取用户提供 vLLM 源码路径下的所有 .py 文件
+2. 识别模型结构：遍历模型目录，列出所有模块文件
+3. 读取 HuggingFace config.json（用户指定路径，或用 scripts/download_hf_config.py 下载）
+4. 从源码中提取每个 MatMul 层的 weight shape（如 hidden_dim, intermediate_size）
+5. 识别 FFN 类型：检查 FFN 模块代码，判断是 Standard / SwiGLU / MoE
+6. 识别注意力类型：检查 attention 模块代码，判断是 MHA / GQA / MLA / Mamba
+```
+
+识别内容：
 - 模块组织: Embedding / Attention / FFN / Output
 - FFN 类型: Standard / SwiGLU / MoE
-- 注意力类型: MHA / GQA / MLA / Mamba（从 config.json 字段判断）
+- 注意力类型: MHA / GQA / MLA / Mamba（从源码和 config.json 判断）
 
 ### 2. 算子 FLOPs 动态推导
 
-**不要写死公式**。AI 根据注意力类型，从 `configs/attention_patterns.yaml` 获取计算特征模式，代入 config 中的 shape 参数动态计算。
+**必须从源码提取 shape 参数，不要写死公式**。
 
-AI 任务：
-- 从 config.json 提取 hidden_size, num_attention_heads, num_key_value_heads, intermediate_size
-- 从源码提取 MatMul weight shape
-- 根据注意力类型计算 FLOPs 和 Bytes
-- 融合算子: AI 推导 + WebSearch 验证
+```
+必须执行的操作：
+1. 使用 Read 工具读取 vLLM 源码中的 model.py / attention.py / ffn.py
+2. 从源码中找到所有 Linear/MatMul 层的 in_features 和 out_features
+3. 从 config.json 提取：hidden_size, num_attention_heads, num_key_value_heads, intermediate_size
+4. 根据识别的注意力类型，从 configs/attention_patterns.yaml 获取计算特征模式
+5. AI 代入实际 shape 值，计算每个模块的 FLOPs 和内存访问量（Bytes）
+```
+
+**融合算子处理**：
+- 读取源码时，识别融合的 LayerNorm + SiLU 等模式
+- AI 推导等效 FLOPs，必要时用 WebSearch 验证融合算子在 Ascend 上的性能
 
 ### 3. Roofline 分析
 
@@ -85,10 +104,16 @@ T_total = T_prefill + gen_len × T_decode
 ## 配置文件
 
 ### chips.json
-芯片参数（峰值算力 TFLOPS、带宽 GB/s），支持华为 Ascend 和 NVIDIA GPU。
+
+使用 Read 工具读取 `configs/chips.json`，获取芯片参数：
+- 峰值算力 `peak_fp32_tflops`
+- 带宽 `bandwidth_gb_s`
+
+如果用户指定了芯片名称（如 Ascend-910B-64GB），从 chips.json 中查找对应参数。如果用户提供了自定义参数（peak_flops, bandwidth），直接使用。
 
 ### attention_patterns.yaml
-注意力计算特征模式模板，供 AI 动态调用。
+
+使用 Read 工具读取 `configs/attention_patterns.yaml`，获取注意力计算特征模式模板。根据识别的注意力类型（MHA/GQA/MLA/Mamba），选择对应的 flops_per_token 和 memory_per_token 公式，代入实际参数计算。
 
 ## 脚本
 
