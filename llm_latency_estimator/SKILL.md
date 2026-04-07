@@ -48,16 +48,27 @@ Skill 会输出：
 
 ### 2. 算子 FLOPs 动态推导
 
-**必须从源码提取 shape 参数，不要写死公式**。
+**必须从源码分析计算模式，不要依赖预置公式**。
 
 ```
 必须执行的操作：
-1. 使用 Read 工具读取 vLLM 源码中的 model.py / attention.py / ffn.py
-2. 从源码中找到所有 Linear/MatMul 层的 in_features 和 out_features
-3. 从 config.json 提取：hidden_size, num_attention_heads, num_key_value_heads, intermediate_size
-4. 根据识别的注意力类型，从 configs/attention_patterns.yaml 获取计算特征模式
-5. AI 代入实际 shape 值，计算每个模块的 FLOPs 和内存访问量（Bytes）
+1. 使用 Read 工具读取 vLLM 源码中的 attention 实现（如 attention.py, flash_attention.py）
+2. 分析 attention 计算流程：
+   - 找出 QKV projection 的 shape (hidden_dim → d_k, d_v)
+   - 找出 attention score 计算方式 (MatMul 还是其他)
+   - 确定 KV cache 的 shape 和访问模式
+3. 分析 FFN 计算流程：
+   - 找出 up_proj, gate_proj, down_proj 的 shape
+   - 判断是否有 SiLU/Swish 激活
+4. AI 根据实际代码推导出该模型的 FLOPs 公式
+5. AI 根据 KV cache 形状计算内存访问量（Bytes）
 ```
+
+**AI 应自行分析的内容**：
+- Attention: QKV projection FLOPs = 2 × in_dim × out_dim × 3 (Q, K, V 分别计算)
+- Attention Score: 根据实际实现（MatMul 或其他）推导
+- FFN SwiGLU: Up + Gate + Down = 3 × hidden_dim × intermediate_size
+- FFN Standard: Up + Down = 2 × hidden_dim × intermediate_size
 
 **融合算子处理**：
 - 读取源码时，识别融合的 LayerNorm + SiLU 等模式
@@ -110,10 +121,6 @@ T_total = T_prefill + gen_len × T_decode
 - 带宽 `bandwidth_gb_s`
 
 如果用户指定了芯片名称（如 Ascend-910B-64GB），从 chips.json 中查找对应参数。如果用户提供了自定义参数（peak_flops, bandwidth），直接使用。
-
-### attention_patterns.yaml
-
-使用 Read 工具读取 `configs/attention_patterns.yaml`，获取注意力计算特征模式模板。根据识别的注意力类型（MHA/GQA/MLA/Mamba），选择对应的 flops_per_token 和 memory_per_token 公式，代入实际参数计算。
 
 ## 脚本
 

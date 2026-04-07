@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 实现基于 Ascend 芯片的 vLLM 大模型 Roofline 性能分析 Skill，支持多输入源、AI 动态推导、Mermaid 可视化。
+**Goal:** 实现基于 Ascend 芯片的 vLLM 大模型 Roofline 性能分析 Skill，支持多输入源、AI 动态推导源码计算模式、Mermaid 可视化。
 
-**Architecture:** 这是一个以 AI 推理为核心的 Skill，核心逻辑由 SKILL.md 定义，配置文件存储芯片参数和注意力模式模板，脚本仅用于 HF 模型下载。AI 完成模型解析、FLOPs 推导、Roofline 分析、时延估算和优化建议生成。
+**Architecture:** 这是一个以 AI 推理为核心的 Skill，核心逻辑由 SKILL.md 定义。AI 直接读取 vLLM 源码分析 FLOPs 模式，chips.json 存储芯片参数，脚本仅用于 HF 模型下载。
 
-**Tech Stack:** Python（仅脚本）、YAML/JSON（配置）、SKILL.md（Skill 定义）
+**Tech Stack:** Python（仅脚本）、JSON（配置）、SKILL.md（Skill 定义）
 
 ---
 
@@ -16,8 +16,7 @@
 llm_latency_estimator/
 ├── SKILL.md                              # 核心 Skill 定义（AI 行为指南）
 ├── configs/
-│   ├── chips.json                       # 预置芯片性能参数
-│   └── attention_patterns.yaml          # 注意力计算特征模式模板
+│   └── chips.json                       # 预置芯片性能参数
 ├── scripts/
 │   └── download_hf_config.py            # 下载 HF config.json
 ├── llm_latency_estimator/
@@ -29,7 +28,7 @@ llm_latency_estimator/
         └── 2026-04-07-llm-roofline-analysis-implementation-plan.md  # 本计划
 ```
 
-**Note:** 不同于 llm_mem_estimator 的 CLI 工具模式，此 Skill 以 SKILL.md 为核心，AI 直接读取配置和源码进行推理，脚本最小化。
+**Note:** 此 Skill 以 SKILL.md 为核心，AI 直接读取 vLLM 源码分析计算模式，不依赖预置公式模板。脚本最小化。
 
 ---
 
@@ -74,20 +73,50 @@ Skill 会输出：
 
 ### 1. 模型结构解析
 
-AI 读取 vLLM 源码结构和 HuggingFace config.json，识别：
+**必须读取用户提供的源码**。使用 Read 工具读取 vLLM 模型目录下的源码文件：
+
+```
+必须执行的操作：
+1. 使用 Read 工具读取用户提供 vLLM 源码路径下的所有 .py 文件
+2. 识别模型结构：遍历模型目录，列出所有模块文件
+3. 读取 HuggingFace config.json（用户指定路径，或用 scripts/download_hf_config.py 下载）
+4. 从源码中提取每个 MatMul 层的 weight shape（如 hidden_dim, intermediate_size）
+5. 识别 FFN 类型：检查 FFN 模块代码，判断是 Standard / SwiGLU / MoE
+6. 识别注意力类型：检查 attention 模块代码，判断是 MHA / GQA / MLA / Mamba
+```
+
+识别内容：
 - 模块组织: Embedding / Attention / FFN / Output
 - FFN 类型: Standard / SwiGLU / MoE
-- 注意力类型: MHA / GQA / MLA / Mamba（从 config.json 字段判断）
+- 注意力类型: MHA / GQA / MLA / Mamba（从源码和 config.json 判断）
 
 ### 2. 算子 FLOPs 动态推导
 
-**不要写死公式**。AI 根据注意力类型，从 `configs/attention_patterns.yaml` 获取计算特征模式，代入 config 中的 shape 参数动态计算。
+**必须从源码分析计算模式，不要依赖预置公式**。
 
-AI 任务：
-- 从 config.json 提取 hidden_size, num_attention_heads, num_key_value_heads, intermediate_size
-- 从源码提取 MatMul weight shape
-- 根据注意力类型计算 FLOPs 和 Bytes
-- 融合算子: AI 推导 + WebSearch 验证
+```
+必须执行的操作：
+1. 使用 Read 工具读取 vLLM 源码中的 attention 实现（如 attention.py, flash_attention.py）
+2. 分析 attention 计算流程：
+   - 找出 QKV projection 的 shape (hidden_dim → d_k, d_v)
+   - 找出 attention score 计算方式 (MatMul 还是其他)
+   - 确定 KV cache 的 shape 和访问模式
+3. 分析 FFN 计算流程：
+   - 找出 up_proj, gate_proj, down_proj 的 shape
+   - 判断是否有 SiLU/Swish 激活
+4. AI 根据实际代码推导出该模型的 FLOPs 公式
+5. AI 根据 KV cache 形状计算内存访问量（Bytes）
+```
+
+**AI 应自行分析的内容**：
+- Attention: QKV projection FLOPs = 2 × in_dim × out_dim × 3 (Q, K, V 分别计算)
+- Attention Score: 根据实际实现（MatMul 或其他）推导
+- FFN SwiGLU: Up + Gate + Down = 3 × hidden_dim × intermediate_size
+- FFN Standard: Up + Down = 2 × hidden_dim × intermediate_size
+
+**融合算子处理**：
+- 读取源码时，识别融合的 LayerNorm + SiLU 等模式
+- AI 推导等效 FLOPs，必要时用 WebSearch 验证融合算子在 Ascend 上的性能
 
 ### 3. Roofline 分析
 
@@ -131,9 +160,6 @@ T_total = T_prefill + gen_len × T_decode
 
 ### chips.json
 芯片参数（峰值算力 TFLOPS、带宽 GB/s），支持华为 Ascend 和 NVIDIA GPU。
-
-### attention_patterns.yaml
-注意力计算特征模式模板，供 AI 动态调用。
 
 ## 脚本
 
@@ -232,104 +258,7 @@ git commit -m "feat: add chips.json with peak flops and bandwidth"
 
 ---
 
-## Task 3: 创建 attention_patterns.yaml
-
-**Files:**
-- Create: `llm_latency_estimator/configs/attention_patterns.yaml`
-
-存储注意力计算的特征模式，供 AI 动态调用。
-
-- [ ] **Step 1: 创建 attention_patterns.yaml**
-
-```yaml
-# 注意力机制计算特征模式模板
-# AI 根据注意力类型代入 config 中的实际参数进行计算
-# 不要在此文件中写死具体数值
-
-attention_patterns:
-  MHA:
-    # Multi-Head Attention (Standard)
-    description: "标准多头注意力，K/V 与 Q 同维度，shape = [batch, n_heads, seq_len, d_head]"
-    kv_cache_shape: "[batch, n_heads, seq_len, d_head]"
-    flops_per_token: |
-      QKV_proj: 2 × hidden_dim × hidden_dim × 3
-      Attention_score: 2 × n_heads × d_head × seq_len
-      Softmax: 3 × n_heads × seq_len
-      Score_weighted_sum: 2 × n_heads × d_head × seq_len
-      Output_proj: 2 × hidden_dim × hidden_dim
-    memory_per_token: |
-      KV_cache_read: 2 × n_heads × seq_len × d_head × bytes_per_element
-      KV_cache_write: 2 × n_heads × d_head × bytes_per_element
-
-  GQA:
-    # Grouped Query Attention
-    description: "分组查询注意力，n_kv_heads < n_q_heads，K/V heads 数量减少"
-    kv_cache_shape: "[batch, n_kv_heads, seq_len, d_head]"
-    kv_ratio: "n_kv_heads / n_q_heads (通常 1/4 到 1/8)"
-    flops_per_token: |
-      Q_proj: 2 × hidden_dim × hidden_dim
-      KV_proj: 2 × hidden_dim × (n_kv_heads × d_head)
-      Attention_score (with KV sharing): 2 × n_kv_heads × d_head × seq_len
-      Score_weighted_sum: 2 × n_kv_heads × d_head × seq_len
-      Output_proj: 2 × hidden_dim × hidden_dim
-    memory_per_token: |
-      KV_cache_read: 2 × n_kv_heads × seq_len × d_head × bytes_per_element (reduced vs MHA)
-      KV_cache_write: 2 × n_kv_heads × d_head × bytes_per_element
-
-  MLA:
-    # Multi-head Latent Attention (DeepSeek V3)
-    description: "低秩压缩注意力，KV cache 压缩到 d_compressed 维度"
-    kv_cache_shape: "[batch, seq_len, d_compressed]"
-    compression_ratio: "d_compressed / (2 × n_heads × d_head)"
-    flops_per_token: |
-      Q_proj: 2 × hidden_dim × d_qa
-      KV_proj (compressed): 2 × hidden_dim × d_compressed
-      Attention_score: 2 × d_compressed × seq_len
-      Output_proj: 2 × hidden_dim × d_compressed
-    memory_per_token: |
-      KV_cache_read: d_compressed × seq_len × bytes_per_element (significant reduction)
-      KV_cache_write: d_compressed × bytes_per_element
-
-  Mamba:
-    # State Space Model (Mamba)
-    description: "状态空间模型，非标准 attention，需要分析 SSM 算子实现"
-    kv_cache_shape: "[batch, state_dim, seq_len] (non-standard)"
-    note: "需 AI 从源码推导 FLOPs，依赖于 state_dim 和 seq_len"
-    flops_per_token: |
-      SSM_forward: O(state_dim × seq_len)
-      具体 FLOPs 需分析 vLLM 中 Mamba 实现源码
-```
-
-ffn_patterns:
-  # FFN 类型模式
-  standard:
-    description: "标准 FFN: Up_proj + Down_proj"
-    flops: "2 × hidden_dim × intermediate_size"
-
-  swiglu:
-    description: "SwiGLU FFN: Gate_proj + SiLU(Up_proj) ⊙ Down_proj"
-    flops: "3 × hidden_dim × intermediate_size"
-
-  moe:
-    description: "MoE FFN: 多个 Expert 分别计算后加权求和"
-    flops: "2 × hidden_dim × intermediate_size × n_experts × top_k (实际只有 top_k Expert 计算)"
-```
-
-- [ ] **Step 2: 验证 YAML 格式**
-
-Run: `python3 -c "import yaml; print(list(yaml.safe_load(open('llm_latency_estimator/configs/attention_patterns.yaml'))['attention_patterns'].keys()))"`
-Expected: `['MHA', 'GQA', 'MLA', 'Mamba']`
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add llm_latency_estimator/configs/attention_patterns.yaml
-git commit -m "feat: add attention_patterns.yaml with MHA/GQA/MLA/Mamba templates"
-```
-
----
-
-## Task 4: 创建 scripts/download_hf_config.py
+## Task 3: 创建 scripts/download_hf_config.py
 
 **Files:**
 - Create: `llm_latency_estimator/scripts/download_hf_config.py`
@@ -350,17 +279,16 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
-def download_config(model_name: str, output_path: str | None = None) -> dict:
-    """Download config.json from HuggingFace model hub."""
+def download_config(model_name: str, output_path: str | None = None) -> dict | None:
+    """Download config.json from HuggingFace model hub. Returns None on failure."""
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
         print("Error: huggingface_hub not installed. Install with: pip install huggingface_hub")
-        sys.exit(1)
+        return None
 
     config_path = hf_hub_download(repo_id=model_name, filename="config.json")
     with open(config_path, 'r') as f:
@@ -383,7 +311,9 @@ def main():
     parser.add_argument("--output", "-o", help="Output directory to save config.json")
     args = parser.parse_args()
 
-    download_config(args.model, args.output)
+    result = download_config(args.model, args.output)
+    if result is None:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
@@ -403,7 +333,7 @@ git commit -m "feat: add download_hf_config.py for HF model config"
 
 ---
 
-## Task 5: 创建 llm_latency_estimator/__init__.py
+## Task 4: 创建 llm_latency_estimator/__init__.py
 
 **Files:**
 - Create: `llm_latency_estimator/llm_latency_estimator/__init__.py`
@@ -432,28 +362,27 @@ git commit -m "feat: add package init for llm_latency_estimator"
 
 ---
 
-## Task 6: 整体验证
+## Task 5: 整体验证
 
 - [ ] **Step 1: 验证项目结构**
 
-Run: `find llm_latency_estimator -type f | sort`
+Run: `find llm_latency_estimator -type f ! -path '*/__pycache__/*' ! -path '*/.git/*' ! -path '*/docs/*' | sort`
 Expected:
 ```
 llm_latency_estimator/
 llm_latency_estimator/SKILL.md
 llm_latency_estimator/configs/
 llm_latency_estimator/configs/chips.json
-llm_latency_estimator/configs/attention_patterns.yaml
 llm_latency_estimator/llm_latency_estimator/
 llm_latency_estimator/llm_latency_estimator/__init__.py
 llm_latency_estimator/scripts/
 llm_latency_estimator/scripts/download_hf_config.py
 ```
 
-- [ ] **Step 2: 验证所有配置文件可解析**
+- [ ] **Step 2: 验证 JSON 配置可解析**
 
-Run: `python3 -c "import yaml, json; yaml.safe_load(open('llm_latency_estimator/configs/attention_patterns.yaml')); json.load(open('llm_latency_estimator/configs/chips.json')); print('All configs OK')"`
-Expected: `All configs OK`
+Run: `python3 -c "import json; json.load(open('llm_latency_estimator/configs/chips.json')); print('chips.json OK')"`
+Expected: `chips.json OK`
 
 - [ ] **Step 3: Commit 验证**
 
@@ -470,12 +399,12 @@ Skill 完成后，AI 可直接用于分析：
 
 1. **用户提供 vLLM 源码路径 + HuggingFace 模型名**
 2. **AI 读取 chips.json 获取芯片参数**
-3. **AI 读取 attention_patterns.yaml 获取计算模式**
+3. **AI 读取 vLLM 源码，动态分析 FLOPs 计算模式**
 4. **AI 从 config.json 提取参数，动态计算 FLOPs 和 Bytes**
 5. **AI 执行 Roofline 分析，生成 Mermaid 图表**
 6. **AI 计算时延，输出优化建议**
 
-无需额外实现代码，AI 依据 SKILL.md 的指引即可完成完整分析流程。
+无需额外实现代码，AI 依据 SKILL.md 的指引读取源码即可完成完整分析流程。
 
 ---
 
@@ -483,8 +412,7 @@ Skill 完成后，AI 可直接用于分析：
 
 ### Spec Coverage
 - [x] 模型结构解析（SKILL.md Section 1）
-- [x] 注意力类型识别（SKILL.md Section 1 + attention_patterns.yaml）
-- [x] 算子 FLOPs 动态推导（SKILL.md Section 2 + attention_patterns.yaml）
+- [x] 算子 FLOPs 动态推导（SKILL.md Section 2，AI 从源码分析，不依赖预置模板）
 - [x] Roofline 分析 max() 公式（SKILL.md Section 3）
 - [x] 时延估算公式（SKILL.md Section 4）
 - [x] 优化建议生成（SKILL.md Section 5）
@@ -500,5 +428,4 @@ Skill 完成后，AI 可直接用于分析：
 
 ### Type Consistency
 - [x] chips.json 字段: peak_fp32_tflops, bandwidth_gb_s（统一后缀）
-- [x] attention_patterns.yaml: attention_patterns 和 ffn_patterns 分开定义
 - [x] SKILL.md 中的公式与设计文档一致（max 非相加）

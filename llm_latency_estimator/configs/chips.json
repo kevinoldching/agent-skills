@@ -4,24 +4,24 @@
       "vendor": "huawei",
       "model": "Ascend-910B",
       "vram_gb": 64,
-      "peak_fp32_tflops": 256,
-      "bandwidth_gb_s": 1200,
+      "peak_fp16_tflops": 353,
+      "bandwidth_gb_s": 1800,
       "cards_per_node": 8
     },
     "Ascend-910C-64GB": {
       "vendor": "huawei",
       "model": "Ascend-910C",
       "vram_gb": 64,
-      "peak_fp32_tflops": 300,
-      "bandwidth_gb_s": 1200,
+      "peak_fp16_tflops": 706,
+      "bandwidth_gb_s": 3600,
       "cards_per_node": 16
     },
     "Ascend-910C-32GB": {
       "vendor": "huawei",
       "model": "Ascend-910C",
       "vram_gb": 32,
-      "peak_fp32_tflops": 300,
-      "bandwidth_gb_s": 1200,
+      "peak_fp16_tflops": 706,
+      "bandwidth_gb_s": 3600,
       "cards_per_node": 16
     }
   },
@@ -30,7 +30,7 @@
       "vendor": "nvidia",
       "model": "H100",
       "vram_gb": 80,
-      "peak_fp32_tflops": 989,
+      "peak_fp16_tflops": 989,
       "bandwidth_gb_s": 3350,
       "cards_per_node": 8
     },
@@ -38,7 +38,7 @@
       "vendor": "nvidia",
       "model": "A100",
       "vram_gb": 80,
-      "peak_fp32_tflops": 312,
+      "peak_fp16_tflops": 312,
       "bandwidth_gb_s": 2039,
       "cards_per_node": 8
     }
