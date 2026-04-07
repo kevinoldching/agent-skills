@@ -13,13 +13,13 @@ import os
 import sys
 from pathlib import Path
 
-def download_config(model_name: str, output_path: str | None = None) -> dict:
-    """Download config.json from HuggingFace model hub."""
+def download_config(model_name: str, output_path: str | None = None) -> dict | None:
+    """Download config.json from HuggingFace model hub. Returns None on failure."""
     try:
         from huggingface_hub import hf_hub_download
     except ImportError:
         print("Error: huggingface_hub not installed. Install with: pip install huggingface_hub")
-        sys.exit(1)
+        return None
 
     config_path = hf_hub_download(repo_id=model_name, filename="config.json")
     with open(config_path, 'r') as f:
@@ -42,7 +42,9 @@ def main():
     parser.add_argument("--output", "-o", help="Output directory to save config.json")
     args = parser.parse_args()
 
-    download_config(args.model, args.output)
+    result = download_config(args.model, args.output)
+    if result is None:
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
