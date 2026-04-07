@@ -38,13 +38,8 @@ Skill 会输出：
 3. 读取 HuggingFace config.json（用户指定路径，或用 scripts/download_hf_config.py 下载）
 4. 从源码中提取每个 MatMul 层的 weight shape（如 hidden_dim, intermediate_size）
 5. 识别 FFN 类型：检查 FFN 模块代码，判断是 Standard / SwiGLU / MoE
-6. 识别注意力类型：检查 attention 模块代码，判断是 MHA / GQA / MLA / Mamba
+6. 识别注意力类型：检查 attention 模块代码，判断是 MHA / GQA / MLA / Mamba或其它类型
 ```
-
-识别内容：
-- 模块组织: Embedding / Attention / FFN / Output
-- FFN 类型: Standard / SwiGLU / MoE
-- 注意力类型: MHA / GQA / MLA / Mamba（从源码和 config.json 判断）
 
 ### 2. 算子 FLOPs 动态推导
 
@@ -89,21 +84,41 @@ AI Balance = PeakFLOPs / Bandwidth
 
 ### 4. 时延估算
 
+**⚠️ 警告：以下公式中的 FLOPs 和 Bytes 值必须来自第2步的源码分析结果，不得直接从 config.json 计算。**
+
+完成第2步后，AI 已推导出：
+- `FLOPs_attn(seq_len)` — Attention 模块的 FLOPs（与序列长度相关）
+- `Bytes_kvcache(seq_len)` — Attention 模块的 KV cache 内存访问量
+- `FLOPs_ffn` — FFN 模块的 FLOPs
+- `Bytes_ffn_weights` — FFN 模块的权重内存访问量
+
+将这些值代入以下公式：
+
 ```
-T_prefill = Σ_layers max(FLOPs_layer(prompt_len) / PeakFLOPs, Bytes_layer / Bandwidth)
+# 单模块耗时（严格使用 max，非相加）
+T_module = max(FLOPs_module / PeakFLOPs, Bytes_module / Bandwidth)
 
-T_attn_decode(seq_len) = max(FLOPs_attn(seq_len) / PeakFLOPs, Bytes_kvcache(seq_len) / Bandwidth)
-T_ffn_decode = max(FLOPs_ffn / PeakFLOPs, Bytes_ffn_weights / Bandwidth)
-T_decode(seq_len) = Σ_layers (T_attn_layer(seq_len) + T_ffn_layer)
+# Prefill 阶段（所有 Transformer 层串行）
+T_prefill = Σ_layers T_module(prompt_len)
 
+# Decode 阶段（逐 token 生成，seq_len 随已生成长度变化）
+T_decode = Σ_layers (T_attn_layer + T_ffn_layer)
+
+# 端到端总时延
 T_total = T_prefill + gen_len × T_decode
 ```
+
+**数据来源检查清单**：
+- [ ] `FLOPs_attn` 是否来自源码中 MatMul shape 分析？
+- [ ] `Bytes_kvcache` 是否来自源码中 KV cache 访问模式分析？
+- [ ] `FLOPs_ffn` 是否来自源码中 FFN shape 分析？
+- [ ] `Bytes_ffn_weights` 是否来自源码中权重 size 分析？
 
 ### 5. 优化建议生成
 
 基于瓶颈分析，AI 输出针对性建议：
-- Memory-Bound 模块: 量化、KV cache 压缩、Flash Attention、算子融合
-- Compute-Bound 模块: Tensor Core 优化、精度选择、CANN 融合算子
+- Memory-Bound 模块: 量化、KV cache 压缩、Flash Attention、算子融合等
+- Compute-Bound 模块: Tensor Core 优化、精度选择、CANN 融合算子等
 
 ### 6. 输出格式
 
@@ -116,8 +131,8 @@ T_total = T_prefill + gen_len × T_decode
 
 ### chips.json
 
-使用 Read 工具读取 `configs/chips.json`，获取芯片参数：
-- 峰值算力 `peak_fp32_tflops`
+使用 Read 工具读取 `references/chips.json`，获取芯片参数：
+- 峰值算力 `peak_fp16_tflops`
 - 带宽 `bandwidth_gb_s`
 
 如果用户指定了芯片名称（如 Ascend-910B-64GB），从 chips.json 中查找对应参数。如果用户提供了自定义参数（peak_flops, bandwidth），直接使用。
@@ -128,4 +143,7 @@ T_total = T_prefill + gen_len × T_decode
 
 ## 输出示例
 
-见设计文档 `docs/superpowers/specs/2026-04-07-llm-roofline-analysis-design.md` 第 4 节。
+输出格式模板见 `references/output_format.md`，包含：
+1. **Roofline 分析**: 模块分析表 + ASCII 图表
+2. **时延估算**: Prefill / Decode / 总时延分解
+3. **优化建议**: 分模块针对性建议
