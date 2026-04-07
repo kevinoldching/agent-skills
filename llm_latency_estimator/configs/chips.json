@@ -1,0 +1,46 @@
+{
+  "huawei": {
+    "Ascend-910B-64GB": {
+      "vendor": "huawei",
+      "model": "Ascend-910B",
+      "vram_gb": 64,
+      "peak_fp32_tflops": 256,
+      "bandwidth_gb_s": 1200,
+      "cards_per_node": 8
+    },
+    "Ascend-910C-64GB": {
+      "vendor": "huawei",
+      "model": "Ascend-910C",
+      "vram_gb": 64,
+      "peak_fp32_tflops": 300,
+      "bandwidth_gb_s": 1200,
+      "cards_per_node": 16
+    },
+    "Ascend-910C-32GB": {
+      "vendor": "huawei",
+      "model": "Ascend-910C",
+      "vram_gb": 32,
+      "peak_fp32_tflops": 300,
+      "bandwidth_gb_s": 1200,
+      "cards_per_node": 16
+    }
+  },
+  "nvidia": {
+    "H100-80GB": {
+      "vendor": "nvidia",
+      "model": "H100",
+      "vram_gb": 80,
+      "peak_fp32_tflops": 989,
+      "bandwidth_gb_s": 3350,
+      "cards_per_node": 8
+    },
+    "A100-80GB": {
+      "vendor": "nvidia",
+      "model": "A100",
+      "vram_gb": 80,
+      "peak_fp32_tflops": 312,
+      "bandwidth_gb_s": 2039,
+      "cards_per_node": 8
+    }
+  }
+}
