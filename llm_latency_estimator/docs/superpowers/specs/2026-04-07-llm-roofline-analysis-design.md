@@ -316,18 +316,31 @@ T_total = T_prefill + gen_len × T_decode
 
 ### Roofline 图示
 
+Skill 使用 **Excalidraw MCP** 实时生成专业 Roofline 图表，包含：
+
+- **双对角线 Roofline**: Memory-Bound 斜线 + Compute-Bound 水平线
+- **模块数据点**: 各模块（Attention、FFN、Embedding）以圆点标注在图上
+- **瓶颈分界线**: AI Balance 临界点虚线标注
+- **区间着色**: Compute-Bound / Memory-Bound 区域用不同颜色区分
+
 ```
-FLOPs/Byte
-    │
-    │         /─────── Compute-Bound 区间
-    │        /
-  200├───────
-    │      │
-    │      │  Memory-Bound 区间
-    │      │
-    └─────────────────────→ I (计算强度)
-        20    100    200
+         TFLOPS
+           ↑
+           │         ┌─────────── Compute-Bound (Peak FLOPs)
+     Peak  │         │     ● FFN
+    TFLOPS ├─────────┼────────●
+           │         │    ● Attention
+           │         │
+    AI     │         │● Embedding
+  Balance └─────────●─────────────────────────→ I (FLOPs/Byte)
+           │    Memory-Bound (Bandwidth × I)
 ```
+
+AI 生成图表时会：
+1. 从芯片配置读取 PeakFLOPs 和 Bandwidth
+2. 计算 AI Balance = PeakFLOPs / Bandwidth
+3. 将各模块的计算强度标注在图上
+4. 标注哪些模块处于 Compute-Bound 区间，哪些处于 Memory-Bound 区间
 
 ### 整体评估
 
@@ -464,9 +477,10 @@ digraph dataflow {
     op_flops [label="AI: 算子 FLOPs 解析\n根据注意力类型动态推导 FLOPs + Bytes"];
     fused_ops [label="AI: 融合算子推导\n+ WebSearch 验证"];
     roofline [label="AI: Roofline 分析\nmax(FLOPs/PeakFLOPs, Bytes/Bandwidth)"];
+    visualize [label="Excalidraw MCP:\n生成 Roofline 图表"];
     latency [label="AI: 时延估算\nPrefill + Decode(max) + 总时延"];
     optimization [label="AI: 优化建议生成\n基于瓶颈分析输出针对性建议"];
-    report [label="AI: 报告生成\nRoofline + 时延 + 优化建议"];
+    report [label="AI: 报告生成\nRoofline 图 + 时延 + 优化建议"];
 
     input -> model_parse;
     input -> hf_fetch;
@@ -475,11 +489,40 @@ digraph dataflow {
     attention_type -> op_flops;
     op_flops -> fused_ops;
     fused_ops -> roofline;
-    roofline -> latency;
+    roofline -> visualize;
+    visualize -> latency;
     latency -> optimization;
     optimization -> report;
 }
 ```
+
+### 7.1 Roofline 图表生成（Excalidraw MCP）
+
+AI 使用 Excalidraw MCP 实时生成可视化 Roofline 图表：
+
+```python
+# AI 调用 Excalidraw MCP 生成图表
+mcp__excalidraw__batch_create_elements(elements=[
+    # Y轴 (TFLOPS)
+    {"type": "arrow", "x": 100, "y": 80, ...},
+    # X轴 (I)
+    {"type": "arrow", "x": 100, "y": 380, ...},
+    # Roofline 斜线 (Memory-Bound)
+    {"type": "line", "strokeColor": "#e03131", ...},
+    # Roofline 水平线 (Compute-Bound)
+    {"type": "line", "strokeColor": "#2f9e44", ...},
+    # 各模块数据点 (Attention, FFN, Embedding)
+    {"type": "ellipse", "backgroundColor": "#1971c2", ...},
+    ...
+])
+mcp__excalidraw__take_snapshot()  # 获取图表快照
+```
+
+图表包含：
+- 双轴标注（TFLOPS / FLOPs/Byte）
+- Roofline 边界线（Memory-Bound 红色斜线 + Compute-Bound 绿色水平线）
+- AI Balance 临界点虚线标注
+- 各模块计算强度数据点（不同颜色区分模块类型）
 
 ---
 
