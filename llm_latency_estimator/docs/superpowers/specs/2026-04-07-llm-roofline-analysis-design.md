@@ -314,41 +314,45 @@ T_total = T_prefill + gen_len × T_decode
 - seq_len < [临界值]: Compute-Bound
 - seq_len > [临界值]: Memory-Bound
 
-### Roofline 图示（文本图表）
+### Roofline 图示（Mermaid xychart）
 
-Skill 以文本/Markdown 表格形式输出 Roofline 分析结果，AI 负责标注各模块在 Roofline 中的位置：
+Skill 使用 **Mermaid xychart-beta** 渲染 Roofline 模型图，AI 动态代入芯片参数和模块数据：
 
-```markdown
-### Roofline 位置图
-
-```
-                        性能 (TFLOPS)
-                        ↑
-                        │    ┌── Compute-Bound
-             ● FFN      │    │   (Peak FLOPs)
-              /         │────┤
-             /  ●Attn   │    │
-            /    \      │    │
-  ─────────●────────────┴────┼──────→ 计算强度 I (FLOPs/Byte)
-  Embedding  \              │ Memory-Bound
-                \           │  (Bandwidth × I)
-                 \__________│
+```mermaid
+xychart-beta
+    title "Roofline Model — Ascend-910B-64GB"
+    x-axis "Arithmetic Intensity (FLOPs/Byte)" [0, 10, 50, 100, 150, 213]
+    y-axis "Attainable Performance (TFLOPS)" 0 --> 300
+    line [0, 42.6, 128, 171, 213, 256]
+    scatter [0.05, 8.5, 45.2, 25.0]
+    annotate [213, 256] "AI Balance"
 ```
 
-### 模块 Roofline 位置表
+**图表说明**：
+- **折线（Roofline）**：从 `(0, 0)` 到 `(AI Balance, PeakFLOPs)` 的 Memory-Bound 斜线段 + Compute-Bound 水平段
+  - Memory-Bound 区间：`Bandwidth × I`（斜线）
+  - Compute-Bound 区间：`PeakFLOPs`（水平线）
+- **散点（模块位置）**：各模块的计算强度点落在 Roofline 下方或线上
+  - AI 自动从 config 提取参数，计算各模块的 FLOPs 和 Bytes
+  - scatter 位置直观展示各模块是 compute-bound 还是 memory-bound
+- **标注（annotate）**：AI Balance 临界点位置
 
-| 模块 | 计算强度 I | AI Balance 对比 | 瓶颈类型 | 距峰值距离 |
-|------|-----------|----------------|---------|----------|
-| Embedding | 0.05 | < AI Balance | Memory-Bound | 远离峰值 |
-| Attention | 8.5 | < AI Balance | Memory-Bound | 接近临界 |
-| FFN | 45.2 | > AI Balance | Compute-Bound | 接近峰值 |
-| Output | 25.0 | ≈ AI Balance | Balanced | 接近峰值 |
+**AI 动态生成**：
+```mermaid
+xychart-beta
+    title "Roofline Model — [芯片型号]"
+    x-axis "Arithmetic Intensity (FLOPs/Byte)" [0, ${AI_Balance/4}, ${AI_Balance/2}, ${AI_Balance}, ${AI_Balance*1.2}]
+    y-axis "Attainable Performance (TFLOPS)" 0 --> ${PeakFLOPS * 1.2}
+    line [0, ${Bandwidth * AI_Balance / 4}, ${Bandwidth * AI_Balance / 2}, ${PeakFLOPS}, ${PeakFLOPS}]
+    scatter [${模块1_I}, ${模块2_I}, ${模块3_I}, ${模块4_I}]
+    annotate [${AI_Balance}, ${PeakFLOPS}] "AI Balance"
+```
 
 AI 在输出时会：
 1. 从芯片配置读取 PeakFLOPs 和 Bandwidth，计算 AI Balance
-2. 标注各模块的计算强度 I 在 Roofline 图中的相对位置
-3. 说明各模块距离性能峰值的差距
-4. 标注 Compute-Bound 和 Memory-Bound 区间分界点（AI Balance）
+2. 动态生成 Mermaid 代码，x 轴范围覆盖所有模块计算强度
+3. 用 scatter 标注各模块的计算强度散点，直观展示是 compute-bound 还是 memory-bound
+4. 用 annotate 标注 AI Balance 临界点
 
 ### 整体评估
 
