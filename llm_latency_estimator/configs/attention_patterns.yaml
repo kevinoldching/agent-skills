@@ -1,0 +1,70 @@
+# 注意力机制计算特征模式模板
+# AI 根据注意力类型代入 config 中的实际参数进行计算
+# 不要在此文件中写死具体数值
+
+attention_patterns:
+  MHA:
+    # Multi-Head Attention (Standard)
+    description: "标准多头注意力，K/V 与 Q 同维度，shape = [batch, n_heads, seq_len, d_head]"
+    kv_cache_shape: "[batch, n_heads, seq_len, d_head]"
+    flops_per_token: |
+      QKV_proj: 2 × hidden_dim × hidden_dim × 3
+      Attention_score: 2 × n_heads × d_head × seq_len
+      Softmax: 3 × n_heads × seq_len
+      Score_weighted_sum: 2 × n_heads × d_head × seq_len
+      Output_proj: 2 × hidden_dim × hidden_dim
+    memory_per_token: |
+      KV_cache_read: 2 × n_heads × seq_len × d_head × bytes_per_element
+      KV_cache_write: 2 × n_heads × d_head × bytes_per_element
+
+  GQA:
+    # Grouped Query Attention
+    description: "分组查询注意力，n_kv_heads < n_q_heads，K/V heads 数量减少"
+    kv_cache_shape: "[batch, n_kv_heads, seq_len, d_head]"
+    kv_ratio: "n_kv_heads / n_q_heads (通常 1/4 到 1/8)"
+    flops_per_token: |
+      Q_proj: 2 × hidden_dim × hidden_dim
+      KV_proj: 2 × hidden_dim × (n_kv_heads × d_head)
+      Attention_score (with KV sharing): 2 × n_kv_heads × d_head × seq_len
+      Score_weighted_sum: 2 × n_kv_heads × d_head × seq_len
+      Output_proj: 2 × hidden_dim × hidden_dim
+    memory_per_token: |
+      KV_cache_read: 2 × n_kv_heads × seq_len × d_head × bytes_per_element (reduced vs MHA)
+      KV_cache_write: 2 × n_kv_heads × d_head × bytes_per_element
+
+  MLA:
+    # Multi-head Latent Attention (DeepSeek V3)
+    description: "低秩压缩注意力，KV cache 压缩到 d_compressed 维度"
+    kv_cache_shape: "[batch, seq_len, d_compressed]"
+    compression_ratio: "d_compressed / (2 × n_heads × d_head)"
+    flops_per_token: |
+      Q_proj: 2 × hidden_dim × d_qa
+      KV_proj (compressed): 2 × hidden_dim × d_compressed
+      Attention_score: 2 × d_compressed × seq_len
+      Output_proj: 2 × hidden_dim × d_compressed
+    memory_per_token: |
+      KV_cache_read: d_compressed × seq_len × bytes_per_element (significant reduction)
+      KV_cache_write: d_compressed × bytes_per_element
+
+  Mamba:
+    # State Space Model (Mamba)
+    description: "状态空间模型，非标准 attention，需要分析 SSM 算子实现"
+    kv_cache_shape: "[batch, state_dim, seq_len] (non-standard)"
+    note: "需 AI 从源码推导 FLOPs，依赖于 state_dim 和 seq_len"
+    flops_per_token: |
+      SSM_forward: O(state_dim × seq_len)
+      具体 FLOPs 需分析 vLLM 中 Mamba 实现源码
+
+ffn_patterns:
+  # FFN 类型模式
+  standard:
+    description: "标准 FFN: Up_proj + Down_proj"
+    flops: "2 × hidden_dim × intermediate_size"
+
+  swiglu:
+    description: "SwiGLU FFN: Gate_proj + SiLU(Up_proj) ⊙ Down_proj"
+    flops: "3 × hidden_dim × intermediate_size"
+
+  moe:
+    description: "MoE FFN: 多个 Expert 分别计算后加权求和"
+    flops: "2 × hidden_dim × intermediate_size × n_experts × top_k (实际只有 top_k Expert 计算)"
