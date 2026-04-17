@@ -333,7 +333,7 @@ class ModelDetector:
         raise FileNotFoundError(f"config.json not found in {weights_path}")
 
     @staticmethod
-    def _load_ssh_key(key_filename: str) -> Optional[paramiko.PKey]:
+    def _load_ssh_key(key_filename: str) -> "Optional[paramiko.PKey]":
         """Try to load SSH key, supporting RSA, ECDSA, and ED25519 types"""
         import paramiko
         for key_class in (paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key):
