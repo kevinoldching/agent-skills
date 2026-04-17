@@ -28,6 +28,21 @@ def format_supported_chips(chips_config):
     return '\n'.join(vendor_groups)
 
 
+def parse_remote_path(remote_str):
+    """Parse remote string in format: user@host:/path/to/model
+
+    Returns:
+        tuple: (username, host, remote_path)
+    """
+    import re
+    # Pattern: user@host:/path
+    pattern = r'^(?P<user>[^@]+)@(?P<host>[^:]+):(?P<path>.+)$'
+    match = re.match(pattern, remote_str)
+    if not match:
+        raise ValueError(f"Invalid remote format: {remote_str}. Expected format: user@host:/path/to/model")
+    return match.group('user'), match.group('host'), match.group('path')
+
+
 def main():
     # Pre-check: if --chip is provided without a value, show supported chips and exit
     if '--chip' in sys.argv:
@@ -53,6 +68,8 @@ def main():
     input_group.add_argument('--config', type=str, help="Path to model YAML config file")
     input_group.add_argument('--model', type=str, help="HuggingFace model name")
     input_group.add_argument('--local', type=str, help="Path to local model weights")
+    input_group.add_argument('--remote', type=str,
+                            help="Remote model via SFTP (format: user@host:/path/to/model)")
 
     # Generation options
     parser.add_argument('--generate-config', action='store_true',
@@ -167,8 +184,16 @@ def main():
             print(f"Generating config from local weights: {args.local}")
             model_name = Path(args.local).name
             config = generator.generate_config(args.local, is_local=True)
+        elif args.remote:
+            print(f"Generating config from remote weights: {args.remote}")
+            username, host, remote_path = parse_remote_path(args.remote)
+            model_name = Path(remote_path).name
+            config = generator.generate_config(
+                remote_path, is_remote=True,
+                remote_username=username, remote_host=host
+            )
         else:
-            print("Error: --model or --local required with --generate-config", file=sys.stderr)
+            print("Error: --model, --local, or --remote required with --generate-config", file=sys.stderr)
             sys.exit(1)
 
         output_config_path = args.output_config or str(script_dir / "configs" / "models" / f"{model_name}.yaml")
@@ -220,6 +245,14 @@ def main():
             print(f"Generating config from HuggingFace model: {args.model}")
             config = generator.generate_config(args.model, is_local=False)
             model_name = args.model.split('/')[-1]
+        elif args.remote:
+            print(f"Generating config from remote weights: {args.remote}")
+            username, host, remote_path = parse_remote_path(args.remote)
+            config = generator.generate_config(
+                remote_path, is_remote=True,
+                remote_username=username, remote_host=host
+            )
+            model_name = Path(remote_path).name
         else:
             print(f"Generating config from local weights: {args.local}")
             config = generator.generate_config(args.local, is_local=True)

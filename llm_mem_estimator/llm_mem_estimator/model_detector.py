@@ -333,11 +333,77 @@ class ModelDetector:
         raise FileNotFoundError(f"config.json not found in {weights_path}")
 
     @staticmethod
-    def get_weights_metadata(model_name_or_path: str, is_local: bool = False) -> Dict[str, Dict[str, Any]]:
-        """Get weights metadata from HuggingFace or local path"""
+    def detect_from_remote(host: str, remote_path: str, username: str,
+                          key_filename: Optional[str] = None) -> Dict[str, Any]:
+        """Detect model architecture from remote server via SFTP
+
+        Args:
+            host: Remote server hostname or IP
+            remote_path: Path to the model directory on remote server
+            username: SSH username
+            key_filename: Path to SSH private key file (optional, defaults to ~/.ssh/id_rsa or ~/.ssh/id_ed25519)
+        """
+        import paramiko
+
+        # Try default SSH key locations if not specified
+        if not key_filename:
+            default_keys = [Path.home() / '.ssh' / 'id_rsa',
+                           Path.home() / '.ssh' / 'id_ed25519',
+                           Path.home() / '.ssh' / 'id_ecdsa']
+            for key_path in default_keys:
+                if key_path.exists():
+                    key_filename = str(key_path)
+                    break
+
+        # Connect via SFTP
+        transport = paramiko.Transport((host, 22))
+        try:
+            if key_filename:
+                pkey = paramiko.RSAKey.from_private_key_file(key_filename)
+                transport.connect(username=username, pkey=pkey)
+            else:
+                # Try agent auth
+                transport.connect(username=username)
+
+            sftp = paramiko.SFTPClient.from_transport(transport)
+
+            # Try to find config.json
+            config_path = remote_path.rstrip('/') + "/config.json"
+            try:
+                with sftp.file(config_path, 'rb') as f:
+                    config_data = f.read()
+                    return json.loads(config_data.decode('utf-8'))
+            except FileNotFoundError:
+                raise FileNotFoundError(f"config.json not found at {config_path}")
+            finally:
+                sftp.close()
+        finally:
+            transport.close()
+
+    @staticmethod
+    def get_weights_metadata(model_name_or_path: str, is_local: bool = False,
+                            is_remote: bool = False, remote_username: Optional[str] = None,
+                            remote_host: Optional[str] = None,
+                            remote_key_filename: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Get weights metadata from HuggingFace, local path, or remote server via SFTP
+
+        Args:
+            model_name_or_path: HuggingFace model name, local path, or remote path (used as remote_path when is_remote=True)
+            is_local: If True, treat model_name_or_path as local filesystem path
+            is_remote: If True, treat model_name_or_path as remote_path and use SFTP
+            remote_username: SSH username (required when is_remote=True)
+            remote_host: SSH host (required when is_remote=True)
+            remote_key_filename: Path to SSH private key (optional, defaults to ~/.ssh/id_rsa or ~/.ssh/id_ed25519)
+        """
         try:
             if is_local:
                 return ModelDetector._get_local_weights_metadata(model_name_or_path)
+            elif is_remote:
+                if not remote_username or not remote_host:
+                    raise ValueError("remote_username and remote_host are required when is_remote=True")
+                return ModelDetector._get_remote_weights_metadata(
+                    remote_host, model_name_or_path, remote_username, remote_key_filename
+                )
             else:
                 return ModelDetector._get_huggingface_weights_metadata(model_name_or_path)
         except Exception as e:
@@ -449,6 +515,91 @@ class ModelDetector:
 
         return metadata
 
+    @staticmethod
+    def _get_remote_weights_metadata(host: str, remote_path: str, username: str,
+                                     key_filename: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Get weights metadata from remote server via SFTP
+
+        Only reads safetensors file headers (first 8 + header_size bytes) to get
+        tensor metadata (name/shape/dtype), without downloading actual weight data.
+
+        Args:
+            host: Remote server hostname or IP
+            remote_path: Path to the model directory on remote server
+            username: SSH username
+            key_filename: Path to SSH private key file (optional, defaults to ~/.ssh/id_rsa or ~/.ssh/id_ed25519)
+        """
+        import paramiko
+        import struct
+
+        # Try default SSH key locations if not specified
+        if not key_filename:
+            default_keys = [Path.home() / '.ssh' / 'id_rsa',
+                           Path.home() / '.ssh' / 'id_ed25519',
+                           Path.home() / '.ssh' / 'id_ecdsa']
+            for key_path in default_keys:
+                if key_path.exists():
+                    key_filename = str(key_path)
+                    break
+
+        # Connect via SFTP
+        transport = paramiko.Transport((host, 22))
+        try:
+            if key_filename:
+                pkey = paramiko.RSAKey.from_private_key_file(key_filename)
+                transport.connect(username=username, pkey=pkey)
+            else:
+                transport.connect(username=username)
+
+            sftp = paramiko.SFTPClient.from_transport(transport)
+
+            # Find all safetensors files in remote directory
+            try:
+                all_files = sftp.listdir(remote_path)
+            except FileNotFoundError:
+                raise FileNotFoundError(f"Remote path not found: {remote_path}")
+
+            safetensors_files = [f for f in all_files if f.endswith('.safetensors')]
+            if not safetensors_files:
+                raise FileNotFoundError(f"No safetensors files found in {remote_path}")
+
+            all_tensors = {}
+
+            for shard_file in safetensors_files:
+                remote_file_path = remote_path.rstrip('/') + '/' + shard_file
+                try:
+                    # Open file in binary mode
+                    with sftp.file(remote_file_path, 'rb') as f:
+                        # Read first 8 bytes to get header_size (uint64, little-endian)
+                        header_size_bytes = f.read(8)
+                        if len(header_size_bytes) < 8:
+                            raise RuntimeError(f"Cannot read header size from {remote_file_path}")
+
+                        header_size = struct.unpack('<Q', header_size_bytes)[0]
+
+                        # Read JSON header (metadata only, not actual weight data)
+                        header_json = f.read(header_size)
+                        if len(header_json) < header_size:
+                            raise RuntimeError(f"Cannot read full header from {remote_file_path}")
+
+                        # Parse JSON metadata
+                        header = json.loads(header_json.decode('utf-8'))
+
+                        # Extract tensor info
+                        for tensor_name, tensor_info in header.items():
+                            all_tensors[tensor_name] = {
+                                'shape': tensor_info['shape'],
+                                'dtype': tensor_info['dtype']
+                            }
+                except Exception as e:
+                    raise RuntimeError(f"Failed to read metadata from {remote_file_path}: {e}")
+
+            sftp.close()
+            return all_tensors
+
+        finally:
+            transport.close()
+
 
 # ============================================================================
 # Config Generator
@@ -461,20 +612,53 @@ class ConfigGenerator:
         self.classifier = weight_classifier
 
     def generate_config(self, model_name_or_path: str, is_local: bool = False,
+                       is_remote: bool = False, remote_username: Optional[str] = None,
+                       remote_host: Optional[str] = None, remote_key_filename: Optional[str] = None,
                        model_type: Optional[str] = None) -> ModelConfig:
-        """Generate model configuration from HuggingFace or local weights"""
+        """Generate model configuration from HuggingFace, local, or remote weights
+
+        Args:
+            model_name_or_path: HuggingFace model name, local path, or remote path
+            is_local: If True, treat model_name_or_path as local filesystem path
+            is_remote: If True, treat model_name_or_path as remote_path and use SFTP
+            remote_username: SSH username (required when is_remote=True)
+            remote_host: SSH host (required when is_remote=True)
+            remote_key_filename: Path to SSH private key (optional)
+            model_type: HuggingFace model_type
+        """
         # Get model config
         if is_local:
             hf_config = ModelDetector.detect_from_local(model_name_or_path)
+        elif is_remote:
+            if not remote_username or not remote_host:
+                raise ValueError("remote_username and remote_host are required when is_remote=True")
+            hf_config = ModelDetector.detect_from_remote(remote_host, model_name_or_path, remote_username, remote_key_filename)
         else:
             hf_config = ModelDetector.detect_from_huggingface(model_name_or_path)
 
         # Get weights metadata and calculate total parameters
-        weights_metadata = ModelDetector.get_weights_metadata(model_name_or_path, is_local)
+        weights_metadata = ModelDetector.get_weights_metadata(
+            model_name_or_path, is_local, is_remote, remote_username, remote_host, remote_key_filename
+        )
 
         # Calculate total parameters from safetensors metadata
         total_params = "unknown"
-        if not is_local:
+        if is_remote:
+            # For remote weights, calculate from weights metadata
+            try:
+                total_elements = 0
+                for weight_name, weight_info in weights_metadata.items():
+                    shape = weight_info.get('shape', [])
+                    dtype = weight_info.get('dtype', 'fp16')
+                    elements = 1
+                    for dim in shape:
+                        elements *= dim
+                    total_elements += elements
+                if total_elements > 0:
+                    total_params = str(total_elements)
+            except Exception:
+                pass
+        elif not is_local:
             try:
                 from huggingface_hub import get_safetensors_metadata
                 import os
