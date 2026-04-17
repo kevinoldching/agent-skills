@@ -8,6 +8,7 @@ description: |
   - 分析不同并行策略（TP、PP、DP、CP、EP）的显存分布
   - 处理 Prefill/Decode (PD) 分离场景
   - 从 HuggingFace 模型生成 YAML 配置文件
+  - 从远程服务器通过 SFTP 读取模型权重（无需下载）
   - 比较不同芯片、模型或并行配置的显存占用
   - 固定 activation 峰值（--activation-peak）进行估算
 
@@ -201,6 +202,14 @@ python scripts/calculate_mem.py \
     --prompt-len 4096 \
     --gen-len 1024
 
+# 从远程服务器（SFTP 远程读取）
+python scripts/calculate_mem.py \
+    --remote ubuntu@192.168.1.100:/data/models/Qwen2.5-0.5B \
+    --batch-size 1 \
+    --prompt-len 4096 \
+    --gen-len 1024 \
+    --tp 4
+
 ### PD分离场景（--stage 参数）
 
 ```bash
@@ -320,6 +329,7 @@ python scripts/calculate_mem.py \
    - 已有 YAML 配置文件 → 使用 `--config`
    - HuggingFace 模型 → 使用 `--model`
    - 本地权重 → 使用 `--local`
+   - 远程服务器权重 → 使用 `--remote user@host:/path/to/model`
 
 2. **确定目标**：
    - 固定序列长度 → 同时提供 `--prompt-len` 和 `--gen-len`

@@ -15,6 +15,7 @@ python scripts/calculate_mem.py [选项]
 | `--config` | 指定模型 YAML 配置文件路径 | `--config configs/models/gpt-oss-120b.yaml` |
 | `--model` | HuggingFace 模型名称 | `--model Qwen/Qwen2.5-0.5B` |
 | `--local` | 本地模型权重路径 | `--local ./models/llama-weights` |
+| `--remote` | 远程服务器模型（SFTP），格式: `user@host:/path/to/model` | `--remote ubuntu@192.168.1.100:/data/models/Qwen2.5-0.5B` |
 
 ## 配置生成选项
 
@@ -31,6 +32,9 @@ python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config
 
 # 指定输出路径
 python scripts/calculate_mem.py --model Qwen/Qwen2.5-0.5B --generate-config --output-config ./my_config.yaml
+
+# 从远程服务器生成配置（通过 SFTP）
+python scripts/calculate_mem.py --remote ubuntu@192.168.1.100:/data/models/Qwen2.5-0.5B --generate-config
 ```
 
 ## 估算参数
@@ -209,6 +213,24 @@ python scripts/calculate_mem.py \
     --gen-len 1024
 ```
 
+### 示例 2.1：从远程服务器估算（通过 SFTP）
+
+```bash
+# 从远程 Linux 服务器读取模型权重，通过 SFTP 只读取元数据（不下载完整权重）
+python scripts/calculate_mem.py \
+    --remote ubuntu@192.168.1.100:/data/models/Qwen2.5-0.5B \
+    --batch-size 1 \
+    --prompt-len 4096 \
+    --gen-len 1024 \
+    --tp 4
+```
+
+> **SFTP 远程读取说明**：
+> - 通过 SSH/SFTP 连接到远程服务器，只读取 safetensors 文件头部元数据
+> - 不下载完整权重文件，传输量约几百字节（而非几百 GB）
+> - 自动使用 `~/.ssh/id_rsa` 或 `~/.ssh/id_ed25519` 密钥认证
+> - 适用于：权重太大无法下载、权限限制无法复制、跨平台访问等场景
+
 ### 示例 3：查找硬件最大支持生成长度 (Decode 场景)
 
 ```bash
@@ -295,7 +317,7 @@ python scripts/calculate_mem.py \
 ## 完整选项列表
 
 ```
-usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
+usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL | --remote REMOTE)
                        [--generate-config] [--output-config OUTPUT_CONFIG]
                        [--batch-size BATCH_SIZE] [--prompt-len PROMPT_LEN] [--gen-len GEN_LEN]
                        [--kv-dtype KV_DTYPE] [--activation-dtype ACTIVATION_DTYPE]
@@ -311,7 +333,8 @@ usage: calculate_mem.py [-h] (--config CONFIG | --model MODEL | --local LOCAL)
 
 ## 注意事项
 
-1. **输入优先级**：`--config` > `--model` > `--local`，三者互斥
+1. **输入优先级**：`--config` > `--model` > `--local` > `--remote`，四者互斥
 2. **查找最大序列长度时**：必须指定 `--chip` 参数
 3. **并行度影响显存**：TP/PP/DP/CP 会影响每张卡的显存占用
 4. **系统保留显存**：默认保留 2GB，可根据实际情况调整
+5. **SFTP 远程读取**：仅支持 SSH 密钥认证（无密码），自动使用默认密钥文件
