@@ -378,20 +378,27 @@ class ModelDetector:
         # Connect via SFTP
         transport = paramiko.Transport((host, 22))
         try:
-            # Try SSH agent first if available
-            agent = paramiko.Agent()
-            agent_keys = agent.get_keys()
-            if agent_keys:
-                print(f"Using SSH agent with {len(agent_keys)} key(s)")
-                transport.connect(username=username, pkey=agent_keys[0])
-            elif key_filename:
-                pkey = ModelDetector._load_ssh_key(key_filename)
-                if pkey is None:
-                    raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                print(f"Using SSH key file: {key_filename}")
-                transport.connect(username=username, pkey=pkey)
-            else:
-                raise RuntimeError("No SSH key found. Please specify --remote-key or ensure SSH agent is running.")
+            # Use look_for_keys=True to let paramiko search default keys like scp does
+            # This is more reliable on Windows than explicitly calling Agent()
+            try:
+                transport.connect(
+                    username=username,
+                    password=None,
+                    pkey=None,
+                    look_for_keys=True,  # Search ~/.ssh/ for keys automatically
+                    allow_agent=True     # Try SSH agent if available
+                )
+                print("Connected via SSH with automatic key detection")
+            except Exception as e:
+                if key_filename:
+                    # Fallback to specified key file
+                    pkey = ModelDetector._load_ssh_key(key_filename)
+                    if pkey is None:
+                        raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                    print(f"Using SSH key file: {key_filename}")
+                    transport.connect(username=username, pkey=pkey)
+                else:
+                    raise RuntimeError(f"SSH connection failed: {e}")
 
             sftp = paramiko.SFTPClient.from_transport(transport)
 
@@ -580,20 +587,27 @@ class ModelDetector:
         # Connect via SFTP
         transport = paramiko.Transport((host, 22))
         try:
-            # Try SSH agent first if available
-            agent = paramiko.Agent()
-            agent_keys = agent.get_keys()
-            if agent_keys:
-                print(f"Using SSH agent with {len(agent_keys)} key(s)")
-                transport.connect(username=username, pkey=agent_keys[0])
-            elif key_filename:
-                pkey = ModelDetector._load_ssh_key(key_filename)
-                if pkey is None:
-                    raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                print(f"Using SSH key file: {key_filename}")
-                transport.connect(username=username, pkey=pkey)
-            else:
-                raise RuntimeError("No SSH key found. Please specify --remote-key or ensure SSH agent is running.")
+            # Use look_for_keys=True to let paramiko search default keys like scp does
+            # This is more reliable on Windows than explicitly calling Agent()
+            try:
+                transport.connect(
+                    username=username,
+                    password=None,
+                    pkey=None,
+                    look_for_keys=True,  # Search ~/.ssh/ for keys automatically
+                    allow_agent=True     # Try SSH agent if available
+                )
+                print("Connected via SSH with automatic key detection")
+            except Exception as e:
+                if key_filename:
+                    # Fallback to specified key file
+                    pkey = ModelDetector._load_ssh_key(key_filename)
+                    if pkey is None:
+                        raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                    print(f"Using SSH key file: {key_filename}")
+                    transport.connect(username=username, pkey=pkey)
+                else:
+                    raise RuntimeError(f"SSH connection failed: {e}")
 
             sftp = paramiko.SFTPClient.from_transport(transport)
 
