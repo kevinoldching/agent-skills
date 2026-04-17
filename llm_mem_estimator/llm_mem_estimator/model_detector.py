@@ -333,6 +333,17 @@ class ModelDetector:
         raise FileNotFoundError(f"config.json not found in {weights_path}")
 
     @staticmethod
+    def _load_ssh_key(key_filename: str) -> Optional[paramiko.PKey]:
+        """Try to load SSH key, supporting RSA, ECDSA, and ED25519 types"""
+        import paramiko
+        for key_class in (paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key):
+            try:
+                return key_class.from_private_key_file(key_filename)
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
     def detect_from_remote(host: str, remote_path: str, username: str,
                           key_filename: Optional[str] = None) -> Dict[str, Any]:
         """Detect model architecture from remote server via SFTP
@@ -347,33 +358,40 @@ class ModelDetector:
 
         # Try default SSH key locations if not specified
         if not key_filename:
-            default_keys = [Path.home() / '.ssh' / 'id_rsa',
-                           Path.home() / '.ssh' / 'id_ed25519',
-                           Path.home() / '.ssh' / 'id_ecdsa']
+            # Common SSH key locations (including Windows with Git Bash/WSL)
+            home = Path.home()
+            default_keys = [
+                home / '.ssh' / 'id_rsa',
+                home / '.ssh' / 'id_ed25519',
+                home / '.ssh' / 'id_ecdsa',
+                home / '.ssh' / 'id_ed448',
+                # Windows Git Bash/WSL paths
+                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_rsa',
+                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_ed25519',
+            ]
             for key_path in default_keys:
-                if key_path.exists():
+                if key_path.exists() and key_path.is_file():
                     key_filename = str(key_path)
+                    print(f"Using SSH key: {key_path}")
                     break
 
         # Connect via SFTP
         transport = paramiko.Transport((host, 22))
         try:
-            if key_filename:
-                # Try different key types (RSA, ECDSA, ED25519)
-                pkey = None
-                for key_class in (paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key):
-                    try:
-                        pkey = key_class.from_private_key_file(key_filename)
-                        break
-                    except Exception:
-                        continue
-
+            # Try SSH agent first if available
+            agent = paramiko.Agent()
+            agent_keys = agent.get_keys()
+            if agent_keys:
+                print(f"Using SSH agent with {len(agent_keys)} key(s)")
+                transport.connect(username=username, pkey=agent_keys[0])
+            elif key_filename:
+                pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                print(f"Using SSH key file: {key_filename}")
                 transport.connect(username=username, pkey=pkey)
             else:
-                # Try agent auth
-                transport.connect(username=username)
+                raise RuntimeError("No SSH key found. Please specify --remote-key or ensure SSH agent is running.")
 
             sftp = paramiko.SFTPClient.from_transport(transport)
 
@@ -544,32 +562,38 @@ class ModelDetector:
 
         # Try default SSH key locations if not specified
         if not key_filename:
-            default_keys = [Path.home() / '.ssh' / 'id_rsa',
-                           Path.home() / '.ssh' / 'id_ed25519',
-                           Path.home() / '.ssh' / 'id_ecdsa']
+            home = Path.home()
+            default_keys = [
+                home / '.ssh' / 'id_rsa',
+                home / '.ssh' / 'id_ed25519',
+                home / '.ssh' / 'id_ecdsa',
+                home / '.ssh' / 'id_ed448',
+                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_rsa',
+                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_ed25519',
+            ]
             for key_path in default_keys:
-                if key_path.exists():
+                if key_path.exists() and key_path.is_file():
                     key_filename = str(key_path)
+                    print(f"Using SSH key: {key_path}")
                     break
 
         # Connect via SFTP
         transport = paramiko.Transport((host, 22))
         try:
-            if key_filename:
-                # Try different key types (RSA, ECDSA, ED25519)
-                pkey = None
-                for key_class in (paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key):
-                    try:
-                        pkey = key_class.from_private_key_file(key_filename)
-                        break
-                    except Exception:
-                        continue
-
+            # Try SSH agent first if available
+            agent = paramiko.Agent()
+            agent_keys = agent.get_keys()
+            if agent_keys:
+                print(f"Using SSH agent with {len(agent_keys)} key(s)")
+                transport.connect(username=username, pkey=agent_keys[0])
+            elif key_filename:
+                pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                print(f"Using SSH key file: {key_filename}")
                 transport.connect(username=username, pkey=pkey)
             else:
-                transport.connect(username=username)
+                raise RuntimeError("No SSH key found. Please specify --remote-key or ensure SSH agent is running.")
 
             sftp = paramiko.SFTPClient.from_transport(transport)
 
