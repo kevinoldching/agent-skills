@@ -360,6 +360,50 @@ class ModelDetector:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+        # Diagnostics: Check what keys/agent is available
+        print(f"\n=== SSH Diagnostics ===")
+        print(f"Host: {host}, Username: {username}")
+        print(f"Key filename specified: {key_filename}")
+
+        # Check SSH agent
+        try:
+            agent = paramiko.Agent()
+            agent_keys = agent.get_keys()
+            print(f"SSH Agent keys: {len(agent_keys)} found")
+            for i, k in enumerate(agent_keys):
+                print(f"  Agent key {i}: {k.get_name()}")
+        except Exception as agent_err:
+            print(f"SSH Agent error: {agent_err}")
+
+        # Check default key files
+        home = Path.home()
+        default_keys = [
+            home / '.ssh' / 'id_rsa',
+            home / '.ssh' / 'id_ed25519',
+            home / '.ssh' / 'id_ecdsa',
+            home / '.ssh' / 'id_ed448',
+        ]
+        found_keys = [k for k in default_keys if k.exists()]
+        print(f"Key files found: {[str(k) for k in found_keys]}")
+
+        # Check SSH config
+        ssh_config_path = home / '.ssh' / 'config'
+        if ssh_config_path.exists():
+            print(f"SSH config exists at: {ssh_config_path}")
+            # Try to read host-specific config
+            try:
+                with open(ssh_config_path, 'r') as f:
+                    config_content = f.read()
+                    # Check if our host is configured
+                    if host in config_content or f"Host {host}" in config_content:
+                        print(f"  Host '{host}' found in SSH config!")
+            except Exception:
+                pass
+        else:
+            print(f"No SSH config at: {ssh_config_path}")
+
+        print(f"=== End Diagnostics ===\n")
+
         try:
             # look_for_keys=True searches ~/.ssh/ automatically like scp
             # allow_agent=True tries SSH agent if available
@@ -373,18 +417,24 @@ class ModelDetector:
             )
             print("Connected via SSH")
         except Exception as e:
+            print(f"\nSSH connect failed: {type(e).__name__}: {e}")
             if key_filename:
                 # Fallback to specified key file
                 pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
                 print(f"Using SSH key file: {key_filename}")
-                ssh.connect(
-                    hostname=host,
-                    username=username,
-                    password=None,
-                    pkey=pkey
-                )
+                try:
+                    ssh.connect(
+                        hostname=host,
+                        username=username,
+                        password=None,
+                        pkey=pkey
+                    )
+                    print("Connected with explicit key")
+                except Exception as e2:
+                    print(f"Explicit key also failed: {type(e2).__name__}: {e2}")
+                    raise RuntimeError(f"SSH connection failed with explicit key: {e2}")
             else:
                 raise RuntimeError(f"SSH connection failed: {e}")
 
