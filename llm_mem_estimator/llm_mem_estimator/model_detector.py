@@ -419,52 +419,34 @@ class ModelDetector:
         """
         import paramiko
 
-        # Connect using SSHClient (supports look_for_keys and allow_agent like scp/ssh)
+        # Connect using SSHClient
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        # Diagnostics: Check what keys/agent is available
-        print(f"\n=== SSH Diagnostics ===")
-        print(f"Host: {host}, Username: {username}")
-
-        # Check SSH agent
-        try:
-            agent = paramiko.Agent()
-            agent_keys = agent.get_keys()
-            print(f"SSH Agent keys: {len(agent_keys)} found")
-            for i, k in enumerate(agent_keys):
-                print(f"  Agent key {i}: {k.get_name()}")
-        except Exception as agent_err:
-            print(f"SSH Agent error: {agent_err}")
-
-        # Check SSH config for host-specific key
-        ssh_config_key = ModelDetector._get_key_from_ssh_config(host)
-        if ssh_config_key:
-            print(f"SSH config specifies key: {ssh_config_key}")
-            key_filename = ssh_config_key
-        else:
-            # Fallback to default keys
-            home = Path.home()
-            default_keys = [
-                home / '.ssh' / 'id_rsa',
-                home / '.ssh' / 'id_ed25519',
-                home / '.ssh' / 'id_ecdsa',
-                home / '.ssh' / 'id_ed448',
-            ]
-            for k in default_keys:
-                if k.exists():
-                    key_filename = str(k)
-                    print(f"Using default key: {key_filename}")
-                    break
-
-        print(f"=== End Diagnostics ===\n")
+        # Try SSH config for host-specific key first
+        if not key_filename:
+            ssh_config_key = ModelDetector._get_key_from_ssh_config(host)
+            if ssh_config_key:
+                key_filename = ssh_config_key
+            else:
+                # Fallback to default keys
+                home = Path.home()
+                default_keys = [
+                    home / '.ssh' / 'id_rsa',
+                    home / '.ssh' / 'id_ed25519',
+                    home / '.ssh' / 'id_ecdsa',
+                    home / '.ssh' / 'id_ed448',
+                ]
+                for k in default_keys:
+                    if k.exists():
+                        key_filename = str(k)
+                        break
 
         try:
             if key_filename:
                 pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                print(f"Connecting with key: {key_filename}")
                 ssh.connect(
                     hostname=host,
                     username=username,
@@ -472,8 +454,6 @@ class ModelDetector:
                     pkey=pkey
                 )
             else:
-                # No key found, try without key (will likely fail)
-                print("No SSH key found, attempting connect without key...")
                 ssh.connect(
                     hostname=host,
                     username=username,
@@ -481,7 +461,6 @@ class ModelDetector:
                     look_for_keys=True,
                     allow_agent=True
                 )
-            print("Connected via SSH")
         except Exception as e:
             raise RuntimeError(f"SSH connection failed: {e}")
 
@@ -651,13 +630,33 @@ class ModelDetector:
         """
         import paramiko
         import struct
+        import hashlib
+
+        # Prepare cache path (same format as HuggingFace caching)
+        cache_dir = Path.home() / ".cache" / "llm_mem_estimator" / "metadata_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate cache filename from host and remote_path
+        path_hash = hashlib.md5(f"{host}:{remote_path}".encode()).hexdigest()[:12]
+        safe_name = f"remote--{host}--{path_hash}"
+        cache_path = cache_dir / f"{safe_name}_weights.json"
+
+        # Check local cache first
+        if cache_path.exists():
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cached_data = json.load(f)
+                    if isinstance(cached_data, dict) and len(cached_data) > 0:
+                        print(f"Loading remote metadata cache: {cache_path}")
+                        return cached_data
+            except Exception:
+                pass  # Cache corrupted, re-fetch
 
         # Try SSH config for host-specific key first
         if not key_filename:
             ssh_config_key = ModelDetector._get_key_from_ssh_config(host)
             if ssh_config_key:
                 key_filename = ssh_config_key
-                print(f"SSH config specifies key: {key_filename}")
             else:
                 # Fallback to default keys
                 home = Path.home()
@@ -670,7 +669,6 @@ class ModelDetector:
                 for k in default_keys:
                     if k.exists():
                         key_filename = str(k)
-                        print(f"Using default key: {key_filename}")
                         break
 
         # Connect using SSHClient
@@ -682,7 +680,6 @@ class ModelDetector:
                 pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                print(f"Connecting with key: {key_filename}")
                 ssh.connect(
                     hostname=host,
                     username=username,
@@ -690,7 +687,6 @@ class ModelDetector:
                     pkey=pkey
                 )
             else:
-                print("No SSH key found, attempting connect without key...")
                 ssh.connect(
                     hostname=host,
                     username=username,
@@ -698,7 +694,6 @@ class ModelDetector:
                     look_for_keys=True,
                     allow_agent=True
                 )
-            print("Connected via SSH")
 
             sftp = ssh.open_sftp()
 
@@ -745,6 +740,11 @@ class ModelDetector:
 
             sftp.close()
             ssh.close()
+
+            # Write to cache
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(all_tensors, f, indent=4)
+
             return all_tensors
 
         finally:
