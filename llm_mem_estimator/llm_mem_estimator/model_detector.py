@@ -359,7 +359,8 @@ class ModelDetector:
         transport = paramiko.Transport((host, 22))
         try:
             if key_filename:
-                pkey = paramiko.RSAKey.from_private_key_file(key_filename)
+                # Use PKey.from_private_key_file to auto-detect key type (RSA/ECDSA/ED25519)
+                pkey = paramiko.PKey.from_private_key_file(key_filename)
                 transport.connect(username=username, pkey=pkey)
             else:
                 # Try agent auth
@@ -546,7 +547,8 @@ class ModelDetector:
         transport = paramiko.Transport((host, 22))
         try:
             if key_filename:
-                pkey = paramiko.RSAKey.from_private_key_file(key_filename)
+                # Use PKey.from_private_key_file to auto-detect key type (RSA/ECDSA/ED25519)
+                pkey = paramiko.PKey.from_private_key_file(key_filename)
                 transport.connect(username=username, pkey=pkey)
             else:
                 transport.connect(username=username)
