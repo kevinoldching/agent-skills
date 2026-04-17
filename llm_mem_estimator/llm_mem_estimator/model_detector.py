@@ -352,68 +352,56 @@ class ModelDetector:
             host: Remote server hostname or IP
             remote_path: Path to the model directory on remote server
             username: SSH username
-            key_filename: Path to SSH private key file (optional, defaults to ~/.ssh/id_rsa or ~/.ssh/id_ed25519)
+            key_filename: Path to SSH private key file (optional)
         """
         import paramiko
 
-        # Try default SSH key locations if not specified
-        if not key_filename:
-            # Common SSH key locations (including Windows with Git Bash/WSL)
-            home = Path.home()
-            default_keys = [
-                home / '.ssh' / 'id_rsa',
-                home / '.ssh' / 'id_ed25519',
-                home / '.ssh' / 'id_ecdsa',
-                home / '.ssh' / 'id_ed448',
-                # Windows Git Bash/WSL paths
-                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_rsa',
-                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_ed25519',
-            ]
-            for key_path in default_keys:
-                if key_path.exists() and key_path.is_file():
-                    key_filename = str(key_path)
-                    print(f"Using SSH key: {key_path}")
-                    break
+        # Connect using SSHClient (supports look_for_keys and allow_agent like scp/ssh)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        # Connect via SFTP
-        transport = paramiko.Transport((host, 22))
         try:
-            # Use look_for_keys=True to let paramiko search default keys like scp does
-            # This is more reliable on Windows than explicitly calling Agent()
-            try:
-                transport.connect(
+            # look_for_keys=True searches ~/.ssh/ automatically like scp
+            # allow_agent=True tries SSH agent if available
+            ssh.connect(
+                hostname=host,
+                username=username,
+                password=None,
+                pkey=None,
+                look_for_keys=True,
+                allow_agent=True
+            )
+            print("Connected via SSH")
+        except Exception as e:
+            if key_filename:
+                # Fallback to specified key file
+                pkey = ModelDetector._load_ssh_key(key_filename)
+                if pkey is None:
+                    raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                print(f"Using SSH key file: {key_filename}")
+                ssh.connect(
+                    hostname=host,
                     username=username,
                     password=None,
-                    pkey=None,
-                    look_for_keys=True,  # Search ~/.ssh/ for keys automatically
-                    allow_agent=True     # Try SSH agent if available
+                    pkey=pkey
                 )
-                print("Connected via SSH with automatic key detection")
-            except Exception as e:
-                if key_filename:
-                    # Fallback to specified key file
-                    pkey = ModelDetector._load_ssh_key(key_filename)
-                    if pkey is None:
-                        raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                    print(f"Using SSH key file: {key_filename}")
-                    transport.connect(username=username, pkey=pkey)
-                else:
-                    raise RuntimeError(f"SSH connection failed: {e}")
+            else:
+                raise RuntimeError(f"SSH connection failed: {e}")
 
-            sftp = paramiko.SFTPClient.from_transport(transport)
+        # Get SFTP client from SSH client
+        sftp = ssh.open_sftp()
 
-            # Try to find config.json
-            config_path = remote_path.rstrip('/') + "/config.json"
-            try:
-                with sftp.file(config_path, 'rb') as f:
-                    config_data = f.read()
-                    return json.loads(config_data.decode('utf-8'))
-            except FileNotFoundError:
-                raise FileNotFoundError(f"config.json not found at {config_path}")
-            finally:
-                sftp.close()
+        # Try to find config.json
+        config_path = remote_path.rstrip('/') + "/config.json"
+        try:
+            with sftp.file(config_path, 'rb') as f:
+                config_data = f.read()
+                return json.loads(config_data.decode('utf-8'))
+        except FileNotFoundError:
+            raise FileNotFoundError(f"config.json not found at {config_path}")
         finally:
-            transport.close()
+            sftp.close()
+            ssh.close()
 
     @staticmethod
     def get_weights_metadata(model_name_or_path: str, is_local: bool = False,
@@ -584,32 +572,37 @@ class ModelDetector:
                     print(f"Using SSH key: {key_path}")
                     break
 
-        # Connect via SFTP
-        transport = paramiko.Transport((host, 22))
+        # Connect using SSHClient (supports look_for_keys and allow_agent like scp/ssh)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
         try:
-            # Use look_for_keys=True to let paramiko search default keys like scp does
-            # This is more reliable on Windows than explicitly calling Agent()
             try:
-                transport.connect(
+                ssh.connect(
+                    hostname=host,
                     username=username,
                     password=None,
                     pkey=None,
-                    look_for_keys=True,  # Search ~/.ssh/ for keys automatically
-                    allow_agent=True     # Try SSH agent if available
+                    look_for_keys=True,
+                    allow_agent=True
                 )
-                print("Connected via SSH with automatic key detection")
+                print("Connected via SSH")
             except Exception as e:
                 if key_filename:
-                    # Fallback to specified key file
                     pkey = ModelDetector._load_ssh_key(key_filename)
                     if pkey is None:
                         raise RuntimeError(f"Failed to load SSH key: {key_filename}")
                     print(f"Using SSH key file: {key_filename}")
-                    transport.connect(username=username, pkey=pkey)
+                    ssh.connect(
+                        hostname=host,
+                        username=username,
+                        password=None,
+                        pkey=pkey
+                    )
                 else:
                     raise RuntimeError(f"SSH connection failed: {e}")
 
-            sftp = paramiko.SFTPClient.from_transport(transport)
+            sftp = ssh.open_sftp()
 
             # Find all safetensors files in remote directory
             try:
@@ -653,10 +646,11 @@ class ModelDetector:
                     raise RuntimeError(f"Failed to read metadata from {remote_file_path}: {e}")
 
             sftp.close()
+            ssh.close()
             return all_tensors
 
         finally:
-            transport.close()
+            ssh.close()
 
 
 # ============================================================================
