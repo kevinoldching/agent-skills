@@ -344,6 +344,69 @@ class ModelDetector:
         return None
 
     @staticmethod
+    def _get_key_from_ssh_config(host: str) -> "Optional[str]":
+        """Parse ~/.ssh/config to find IdentityFile for a specific host
+
+        This mimics OpenSSH's behavior of reading ~/.ssh/config to find
+        host-specific keys.
+        """
+        home = Path.home()
+        ssh_config_path = home / '.ssh' / 'config'
+
+        if not ssh_config_path.exists():
+            return None
+
+        try:
+            with open(ssh_config_path, 'r') as f:
+                lines = f.readlines()
+        except Exception:
+            return None
+
+        # Parse SSH config (simple state machine)
+        current_host = None
+        current_key = None
+
+        for line in lines:
+            line = line.strip()
+
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+
+            # Host directive
+            if line.lower().startswith('host '):
+                # Save previous host's key if it matches
+                if current_host is not None and (host == current_host or ModelDetector._host_matches(host, current_host)):
+                    return current_key
+
+                # Start new host block
+                current_host = line.split(None, 1)[1] if len(line.split(None, 1)) > 1 else ''
+                current_key = None
+
+            # IdentityFile directive (only in current host block)
+            elif line.lower().startswith('identityfile '):
+                # Expand ~ to home directory
+                key_path = line.split(None, 1)[1] if len(line.split(None, 1)) > 1 else ''
+                if key_path.startswith('~'):
+                    key_path = str(home) + key_path[1:]
+                current_key = key_path
+
+        # Check final host block
+        if current_host is not None and (host == current_host or ModelDetector._host_matches(host, current_host)):
+            return current_key
+
+        return None
+
+    @staticmethod
+    def _host_matches(hostname: str, pattern: str) -> bool:
+        """Check if hostname matches SSH config pattern (supports wildcards)"""
+        import re
+        # Convert SSH config pattern to regex
+        # * matches anything, ? matches single char
+        regex_pattern = pattern.replace('.', r'\.').replace('*', '.*').replace('?', '.')
+        return bool(re.match(f'^{regex_pattern}$', hostname))
+
+    @staticmethod
     def detect_from_remote(host: str, remote_path: str, username: str,
                           key_filename: Optional[str] = None) -> Dict[str, Any]:
         """Detect model architecture from remote server via SFTP
@@ -363,7 +426,6 @@ class ModelDetector:
         # Diagnostics: Check what keys/agent is available
         print(f"\n=== SSH Diagnostics ===")
         print(f"Host: {host}, Username: {username}")
-        print(f"Key filename specified: {key_filename}")
 
         # Check SSH agent
         try:
@@ -375,68 +437,53 @@ class ModelDetector:
         except Exception as agent_err:
             print(f"SSH Agent error: {agent_err}")
 
-        # Check default key files
-        home = Path.home()
-        default_keys = [
-            home / '.ssh' / 'id_rsa',
-            home / '.ssh' / 'id_ed25519',
-            home / '.ssh' / 'id_ecdsa',
-            home / '.ssh' / 'id_ed448',
-        ]
-        found_keys = [k for k in default_keys if k.exists()]
-        print(f"Key files found: {[str(k) for k in found_keys]}")
-
-        # Check SSH config
-        ssh_config_path = home / '.ssh' / 'config'
-        if ssh_config_path.exists():
-            print(f"SSH config exists at: {ssh_config_path}")
-            # Try to read host-specific config
-            try:
-                with open(ssh_config_path, 'r') as f:
-                    config_content = f.read()
-                    # Check if our host is configured
-                    if host in config_content or f"Host {host}" in config_content:
-                        print(f"  Host '{host}' found in SSH config!")
-            except Exception:
-                pass
+        # Check SSH config for host-specific key
+        ssh_config_key = ModelDetector._get_key_from_ssh_config(host)
+        if ssh_config_key:
+            print(f"SSH config specifies key: {ssh_config_key}")
+            key_filename = ssh_config_key
         else:
-            print(f"No SSH config at: {ssh_config_path}")
+            # Fallback to default keys
+            home = Path.home()
+            default_keys = [
+                home / '.ssh' / 'id_rsa',
+                home / '.ssh' / 'id_ed25519',
+                home / '.ssh' / 'id_ecdsa',
+                home / '.ssh' / 'id_ed448',
+            ]
+            for k in default_keys:
+                if k.exists():
+                    key_filename = str(k)
+                    print(f"Using default key: {key_filename}")
+                    break
 
         print(f"=== End Diagnostics ===\n")
 
         try:
-            # look_for_keys=True searches ~/.ssh/ automatically like scp
-            # allow_agent=True tries SSH agent if available
-            ssh.connect(
-                hostname=host,
-                username=username,
-                password=None,
-                pkey=None,
-                look_for_keys=True,
-                allow_agent=True
-            )
-            print("Connected via SSH")
-        except Exception as e:
-            print(f"\nSSH connect failed: {type(e).__name__}: {e}")
             if key_filename:
-                # Fallback to specified key file
                 pkey = ModelDetector._load_ssh_key(key_filename)
                 if pkey is None:
                     raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                print(f"Using SSH key file: {key_filename}")
-                try:
-                    ssh.connect(
-                        hostname=host,
-                        username=username,
-                        password=None,
-                        pkey=pkey
-                    )
-                    print("Connected with explicit key")
-                except Exception as e2:
-                    print(f"Explicit key also failed: {type(e2).__name__}: {e2}")
-                    raise RuntimeError(f"SSH connection failed with explicit key: {e2}")
+                print(f"Connecting with key: {key_filename}")
+                ssh.connect(
+                    hostname=host,
+                    username=username,
+                    password=None,
+                    pkey=pkey
+                )
             else:
-                raise RuntimeError(f"SSH connection failed: {e}")
+                # No key found, try without key (will likely fail)
+                print("No SSH key found, attempting connect without key...")
+                ssh.connect(
+                    hostname=host,
+                    username=username,
+                    password=None,
+                    look_for_keys=True,
+                    allow_agent=True
+                )
+            print("Connected via SSH")
+        except Exception as e:
+            raise RuntimeError(f"SSH connection failed: {e}")
 
         # Get SFTP client from SSH client
         sftp = ssh.open_sftp()
@@ -600,57 +647,58 @@ class ModelDetector:
             host: Remote server hostname or IP
             remote_path: Path to the model directory on remote server
             username: SSH username
-            key_filename: Path to SSH private key file (optional, defaults to ~/.ssh/id_rsa or ~/.ssh/id_ed25519)
+            key_filename: Path to SSH private key file (optional)
         """
         import paramiko
         import struct
 
-        # Try default SSH key locations if not specified
+        # Try SSH config for host-specific key first
         if not key_filename:
-            home = Path.home()
-            default_keys = [
-                home / '.ssh' / 'id_rsa',
-                home / '.ssh' / 'id_ed25519',
-                home / '.ssh' / 'id_ecdsa',
-                home / '.ssh' / 'id_ed448',
-                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_rsa',
-                Path(os.environ.get('USERPROFILE', '')) / '.ssh' / 'id_ed25519',
-            ]
-            for key_path in default_keys:
-                if key_path.exists() and key_path.is_file():
-                    key_filename = str(key_path)
-                    print(f"Using SSH key: {key_path}")
-                    break
+            ssh_config_key = ModelDetector._get_key_from_ssh_config(host)
+            if ssh_config_key:
+                key_filename = ssh_config_key
+                print(f"SSH config specifies key: {key_filename}")
+            else:
+                # Fallback to default keys
+                home = Path.home()
+                default_keys = [
+                    home / '.ssh' / 'id_rsa',
+                    home / '.ssh' / 'id_ed25519',
+                    home / '.ssh' / 'id_ecdsa',
+                    home / '.ssh' / 'id_ed448',
+                ]
+                for k in default_keys:
+                    if k.exists():
+                        key_filename = str(k)
+                        print(f"Using default key: {key_filename}")
+                        break
 
-        # Connect using SSHClient (supports look_for_keys and allow_agent like scp/ssh)
+        # Connect using SSHClient
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
-            try:
+            if key_filename:
+                pkey = ModelDetector._load_ssh_key(key_filename)
+                if pkey is None:
+                    raise RuntimeError(f"Failed to load SSH key: {key_filename}")
+                print(f"Connecting with key: {key_filename}")
                 ssh.connect(
                     hostname=host,
                     username=username,
                     password=None,
-                    pkey=None,
+                    pkey=pkey
+                )
+            else:
+                print("No SSH key found, attempting connect without key...")
+                ssh.connect(
+                    hostname=host,
+                    username=username,
+                    password=None,
                     look_for_keys=True,
                     allow_agent=True
                 )
-                print("Connected via SSH")
-            except Exception as e:
-                if key_filename:
-                    pkey = ModelDetector._load_ssh_key(key_filename)
-                    if pkey is None:
-                        raise RuntimeError(f"Failed to load SSH key: {key_filename}")
-                    print(f"Using SSH key file: {key_filename}")
-                    ssh.connect(
-                        hostname=host,
-                        username=username,
-                        password=None,
-                        pkey=pkey
-                    )
-                else:
-                    raise RuntimeError(f"SSH connection failed: {e}")
+            print("Connected via SSH")
 
             sftp = ssh.open_sftp()
 
