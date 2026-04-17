@@ -631,6 +631,7 @@ class ModelDetector:
         import paramiko
         import struct
         import hashlib
+        from tqdm import tqdm
 
         # Prepare cache path (same format as HuggingFace caching)
         cache_dir = Path.home() / ".cache" / "llm_mem_estimator" / "metadata_cache"
@@ -709,7 +710,8 @@ class ModelDetector:
 
             all_tensors = {}
 
-            for shard_file in safetensors_files:
+            print(f"Reading metadata from {len(safetensors_files)} safetensors files...")
+            for shard_file in tqdm(safetensors_files, desc="Reading headers", unit="file"):
                 remote_file_path = remote_path.rstrip('/') + '/' + shard_file
                 try:
                     # Open file in binary mode
