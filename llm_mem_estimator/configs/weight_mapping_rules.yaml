@@ -8,6 +8,7 @@ generic:
       - ".*\\.embed_tokens\\.weight$"
       - "^model\\.embed_tokens\\.weight$"
       - ".*\\.lm_head\\.weight$"
+      - "lm_head\\.weight$"
       - ".*wte.*"              # GPT style
       - ".*word_embeddings.*"  # BERT style
 

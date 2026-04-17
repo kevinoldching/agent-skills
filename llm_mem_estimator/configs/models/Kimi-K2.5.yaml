@@ -1,6 +1,6 @@
 model_identity:
   name: Kimi-K2.5
-  total_params: '170.74B'
+  total_params: 'unknown'
   num_layers: 61
 architecture_config:
   hidden_size: 7168
@@ -23,6 +23,13 @@ architecture_config:
   qk_nope_head_dim: 128
 modules:
   others:
+    mm_projector.pre_norm.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.pre_norm.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.0.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.0.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.2.bias: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mm_projector.proj.2.weight: {shape: [7168, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    language_model.model.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
     vision_tower.encoder.blocks.0.mlp.fc0.bias: {shape: [4304], dtype: BF16, layers: 1, parallel_strategy: replicated}
     vision_tower.encoder.blocks.0.mlp.fc0.weight: {shape: [4304, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
     vision_tower.encoder.blocks.0.mlp.fc1.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
@@ -352,30 +359,6 @@ modules:
     vision_tower.patch_embed.pos_emb.weight: {shape: [64, 64, 1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
     vision_tower.patch_embed.proj.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
     vision_tower.patch_embed.proj.weight: {shape: [1152, 3, 14, 14], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    language_model.lm_head.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    language_model.model.embed_tokens.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    language_model.model.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.pre_norm.bias: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.pre_norm.weight: {shape: [1152], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.proj.0.bias: {shape: [4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.proj.0.weight: {shape: [4608, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.proj.2.bias: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mm_projector.proj.2.weight: {shape: [7168, 4608], dtype: BF16, layers: 1, parallel_strategy: replicated}
-  norm:
-    language_model.input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-  ffn_dense:
-    language_model.model.layers.0.mlp.down_proj.weight: {shape: [7168, 18432], dtype: BF16, layers: 1, parallel_strategy: TP}
-    language_model.model.layers.0.mlp.gate_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
-    language_model.model.layers.0.mlp.up_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
-  attention:
-    language_model.self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.self_attn.kv_b_proj.weight: {shape: [16384, 512], dtype: BF16, layers: 61, parallel_strategy: TP}
-    language_model.self_attn.o_proj.weight: {shape: [7168, 8192], dtype: BF16, layers: 61, parallel_strategy: TP}
-    language_model.self_attn.q_a_layernorm.weight: {shape: [1536], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    language_model.self_attn.q_b_proj.weight: {shape: [12288, 1536], dtype: BF16, layers: 61, parallel_strategy: TP}
   ffn_moe:
     language_model.mlp.gate.e_score_correction_bias: {shape: [384], dtype: F32, layers: 60, parallel_strategy: replicated}
     language_model.mlp.experts.N.down_proj.weight_packed: {shape: [384, 7168, 256], dtype: I32, layers: 60, parallel_strategy: EP}
@@ -388,10 +371,28 @@ modules:
     language_model.mlp.experts.N.gate_proj.weight_scale: {shape: [384, 2048, 224], dtype: BF16, layers: 60, parallel_strategy: EP}
     language_model.mlp.experts.N.up_proj.weight_scale: {shape: [384, 2048, 224], dtype: BF16, layers: 60, parallel_strategy: EP}
     language_model.mlp.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+  norm:
+    language_model.input_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.post_attention_layernorm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
   ffn_shared_expert:
-    language_model.mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: BF16, layers: 60, parallel_strategy: replicated}
-    language_model.mlp.shared_experts.gate_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
-    language_model.mlp.shared_experts.up_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: replicated}
+    language_model.mlp.shared_experts.down_proj.weight: {shape: [7168, 2048], dtype: BF16, layers: 60, parallel_strategy: TP_SHARED_EXPERT}
+    language_model.mlp.shared_experts.gate_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: TP_SHARED_EXPERT}
+    language_model.mlp.shared_experts.up_proj.weight: {shape: [2048, 7168], dtype: BF16, layers: 60, parallel_strategy: TP_SHARED_EXPERT}
+  attention:
+    language_model.self_attn.kv_a_layernorm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.kv_a_proj_with_mqa.weight: {shape: [576, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.kv_b_proj.weight: {shape: [16384, 512], dtype: BF16, layers: 61, parallel_strategy: TP}
+    language_model.self_attn.o_proj.weight: {shape: [7168, 8192], dtype: BF16, layers: 61, parallel_strategy: TP}
+    language_model.self_attn.q_a_layernorm.weight: {shape: [1536], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.q_a_proj.weight: {shape: [1536, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    language_model.self_attn.q_b_proj.weight: {shape: [12288, 1536], dtype: BF16, layers: 61, parallel_strategy: TP}
+  embedding:
+    language_model.lm_head.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    language_model.model.embed_tokens.weight: {shape: [163840, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+  ffn_dense:
+    language_model.model.layers.0.mlp.down_proj.weight: {shape: [7168, 18432], dtype: BF16, layers: 1, parallel_strategy: TP}
+    language_model.model.layers.0.mlp.gate_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    language_model.model.layers.0.mlp.up_proj.weight: {shape: [18432, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
 computation_rules:
   recommended_capacity_factor:
     has_prefill: 1.25
