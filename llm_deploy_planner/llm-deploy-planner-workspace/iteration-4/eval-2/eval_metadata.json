@@ -1,0 +1,14 @@
+{
+  "eval_id": 2,
+  "eval_name": "minimax-2.5-ascend910b-chat-tps",
+  "prompt": "帮我规划一下LLM推理部署：\n- 模型：Minimax-2.5（MoE模型）\n- 硬件：Ascend910B-64GB\n- 平均输入长度：1024 tokens，平均输出长度：512 tokens\n- 场景：chat\n- 目标：TPS优先",
+  "assertions": [
+    {"id": 1, "text": "输出包含显存分析（模型权重、KV cache）", "type": "contains"},
+    {"id": 2, "text": "明确建议了PD策略（混合或分离）", "type": "contains"},
+    {"id": 3, "text": "包含TP/EP/DP并行策略配置", "type": "contains"},
+    {"id": 4, "text": "提到总卡数需求", "type": "contains"},
+    {"id": 5, "text": "包含吞吐量估算", "type": "contains"},
+    {"id": 6, "text": "EP值正确（MoE模型需要EP>1）", "type": "contains"},
+    {"id": 7, "text": "xPyD计算逻辑正确（若PD分离）", "type": "contains"}
+  ]
+}

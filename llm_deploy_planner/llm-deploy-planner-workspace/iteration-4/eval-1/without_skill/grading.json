@@ -1,0 +1,38 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["MoE Experts | ~341 GB", "Attention + Embedding + Norms | ~15 GB", "KV Cache每token | ~0.05 GB"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD 混部 (Mixed)", "Chat在线推理场景对TPS有较高要求"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 1", "Data Parallel | 1"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总GPU数 | 8"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["预估TPS | 350-450 tokens/s"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "fail",
+      "evidence": ["Expert Parallel | 1 (保守配置(专家全部在一个TP组内))", "Kimi-K2.5 有 384 个 MoE 专家", "EP=1 无法有效分片专家权重，MoE模型应使用 EP > 1"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["PD 混部策略，无需 xPyD 格式"]
+    }
+  },
+  "summary": {
+    "total_score": 6,
+    "max_score": 7,
+    "all_criteria_met": false,
+    "issue": "EP=1 for MoE model with 384 experts is incorrect - MoE requires EP > 1 for expert sharding"
+  }
+}

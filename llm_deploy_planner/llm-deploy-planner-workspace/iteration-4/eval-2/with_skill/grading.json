@@ -1,0 +1,38 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["权重（FP8，EP分片后） | ~26.79 GB", "KV Cache每token | ~0.045 GB", "激活值 | ~0.09 GB"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD 混部（Mixed Prefill/Decode）", "α=0.4 基本平衡"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 8（256 experts / 8 = 32 experts per card）", "Data Parallel | 1"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总GPU数 | 8"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["总TPS估算 | ~38,200 tokens/s", "方案B: 16卡配置 | ~105,000 tokens/s"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "pass",
+      "evidence": ["Expert Parallel | 8（256 experts / 8 = 32 experts per card）", "EP=8 <= 256 experts ✓"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["PD 混部策略，无需 xPyD 格式"]
+    }
+  },
+  "summary": {
+    "total_score": 7,
+    "max_score": 7,
+    "all_criteria_met": true
+  },
+  "notes": ["修复了 MiniMax-M2.5.yaml 中 expert 权重 parallel_strategy 从 replicated 改为 EP 的 bug"]
+}

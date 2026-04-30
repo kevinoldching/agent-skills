@@ -1,0 +1,43 @@
+{
+  "criteria": {
+    "1_由于高输入方差建议了PD分离策略": {
+      "score": "pass",
+      "evidence": [
+        "Line 19: 推荐策略: PD分离部署",
+        "Line 28: 关键因素 | 高输入方差（std=2000 vs mean=1024）...PD混合部署会导致短请求被长请求阻塞，资源利用率低下。PD分离后..."
+      ]
+    },
+    "2_包含Prefill阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Line 91-107: Prefill阶段配置 | 实例数4, TP=4, EP=1, DP=2"
+      ]
+    },
+    "3_包含Decode阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Line 109-126: Decode阶段配置 | 实例数4, TP=4, EP=1, DP=2"
+      ]
+    },
+    "4_包含xPyD格式的实例数量说明": {
+      "score": "pass",
+      "evidence": [
+        "Line 89: 配置格式: 4P4D (x=4, y=1)",
+        "Line 150-166: Section 6 标题为 'xPyD 实例数量说明'，详细解释了 Prefill 和 Decode 的实例数、卡数、TP、DP 配置"
+      ]
+    },
+    "5_提到总卡数需求": {
+      "score": "pass",
+      "evidence": [
+        "Line 8: 硬件 | Ascend-910B-64GB × 4卡/单机 × 8机 = 32卡",
+        "Line 81: 推荐配置: TP=4, DP=8（总32卡）",
+        "Line 226: 总卡数 | 32"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 5,
+    "max_score": 5,
+    "all_criteria_met": true
+  }
+}

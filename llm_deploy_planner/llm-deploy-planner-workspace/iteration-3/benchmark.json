@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "skill_name": "llm-deploy-planner",
+    "skill_path": "/home/omni/code_repos/agent-skills/llm_deploy_planner/llm-deploy-planner",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-03-22T08:00:00Z",
+    "evals_run": ["eval-0", "eval-1", "eval-2"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "run_id": "eval-0-with_skill",
+      "eval_id": 0,
+      "config": "with_skill",
+      "pass": true,
+      "total_score": 5,
+      "max_score": 5,
+      "timing": {
+        "total_tokens": 35705,
+        "duration_ms": 245867,
+        "total_duration_seconds": 245.9
+      }
+    },
+    {
+      "run_id": "eval-0-without_skill",
+      "eval_id": 0,
+      "config": "without_skill",
+      "pass": true,
+      "total_score": 5,
+      "max_score": 5,
+      "timing": {
+        "total_tokens": 37997,
+        "duration_ms": 110463,
+        "total_duration_seconds": 110.5
+      }
+    },
+    {
+      "run_id": "eval-1-with_skill",
+      "eval_id": 1,
+      "config": "with_skill",
+      "pass": true,
+      "total_score": 5,
+      "max_score": 5,
+      "timing": {
+        "total_tokens": 33038,
+        "duration_ms": 95988,
+        "total_duration_seconds": 96.0
+      }
+    },
+    {
+      "run_id": "eval-1-without_skill",
+      "eval_id": 1,
+      "config": "without_skill",
+      "pass": true,
+      "total_score": 5,
+      "max_score": 5,
+      "timing": {
+        "total_tokens": 28643,
+        "duration_ms": 101007,
+        "total_duration_seconds": 101.0
+      }
+    },
+    {
+      "run_id": "eval-2-with_skill",
+      "eval_id": 2,
+      "config": "with_skill",
+      "pass": true,
+      "total_score": 4,
+      "max_score": 4,
+      "timing": {
+        "total_tokens": 37412,
+        "duration_ms": 103784,
+        "total_duration_seconds": 103.8
+      }
+    },
+    {
+      "run_id": "eval-2-without_skill",
+      "eval_id": 2,
+      "config": "without_skill",
+      "pass": true,
+      "total_score": 4,
+      "max_score": 4,
+      "timing": {
+        "total_tokens": 31318,
+        "duration_ms": 83938,
+        "total_duration_seconds": 83.9
+      }
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": "100%",
+      "avg_time_seconds": 148.6,
+      "avg_tokens": 35385
+    },
+    "without_skill": {
+      "pass_rate": "100%",
+      "avg_time_seconds": 98.5,
+      "avg_tokens": 32653
+    },
+    "delta": {
+      "pass_rate": "+0.00",
+      "time_seconds": "+50.1",
+      "tokens": "+2732"
+    }
+  },
+  "notes": [
+    "All 6 runs passed all assertions (100% pass rate)",
+    "with_skill runs took longer on average (+50.1s) due to structured workflow",
+    "EP annotation correctly shows EP=1 for all dense models (Qwen-72B, Llama2-70B, Qwen-7B)",
+    "New constraint added: total_cards must be multiple of single_machine_cards",
+    "llm_mem_estimator call verification and fallback to manual estimation added"
+  ]
+}

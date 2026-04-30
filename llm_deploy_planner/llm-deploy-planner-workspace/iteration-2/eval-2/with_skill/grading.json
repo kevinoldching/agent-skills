@@ -1,0 +1,46 @@
+{
+  "criteria": {
+    "1_包含Qwen-7B的内存估算": {
+      "score": "pass",
+      "evidence": [
+        "模型权重（FP16）: ~14 GB",
+        "Embedding/LM Head: ~1 GB",
+        "activations（估算）: ~1-2 GB",
+        "单卡总开销（无 KV Cache）: ~16 GB",
+        "KV per token per layer = 2 × 32 × 128 × 2 = 16,384 bytes ≈ 16 KB",
+        "单实例单卡可支持 batch_size ≈ 48-64（保守估算 48）"
+      ]
+    },
+    "2_给出了最大并发batch建议": {
+      "score": "pass",
+      "evidence": [
+        "单实例单卡可支持 batch_size ≈ 48-64（保守估算 48）",
+        "最大并发 batch | **48-64 每副本，总计 96-128**",
+        "如果追求最大并发 batch，建议使用 TP=4, DP=2，总最大并发 batch 可达 96-128"
+      ]
+    },
+    "3_明确建议了PD策略（混合或分离）": {
+      "score": "pass",
+      "evidence": [
+        "推荐策略: PD 混部（Mixed Prefill/Decode）",
+        "长度比 α = 0.57 属于基本平衡范围（0.3-0.7）",
+        "使用 PD 混部策略，理由：混部无 KV transfer 开销，带宽利用率更高"
+      ]
+    },
+    "4_包含并行策略配置（TP/EP/DP）": {
+      "score": "pass",
+      "evidence": [
+        "推荐配置: TP=4, EP=1, DP=2",
+        "Tensor Parallel: 4",
+        "Expert Parallel: 1（Dense 模型，无 MoE）",
+        "Data Parallel: 2",
+        "备选配置: TP=8, EP=1, DP=1"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 4,
+    "max_score": 4,
+    "all_criteria_met": true
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "skill_name": "llm-deploy-planner",
+    "skill_path": "/home/omni/code_repos/agent-skills/llm_deploy_planner/llm-deploy-planner",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-03-22T10:30:00Z",
+    "evals_run": ["eval-0", "eval-1", "eval-2"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "run_id": "eval-0-with_skill",
+      "eval_id": 0,
+      "config": "with_skill",
+      "model": "gpt-oss 120b",
+      "hardware": "Ascend-910B-64GB",
+      "pass": true,
+      "total_score": 7,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 62237,
+        "duration_ms": 223750,
+        "total_duration_seconds": 223.8
+      }
+    },
+    {
+      "run_id": "eval-0-without_skill",
+      "eval_id": 0,
+      "config": "without_skill",
+      "model": "gpt-oss 120b",
+      "hardware": "Ascend-910B-64GB",
+      "pass": true,
+      "total_score": 7,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 46401,
+        "duration_ms": 238576,
+        "total_duration_seconds": 238.6
+      }
+    },
+    {
+      "run_id": "eval-1-with_skill",
+      "eval_id": 1,
+      "config": "with_skill",
+      "model": "Kimi-k2.5",
+      "hardware": "Ascend-910B-64GB",
+      "pass": true,
+      "total_score": 7,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 67403,
+        "duration_ms": 240692,
+        "total_duration_seconds": 240.7
+      }
+    },
+    {
+      "run_id": "eval-1-without_skill",
+      "eval_id": 1,
+      "config": "without_skill",
+      "model": "Kimi-k2.5",
+      "hardware": "Ascend-910B-64GB",
+      "pass": false,
+      "total_score": 6,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 56623,
+        "duration_ms": 230078,
+        "total_duration_seconds": 230.1
+      }
+    },
+    {
+      "run_id": "eval-2-with_skill",
+      "eval_id": 2,
+      "config": "with_skill",
+      "model": "Minimax-2.5",
+      "hardware": "Ascend-910B-64GB",
+      "pass": true,
+      "total_score": 7,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 70149,
+        "duration_ms": 430335,
+        "total_duration_seconds": 430.3
+      }
+    },
+    {
+      "run_id": "eval-2-without_skill",
+      "eval_id": 2,
+      "config": "without_skill",
+      "model": "Minimax-2.5",
+      "hardware": "Ascend-910B-64GB",
+      "pass": true,
+      "total_score": 7,
+      "max_score": 7,
+      "timing": {
+        "total_tokens": 68261,
+        "duration_ms": 338607,
+        "total_duration_seconds": 338.6
+      }
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": "100%",
+      "avg_time_seconds": 298.3,
+      "avg_tokens": 66596
+    },
+    "without_skill": {
+      "pass_rate": "83.3%",
+      "avg_time_seconds": 269.1,
+      "avg_tokens": 57095
+    },
+    "delta": {
+      "pass_rate": "+16.7%",
+      "time_seconds": "+29.2",
+      "tokens": "+9501"
+    }
+  },
+  "notes": [
+    "All with_skill runs passed (100% pass rate)",
+    "without_skill for Kimi-k2.5 failed assertion 6 (EP=1 incorrectly for MoE/384 experts)",
+    "with_skill runs use more tokens due to structured workflow but produce correct EP values for MoE models",
+    "Kimi-k2.5 without_skill used EP=1, but with_skill correctly used EP=16",
+    "Minimax-2.5 with_skill additionally fixed a model config bug (expert weight parallel_strategy)"
+  ],
+  "key_findings": {
+    "moe_ep_correctness": {
+      "description": "MoE models correctly use EP > 1 for expert sharding",
+      "with_skill": {
+        "gpt-oss-120b": "EP=8 (128 experts)",
+        "kimi-k2.5": "EP=16 (384 experts)",
+        "minimax-2.5": "EP=8 (256 experts)"
+      },
+      "without_skill": {
+        "gpt-oss-120b": "EP=8 - correct",
+        "kimi-k2.5": "EP=1 - INCORRECT (should be > 1)",
+        "minimax-2.5": "EP=8 - correct"
+      }
+    }
+  }
+}

@@ -206,10 +206,10 @@ norm: rmsnorm
 ## Skill Invocation Interface
 
 ```
-/create_model_arch_diagram <model_id_or_path> [--format png,svg,mmd] [--output /path/to/dir]
+/llm-arch-generator <model_id_or_path> [--format png,svg,mmd] [--output /path/to/dir]
 
 # Example:
-/create_model_arch_diagram meta-llama/Llama-3-8b --format png,svg
+/llm-arch-generator meta-llama/Llama-3-8b --format png,svg
 ```
 
 ### Parameters
@@ -244,12 +244,12 @@ Tool: `@mermaid-js/mermaid-cli` (npm package)
 ## File Structure
 
 ```
-create_model_arch_diagram/
+llm-arch-generator/
 ├── SKILL.md                     # Skill main entry file
 ├── docs/
 │   └── superpowers/
 │       └── specs/
-│           └── 2026-03-21-create_model_arch_diagram-design.md
+│           └── 2026-03-21-llm-arch-generator-design.md
 ├── templates/                    # Model templates (knowledge base)
 │   ├── llama/
 │   ├── mistral/

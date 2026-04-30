@@ -1,0 +1,37 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["模型总权重 (FP16) | ~120 GB", "MXFP4量化后估算 | ~31.5 GB", "KV Cache每token | ~0.15 MB/token"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD 混部 (Mixed)", "Chat → TPS优先 → PD混部"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 8", "Data Parallel | 1"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总GPU数 | 8"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["预估吞吐量 | >1M tokens/s", "预估TTFT | 50-80 ms", "预估TPOT | 15-25 ms"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "pass",
+      "evidence": ["EP=8", "MoE模型 | EP > 1 | 满足 (EP=8)"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["本方案采用PD混部，无需xPyD格式"]
+    }
+  },
+  "summary": {
+    "total_score": 7,
+    "max_score": 7,
+    "all_criteria_met": true
+  }
+}

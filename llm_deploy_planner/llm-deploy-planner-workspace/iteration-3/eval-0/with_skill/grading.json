@@ -1,0 +1,49 @@
+{
+  "criteria": {
+    "1_输出包含内存分析": {
+      "score": "pass",
+      "evidence": [
+        "模型权重 (FP16) = 72B × 2 bytes = 144 GB",
+        "KV Cache 每 token = 2 × num_kv_heads × kv_dim × num_layers × 2 bytes = 262,144 bytes ≈ 0.25 MB/token",
+        "单卡显存总占用: 模型权重 18 GB + KV Cache 3.2 GB + 激活值 31 GB = 总计 52.2 GB"
+      ]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": [
+        "推荐策略: PD 分离部署",
+        "综合结论: 虽然长度比显示可混可分，但场景优先级最高（在线推理+时延敏感），强烈推荐 PD 分离部署"
+      ]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": [
+        "Tensor Parallel (TP) | 8",
+        "Expert Parallel (EP) | 1 (Dense 模型)",
+        "Data Parallel (DP) | 1",
+        "资源配置汇总表: Prefill | 8 | 8 | 1 | 1 | 8 | 64"
+      ]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": [
+        "硬件 | H100-80GB × 8卡/机 × 8机 = 64卡",
+        "总卡数 | 64"
+      ]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": [
+        "单实例吞吐 ~6,250 tokens/s (估算)",
+        "总 Prefill 吞吐 ~50,000 tokens/s",
+        "总 Decode 吞吐 ~50,000 tokens/s",
+        "预估吞吐量 25,000-30,000 tokens/s"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 5,
+    "max_score": 5,
+    "all_criteria_met": true
+  }
+}

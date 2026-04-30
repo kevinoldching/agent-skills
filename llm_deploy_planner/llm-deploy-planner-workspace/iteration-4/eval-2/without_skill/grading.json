@@ -1,0 +1,37 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["权重（FP8） | 26.95 GB", "KV Cache每Token | ~0.05 GB", "单卡总计 | ~29.08 GB"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD 混部", "TPS优先时，混部无KV cache传输开销"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 8", "Data Parallel | 1"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总GPU数 | 8"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["预估TPS | ~1500-2000 tokens/s"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "pass",
+      "evidence": ["EP=8", "MoE专家（256个）在8卡间分片，每卡承载32个专家", "EP=8 <= 256 ✓"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["PD 混部策略"]
+    }
+  },
+  "summary": {
+    "total_score": 7,
+    "max_score": 7,
+    "all_criteria_met": true
+  }
+}

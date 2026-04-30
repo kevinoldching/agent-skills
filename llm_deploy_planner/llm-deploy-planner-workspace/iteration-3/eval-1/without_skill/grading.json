@@ -1,0 +1,53 @@
+{
+  "criteria": {
+    "1_由于高输入方差建议了PD分离策略": {
+      "score": "pass",
+      "evidence": [
+        "Line 28: 推荐策略: PD 分离 (xPyD)",
+        "Line 34: 离线场景通常推荐混部，但极高输入方差(200%)使分离更高效",
+        "Line 47: 实际上输入方差 std=2000 是 mean=1024 的 195%，属于极端高方差场景",
+        "Line 50-54: 输入方差极高 (CV = 2000/1024 ≈ 195%)...分离优势: 1. Prefill 可独立处理不同长度输入..."
+      ]
+    },
+    "2_包含Prefill阶段的并行策略（TP/EP/DP）": {
+      "score": "pass",
+      "evidence": [
+        "Line 109: Tensor Parallel (TP) | 8",
+        "Line 110: Expert Parallel (EP) | 1 (Dense模型)",
+        "Line 111: Data Parallel (DP) | 1",
+        "Line 107: 每实例卡数 = TP(8) × DP(1)"
+      ]
+    },
+    "3_包含Decode阶段的并行策略（TP/EP/DP）": {
+      "score": "pass",
+      "evidence": [
+        "Line 127: Tensor Parallel (TP) | 1",
+        "Line 128: Expert Parallel (EP) | 1 (Dense模型)",
+        "Line 129: Data Parallel (DP) | 16",
+        "Line 125: 每实例卡数 = TP(1) × DP(16)"
+      ]
+    },
+    "4_包含xPyD格式的实例数量说明": {
+      "score": "pass",
+      "evidence": [
+        "Line 28: 推荐策略: PD 分离 (xPyD)",
+        "Line 92: 配置: 2P1D (2 个 Prefill 实例, 1 个 Decode 实例)",
+        "Line 106: 实例数 (x) | 2",
+        "Line 124: 实例数 (y) | 1"
+      ]
+    },
+    "5_提到总卡数需求": {
+      "score": "pass",
+      "evidence": [
+        "Line 15: 总卡数 | 32",
+        "Line 72: 总集群显存 | 32 × 64GB = 2048 GB",
+        "Line 100: **合计** | 3 | - | **32**"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 5,
+    "max_score": 5,
+    "all_criteria_met": true
+  }
+}

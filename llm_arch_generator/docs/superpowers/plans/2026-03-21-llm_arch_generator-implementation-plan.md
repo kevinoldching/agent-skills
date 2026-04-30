@@ -13,14 +13,14 @@
 ## File Structure
 
 ```
-create_model_arch_diagram/
+llm-arch-generator/
 ├── SKILL.md                              # Skill main entry (AI instructions)
 ├── docs/
 │   └── superpowers/
 │       ├── specs/
-│       │   └── 2026-03-21-create_model_arch_diagram-design.md
+│       │   └── 2026-03-21-llm-arch-generator-design.md
 │       └── plans/
-│           └── 2026-03-21-create_model_arch_diagram-implementation-plan.md
+│           └── 2026-03-21-llm-arch-generator-implementation-plan.md
 ├── templates/                            # Model structure templates
 │   ├── llama/
 │   │   └── common.yaml
@@ -49,13 +49,13 @@ create_model_arch_diagram/
 ## Task 1: Create SKILL.md
 
 **Files:**
-- Create: `create_model_arch_diagram/SKILL.md`
+- Create: `llm-arch-generator/SKILL.md`
 
 - [ ] **Step 1: Write SKILL.md with complete AI instructions**
 
 The SKILL.md should contain:
 1. Skill description and purpose
-2. Invocation syntax: `/create_model_arch_diagram <model> [--format png,svg,mmd] [--output /path/to/dir]`
+2. Invocation syntax: `/llm-arch-generator <model> [--format png,svg,mmd] [--output /path/to/dir]`
 3. Input handling:
    - HuggingFace model ID parsing
    - Local file path handling
@@ -130,7 +130,7 @@ Check that all sections from the design spec are covered.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add create_model_arch_diagram/SKILL.md
+git add llm-arch-generator/SKILL.md
 git commit -m "feat: add SKILL.md entry file"
 ```
 
@@ -368,10 +368,10 @@ git commit -m "feat: add LLaMA instance templates"
 - [ ] **Step 1: Verify all files exist**
 
 ```bash
-ls -la create_model_arch_diagram/
-ls -la create_model_arch_diagram/templates/
-ls -la create_model_arch_diagram/templates/llama/
-ls -la create_model_arch_diagram/scripts/
+ls -la llm-arch-generator/
+ls -la llm-arch-generator/templates/
+ls -la llm-arch-generator/templates/llama/
+ls -la llm-arch-generator/scripts/
 ```
 
 - [ ] **Step 2: Verify SKILL.md has all required sections**
@@ -392,7 +392,7 @@ Check coverage:
 
 ```bash
 git add -A
-git commit -m "feat: complete create_model_arch_diagram skill structure"
+git commit -m "feat: complete llm-arch-generator skill structure"
 ```
 
 ---
@@ -403,10 +403,10 @@ After implementation, verify the skill works by:
 
 ```bash
 # Check skill structure
-ls -R create_model_arch_diagram/
+ls -R llm-arch-generator/
 
 # Verify SKILL.md content
-head -50 create_model_arch_diagram/SKILL.md
+head -50 llm-arch-generator/SKILL.md
 
 # Verify templates are valid YAML
 python3 -c "import yaml; yaml.safe_load(open('templates/llama/common.yaml'))"

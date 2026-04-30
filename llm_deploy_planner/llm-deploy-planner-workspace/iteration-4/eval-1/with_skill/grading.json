@@ -1,0 +1,37 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["模型权重（BF16/INT8混合） | ~554 GB", "KV Cache每token | ~2.25 KB（MLA优化）", "单卡最大 batch | 43"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD 混部（Mixed Prefill/Decode）", "α=0.40 属于基本平衡范围（0.3-0.7）"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 16", "Data Parallel | 2（DP = EP/TP = 16/8 = 2）"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总 GPU 数 | 16"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["总 TPS（2副本） | ~2,866 tokens/s", "总最大 batch | 86（2副本 × 43）"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "pass",
+      "evidence": ["Expert Parallel | 16", "Kimi-K2.5 是超大规模 MoE 模型（170B参数，384 experts）", "EP=16 <= 384 experts ✓"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["PD 混部策略，无需 xPyD 格式"]
+    }
+  },
+  "summary": {
+    "total_score": 7,
+    "max_score": 7,
+    "all_criteria_met": true
+  }
+}

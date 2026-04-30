@@ -1,0 +1,47 @@
+{
+  "criteria": {
+    "1_由于高输入方差建议了PD分离策略": {
+      "score": "pass",
+      "evidence": [
+        "Line 31: 'Recommended Strategy: PD Separation (2P1D)'",
+        "Line 39: 'Input Variance | CV = std/mean = 2000/1024 ≈ 195% | Extremely high variance; std >> mean | Strong separation signal'",
+        "Line 44: 'Extreme Input Variance (CV=195%): The standard deviation (2000) is nearly double the mean (1024).'",
+        "Line 47: 'With PD Separation, prefill processes inputs independently, avoiding padding waste'"
+      ]
+    },
+    "2_包含Prefill阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Lines 118-121: 'Tensor Parallel (TP) | 8', 'Expert Parallel (EP) | 8', 'Data Parallel (DP) | 1' for Prefill stage"
+      ]
+    },
+    "3_包含Decode阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Lines 143-145: 'Tensor Parallel (TP) | 1', 'Expert Parallel (EP) | 1', 'Data Parallel (DP) | 16' for Decode stage"
+      ]
+    },
+    "4_包含xPyD格式的实例数量说明": {
+      "score": "pass",
+      "evidence": [
+        "Line 97: 'PD Separation Deployment: 2P1D'",
+        "Line 99: 'Configuration: 2 Prefill Instances + 1 Decode Instance'",
+        "Line 115: 'Instances (x) | 2' for Prefill",
+        "Line 140: 'Instances (y) | 1' for Decode"
+      ]
+    },
+    "5_提到总卡数需求": {
+      "score": "pass",
+      "evidence": [
+        "Line 16: 'Total Cards | 32'",
+        "Line 107: 'Total | 3 | - | 32' in resource allocation table",
+        "Line 308: 'total_cards: 32' in YAML summary"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 5,
+    "max_score": 5,
+    "all_criteria_met": true
+  }
+}

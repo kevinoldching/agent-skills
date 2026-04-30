@@ -1,0 +1,37 @@
+{
+  "criteria": {
+    "1_输出包含显存分析": {
+      "score": "pass",
+      "evidence": ["权重 (FP16/MXFP4) | 60.77 GB", "KV Cache每token | ~0.018 GB", "单卡总计 | 62.87 GB"]
+    },
+    "2_明确建议了PD策略": {
+      "score": "pass",
+      "evidence": ["推荐策略: PD混部", "Chat场景通常为在线推理，但用户明确TPS优先，混部可最大化吞吐量"]
+    },
+    "3_包含TP/EP/DP并行策略配置": {
+      "score": "pass",
+      "evidence": ["Tensor Parallel | 8", "Expert Parallel | 8（MoE模型，128专家）", "Data Parallel | 1"]
+    },
+    "4_提到总卡数需求": {
+      "score": "pass",
+      "evidence": ["总GPU数 | 8", "TP=8 + EP=8 + DP=1（8卡混部）"]
+    },
+    "5_包含吞吐量估算": {
+      "score": "pass",
+      "evidence": ["混部 TPS 公式: TPS = batch_size × (S_in + S_out) / (TTFT + S_out × TPOT)", "TPS ≈ 150K tokens/s"]
+    },
+    "6_EP值正确MoE模型需要EP1": {
+      "score": "pass",
+      "evidence": ["EP=8（MoE模型，128专家）", "EP=8 <= min(8, 128) = 8 ✓"]
+    },
+    "7_xPyD计算逻辑正确若PD分离": {
+      "score": "pass",
+      "evidence": ["本方案采用PD混部，无需xPyD格式", "xPyD格式说明已包含在文档中"]
+    }
+  },
+  "summary": {
+    "total_score": 7,
+    "max_score": 7,
+    "all_criteria_met": true
+  }
+}

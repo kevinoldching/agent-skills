@@ -1,0 +1,51 @@
+{
+  "criteria": {
+    "1_由于高输入方差建议了PD分离策略": {
+      "score": "pass",
+      "evidence": [
+        "Line 19: **推荐策略: PD分离部署**",
+        "Line 28: **关键因素** | **高输入方差（std=2000 vs mean=1024）** | **变异系数CV≈2，输入长度分布极其分散（100~7000+ tokens）。PD混合部署会导致短请求被长请求阻塞，资源利用率低下。PD分离后，Prefill阶段可针对不同输入长度做动态batching，Decode阶段可保持稳定的大batch输出**"
+      ]
+    },
+    "2_包含Prefill阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Lines 98-110 (Prefill 阶段):",
+        "| 实例数 | 4 |",
+        "| Tensor Parallel | 4 |",
+        "| Expert Parallel | 1（Dense模型） |",
+        "| Data Parallel | 2 |"
+      ]
+    },
+    "3_包含Decode阶段的并行策略TP_EP_DP": {
+      "score": "pass",
+      "evidence": [
+        "Lines 116-127 (Decode 阶段):",
+        "| 实例数 | 4 |",
+        "| Tensor Parallel | 4 |",
+        "| Expert Parallel | 1（Dense模型） |",
+        "| Data Parallel | 2 |"
+      ]
+    },
+    "4_包含xPyD格式的实例数量说明": {
+      "score": "pass",
+      "evidence": [
+        "Line 96: **配置格式: 4P1D (x=4 Prefill实例, y=1 Decode实例组)**",
+        "Section 6 (Lines 158-174): '## 6. xPyD 实例数量说明' 详细说明了 Prefill 实例数=4, Decode 实例组数=1 的计算过程"
+      ]
+    },
+    "5_提到总卡数需求": {
+      "score": "pass",
+      "evidence": [
+        "Line 8: 硬件 | Ascend-910B-64GB × 4卡/单机 × 8机 = 32卡",
+        "Line 88: **推荐配置**: TP=4, DP=8（总32卡）",
+        "Line 239: | 总卡数 | 32 |"
+      ]
+    }
+  },
+  "summary": {
+    "total_score": 5,
+    "max_score": 5,
+    "all_criteria_met": true
+  }
+}
