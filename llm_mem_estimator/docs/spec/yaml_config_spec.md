@@ -134,7 +134,7 @@ architecture_config:
 | FP32 | float32, f32 | 4 | 32 位浮点 |
 | FP16 | float16 | 2 | 16 位浮点 |
 | BF16 | bfloat16 | 2 | Brain Float 16 |
-| FP8 | float8, f8_e4m3 | 1 | 8 位浮点 |
+| FP8 | float8, f8_e4m3, f8_e8m0 | 1 | 8 位浮点 |
 | INT8 | int8 | 1 | 8 位整数 |
 | U8 | uint8 | 1 | 8 位无符号整数 |
 | INT4 | int4 | 0.5 | 4 位整数 |

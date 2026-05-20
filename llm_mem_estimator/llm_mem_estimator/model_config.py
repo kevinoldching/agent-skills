@@ -111,6 +111,8 @@ def get_dtype_bytes(dtype: str) -> float:
         "float8": 1,
         "f8_e4m3": 1,
         "float8_e4m3fn": 1,
+        "f8_e8m0": 1,
+        "float8_e8m0": 1,
         # Integer types
         "int8": 1,
         "uint8": 1,

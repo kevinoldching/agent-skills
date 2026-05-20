@@ -157,6 +157,7 @@ class TestGetDtypeBytes:
         assert get_dtype_bytes("fp8") == 1
         assert get_dtype_bytes("float8") == 1
         assert get_dtype_bytes("f8_e4m3") == 1
+        assert get_dtype_bytes("f8_e8m0") == 1
 
     def test_int8(self):
         assert get_dtype_bytes("int8") == 1
