@@ -1146,8 +1146,10 @@ class ConfigGenerator:
                 # This correctly handles cases where not all layers have MoE (e.g., DeepSeek-V3 has MoE only in layers 3-61)
                 layers_count = len(module_layer_indices.get(module_type, set())) or len(weight_list)
 
-                # Use a simplified name (remove model.layers.N prefix if present)
+                # Use a simplified name (remove layer prefix if present)
+                # Support both 'model.layers.N.' and 'layers.N.' patterns
                 simplified_name = base_pattern.replace('model.layers.N.', '')
+                simplified_name = simplified_name.replace('layers.N.', '')
 
                 # For MoE expert weights, incorporate expert dimension into shape
                 shape = first_metadata['shape'].copy()
