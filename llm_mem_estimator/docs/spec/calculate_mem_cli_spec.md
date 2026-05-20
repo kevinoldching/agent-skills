@@ -67,7 +67,7 @@ python scripts/calculate_mem.py --remote ubuntu@192.168.1.100:/data/models/Qwen2
 | 7 | ✓ | ✓ | ✗ | gen_len=用户指定，搜索 max prompt_len，使用 **has_prefill** factor |
 | 8 | ✓ | ✓ | ✓ | batch_size≠1: 正常估算 + 显示 Fits/Exceeds; batch_size=1: **搜索 max batch_size** |
 
-支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`
+支持的数据类型：`fp32`, `fp16`, `bf16`, `fp8`, `int8`, `int4`, `int64`
 
 ## 并行配置
 

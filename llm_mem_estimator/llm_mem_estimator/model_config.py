@@ -130,6 +130,10 @@ def get_dtype_bytes(dtype: str) -> float:
         "uint32": 4,
         "u16": 2,
         "uint16": 2,
+        "i64": 8,
+        "int64": 8,
+        "u64": 8,
+        "uint64": 8,
     }
     dtype_lower = dtype.lower()
     if dtype_lower not in dtype_map:

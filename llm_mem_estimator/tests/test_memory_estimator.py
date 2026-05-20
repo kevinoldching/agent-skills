@@ -171,6 +171,12 @@ class TestGetDtypeBytes:
         assert get_dtype_bytes("uint4") == 0.5
         assert get_dtype_bytes("u4") == 0.5
 
+    def test_int64(self):
+        assert get_dtype_bytes("int64") == 8
+        assert get_dtype_bytes("i64") == 8
+        assert get_dtype_bytes("uint64") == 8
+        assert get_dtype_bytes("u64") == 8
+
     def test_unknown_dtype(self):
         with pytest.raises(ValueError):
             get_dtype_bytes("unknown")
