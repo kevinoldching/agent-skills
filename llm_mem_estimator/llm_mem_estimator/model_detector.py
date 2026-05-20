@@ -1095,9 +1095,11 @@ class ConfigGenerator:
             base_pattern = re.sub(r'^(model\.layers?)\.\d+', r'\1.N', base_pattern)
 
             # Extract layer index before pattern normalization
-            layer_match = re.search(r'\.layers\.(\d+)\.', weight_name)
+            layer_match = re.search(r'\.layers?\.(\d+)\.', weight_name)
             if not layer_match:
-                layer_match = re.search(r'model\.layers\.(\d+)', weight_name)
+                layer_match = re.search(r'^layers?\.(\d+)\.', weight_name)
+            if not layer_match:
+                layer_match = re.search(r'model\.layers?\.(\d+)', weight_name)
             layer_idx = int(layer_match.group(1)) if layer_match else 0
 
             # Classify weight to determine module type for layer tracking
@@ -1134,7 +1136,7 @@ class ConfigGenerator:
                 modules[module_type] = {}
 
             # Determine if this is a per-layer weight
-            is_per_layer = '.layers.N.' in base_pattern or 'model.layers.N' in base_pattern
+            is_per_layer = '.layers.N.' in base_pattern or 'model.layers.N' in base_pattern or 'layers.N.' in base_pattern
 
             # Check if this group has expert consolidation
             has_experts_in_pattern = is_moe and '.experts.N.' in base_pattern
