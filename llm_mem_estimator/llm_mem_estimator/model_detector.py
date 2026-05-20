@@ -1088,9 +1088,11 @@ class ConfigGenerator:
         module_layer_indices = defaultdict(set)
 
         for weight_name, metadata in weights_metadata.items():
-            # Only remove layer numbers first
-            base_pattern = re.sub(r'\.layers?\.\d+\.', '.layers.N.', weight_name)
-            base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
+            # Remove layer numbers first - support both .layers.N. and layers.N patterns
+            base_pattern = re.sub(r'(\.layers?)\.\d+(\.)', r'\1.N\2', weight_name)
+            base_pattern = re.sub(r'(\.layers?)\.\d+$', r'\1.N', base_pattern, flags=re.MULTILINE)
+            base_pattern = re.sub(r'^(layers?)\.\d+(\.)', r'\1.N\2', base_pattern)
+            base_pattern = re.sub(r'^(model\.layers?)\.\d+', r'\1.N', base_pattern)
 
             # Extract layer index before pattern normalization
             layer_match = re.search(r'\.layers\.(\d+)\.', weight_name)

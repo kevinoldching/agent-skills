@@ -17,10 +17,14 @@ def simplify_weight_name(weight_name: str) -> str:
     - .blocks.0. -> .blocks.N.
     - .h.0. -> .h.N.
     - .transformer.blocks.0. -> .transformer.blocks.N.
+    - layers.0. -> layers.N. (no leading dot)
+    - blocks.0. -> blocks.N. (no leading dot)
     """
     # Replace .word.digit. with .word.N.
     # Pattern: dot followed by word characters, then dot, then digits, then dot
     simplified = re.sub(r'(\.\w+)\.\d+(\.)', r'\1.N\2', weight_name)
+    # Replace word.digit. at the start with word.N. (no leading dot)
+    simplified = re.sub(r'^(\w+)\.\d+(\.)', r'\1.N\2', simplified)
     return simplified
 
 

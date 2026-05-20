@@ -26,9 +26,11 @@ def analyze_weight_patterns(weights_metadata):
     patterns = defaultdict(list)
 
     for weight_name in weights_metadata.keys():
-        # 提取基础模式（去掉层号）
-        base_pattern = re.sub(r'\.layers?\.\d+\.', '.layers.N.', weight_name)
-        base_pattern = re.sub(r'model\.layers\.\d+', 'model.layers.N', base_pattern)
+        # 提取基础模式（去掉层号）- 支持 layers.N. 和 layers.N 两种格式
+        base_pattern = re.sub(r'(\.layers?)\.\d+(\.)', r'\1.N\2', weight_name)
+        base_pattern = re.sub(r'(\.layers?)\.\d+$', r'\1.N', base_pattern, flags=re.MULTILINE)
+        base_pattern = re.sub(r'^(layers?)\.\d+(\.)', r'\1.N\2', base_pattern)
+        base_pattern = re.sub(r'^(model\.layers?)\.\d+', r'\1.N', base_pattern)
         patterns[base_pattern].append(weight_name)
 
     print(f"\n发现 {len(patterns)} 种不同的权重模式:")
