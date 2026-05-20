@@ -130,6 +130,7 @@ deepseek:
       - ".*\\.mlp\\.gate\\..*"
       - "^mlp\\.experts\\.\\d+\\..*"
       - ".*\\.mlp\\.experts\\.\\d+\\..*"
+      - ".*\\.ffn\\.experts\\.\\d+\\..*"  # 支持 layers.N.ffn.experts.0.xxx 格式
     exclude:
       - ".*\\.shared_experts\\..*"
 
@@ -138,11 +139,13 @@ deepseek:
       - "^mlp\\.shared_experts\\..*"
       - ".*\\.mlp\\.shared_experts\\..*"
       - ".*\\.shared_experts\\..*"
+      - ".*\\.ffn\\.shared_expert\\..*"  # 支持 layers.N.ffn.shared_expert.xxx 格式
 
   ffn_dense:
     patterns:
       - "^mlp\\.(gate_proj|up_proj|down_proj)\\..*"
       - ".*\\.mlp\\.(gate_proj|up_proj|down_proj)\\..*"
+      - ".*\\.ffn\\.(gate|up|down)\\..*"  # 支持 layers.N.ffn.gate/up/down 格式
     exclude:
       - ".*\\.experts\\..*"
       - ".*\\.shared_experts\\..*"
@@ -161,6 +164,43 @@ deepseek:
   others:
     patterns:
       - "^eh_proj\\.weight$"
+
+# DeepSeek-V4 模型类型（继承 deepseek 并添加特殊模式）
+deepseek_v4:
+  inherit: deepseek
+
+  embedding:
+    patterns:
+      - "^embed\\.weight$"  # Deepseek-V4-Pro 格式
+      - "^head\\.weight$"   # Deepseek-V4-Pro 格式
+
+  attention:
+    patterns:
+      - "^layers\\.\\d+\\.attn\\..*"  # Deepseek-V4-Pro 格式: layers.0.attn.xxx
+
+  ffn_moe:
+    patterns:
+      - "^layers\\.\\d+\\.ffn\\.experts\\.\\d+\\..*"  # Deepseek-V4-Pro 格式
+
+  ffn_shared_expert:
+    patterns:
+      - "^layers\\.\\d+\\.ffn\\.shared_expert\\..*"  # Deepseek-V4-Pro 格式
+
+  ffn_dense:
+    patterns:
+      - "^layers\\.\\d+\\.ffn\\.(gate|up|down)\\..*"  # Deepseek-V4-Pro 格式
+
+  norm:
+    patterns:
+      - "^layers\\.\\d+\\.attn_norm\\..*"  # Deepseek-V4-Pro 格式
+      - "^layers\\.\\d+\\.ffn_norm\\..*"  # Deepseek-V4-Pro 格式
+
+  computation_rules:
+    recommended_capacity_factor:
+      has_prefill: 1.25
+      decode: 12.5
+    kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
+    activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
 
 # GPT-OSS 模型类型（定义共享的 ffn_moe patterns）
 gpt_oss:
