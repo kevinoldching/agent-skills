@@ -177,23 +177,29 @@ deepseek_v4:
   attention:
     patterns:
       - "^layers\\.\\d+\\.attn\\..*"  # Deepseek-V4-Pro 格式: layers.0.attn.xxx
+      - "^mtp\\.\\d+\\.attn\\..*"  # MTP 模块的 attention 权重
 
   ffn_moe:
     patterns:
       - "^layers\\.\\d+\\.ffn\\.experts\\.\\d+\\..*"  # Deepseek-V4-Pro 格式
+      - "^mtp\\.\\d+\\.ffn\\.experts\\.\\d+\\..*"  # MTP 模块的 MoE 权重
 
   ffn_shared_expert:
     patterns:
       - "^layers\\.\\d+\\.ffn\\.shared_expert\\..*"  # Deepseek-V4-Pro 格式
+      - "^mtp\\.\\d+\\.ffn\\.shared_expert\\..*"  # MTP 模块的 shared expert 权重
 
   ffn_dense:
     patterns:
       - "^layers\\.\\d+\\.ffn\\.(gate|up|down)\\..*"  # Deepseek-V4-Pro 格式
+      - "^mtp\\.\\d+\\.ffn\\.(gate|up|down)\\..*"  # MTP 模块的 dense FFN 权重
 
   norm:
     patterns:
       - "^layers\\.\\d+\\.attn_norm\\..*"  # Deepseek-V4-Pro 格式
       - "^layers\\.\\d+\\.ffn_norm\\..*"  # Deepseek-V4-Pro 格式
+      - "^mtp\\.\\d+\\.attn_norm\\..*"  # MTP 模块的 attention norm
+      - "^mtp\\.\\d+\\.ffn_norm\\..*"  # MTP 模块的 FFN norm
 
   computation_rules:
     recommended_capacity_factor:
