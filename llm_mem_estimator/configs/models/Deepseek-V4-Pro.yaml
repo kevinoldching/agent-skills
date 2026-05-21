@@ -20,27 +20,49 @@ architecture_config:
   q_lora_rank: 1536
   qk_rope_head_dim: 64
 modules:
+  embedding:
+    embed.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
+    head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: TP}
   others:
-    embed.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
     hc_head_base: {shape: [4], dtype: F32, layers: 1, parallel_strategy: replicated}
     hc_head_fn: {shape: [4, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
     hc_head_scale: {shape: [1], dtype: F32, layers: 1, parallel_strategy: replicated}
-    head.weight: {shape: [129280, 7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    attn.attn_sink: {shape: [128], dtype: F32, layers: 61, parallel_strategy: replicated}
-    attn.compressor.ape: {shape: [128, 512], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_attn_base: {shape: [24], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_attn_fn: {shape: [24, 28672], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_attn_scale: {shape: [3], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_ffn_base: {shape: [24], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_ffn_fn: {shape: [24, 28672], dtype: F32, layers: 61, parallel_strategy: replicated}
     hc_ffn_scale: {shape: [3], dtype: F32, layers: 61, parallel_strategy: replicated}
+    mtp.0.hc_attn_base: {shape: [24], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_attn_fn: {shape: [24, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_attn_scale: {shape: [3], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_ffn_base: {shape: [24], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_ffn_fn: {shape: [24, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_ffn_scale: {shape: [3], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_head_base: {shape: [4], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_head_fn: {shape: [4, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.hc_head_scale: {shape: [1], dtype: F32, layers: 1, parallel_strategy: replicated}
+    mtp.0.enorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mtp.0.hnorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mtp.0.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mtp.0.e_proj.scale: {shape: [56, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
+    mtp.0.h_proj.scale: {shape: [56, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
+    mtp.0.e_proj.weight: {shape: [7168, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
+    mtp.0.h_proj.weight: {shape: [7168, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
+  norm:
+    norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    attn_norm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    ffn_norm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    mtp.0.attn_norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+    mtp.0.ffn_norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
+  attention:
+    attn.attn_sink: {shape: [128], dtype: F32, layers: 61, parallel_strategy: replicated}
+    attn.compressor.ape: {shape: [128, 512], dtype: F32, layers: 61, parallel_strategy: replicated}
     attn.compressor.norm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.compressor.wgate.weight: {shape: [512, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.compressor.wkv.weight: {shape: [512, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.kv_norm.weight: {shape: [512], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.q_norm.weight: {shape: [1536], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    attn_norm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    ffn_norm.weight: {shape: [7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.wkv.scale: {shape: [4, 56], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
     attn.wo_a.scale: {shape: [128, 32], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
     attn.wo_b.scale: {shape: [56, 128], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
@@ -59,38 +81,18 @@ modules:
     attn.indexer.wq_b.scale: {shape: [64, 12], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
     attn.indexer.wq_b.weight: {shape: [8192, 1536], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
     mtp.0.attn.attn_sink: {shape: [128], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_attn_base: {shape: [24], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_attn_fn: {shape: [24, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_attn_scale: {shape: [3], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_ffn_base: {shape: [24], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_ffn_fn: {shape: [24, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_ffn_scale: {shape: [3], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_head_base: {shape: [4], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_head_fn: {shape: [4, 28672], dtype: F32, layers: 1, parallel_strategy: replicated}
-    mtp.0.hc_head_scale: {shape: [1], dtype: F32, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.kv_norm.weight: {shape: [512], dtype: BF16, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.q_norm.weight: {shape: [1536], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mtp.0.attn_norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mtp.0.enorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mtp.0.ffn_norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mtp.0.hnorm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
-    mtp.0.norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wkv.scale: {shape: [4, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wo_a.scale: {shape: [128, 32], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wo_b.scale: {shape: [56, 128], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wq_a.scale: {shape: [12, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wq_b.scale: {shape: [512, 12], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
-    mtp.0.e_proj.scale: {shape: [56, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
-    mtp.0.h_proj.scale: {shape: [56, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wkv.weight: {shape: [512, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wo_a.weight: {shape: [16384, 4096], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wo_b.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wq_a.weight: {shape: [1536, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wq_b.weight: {shape: [65536, 1536], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-    mtp.0.e_proj.weight: {shape: [7168, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-    mtp.0.h_proj.weight: {shape: [7168, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-  norm:
-    norm.weight: {shape: [7168], dtype: BF16, layers: 1, parallel_strategy: replicated}
   ffn_dense:
     ffn.gate.bias: {shape: [384], dtype: F32, layers: 61, parallel_strategy: TP}
     ffn.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 61, parallel_strategy: TP}
@@ -124,4 +126,8 @@ modules:
     mtp.0.ffn.shared_experts.w2.weight: {shape: [7168, 3072], dtype: F8_E4M3, layers: 1, parallel_strategy: TP}
     mtp.0.ffn.shared_experts.w3.weight: {shape: [3072, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: TP}
 computation_rules:
-  kv_cache: batch_size * (min(seq_len, window_size)*(512*128) * 61 + seq_len*((512*128)*30*4 + (512*128) * 29 * 2) ) / cp_size
+  recommended_capacity_factor:
+    has_prefill: 1.25
+    decode: 12.5
+  kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
+  activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
