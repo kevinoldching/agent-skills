@@ -208,21 +208,28 @@ deepseek_v4:
     kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
     activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
 
+  parallel_defaults:
+    attention:
+      wo_a.weight: TP
+      wo_b.weight: TP
+      wq_b.weight: TP
+      weights_proj.weight: TP
+
 deepseek-v4-pro:
-  inherit: deepseek
+  inherit: deepseek_v4
 
   # DeepSeek v4 Pro 在 MLA 中使用了 Sliding Window Attention（SWA），需要覆盖 kv_cache 公式
   computation_rules:
     kv_cache:
-      swa: "batch_size * (min(seq_len, window_size)*(512*128) * 61 + seq_len*((512*128)*30*4 + (512*128) * 29 * 2) ) / cp_size"
+      swa: "batch_size * seq_len * (512*128) * 31 / cp_size"
 
 deepseek-v4-flash:
-  inherit: deepseek
+  inherit: deepseek_v4
 
   # DeepSeek v4 Pro 在 MLA 中使用了 Sliding Window Attention（SWA），需要覆盖 kv_cache 公式
   computation_rules:
     kv_cache:
-      swa: "batch_size * (min(seq_len, window_size)*(512*128) * 43 + seq_len*((512*128)*21*4 + (512*128) * 20 * 2) ) / cp_size"
+      swa: "batch_size * seq_len * (512*128) * 22 / cp_size"
 
 # GPT-OSS 模型类型（定义共享的 ffn_moe patterns）
 gpt_oss:

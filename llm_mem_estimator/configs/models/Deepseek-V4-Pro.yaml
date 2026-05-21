@@ -1,5 +1,5 @@
 model_identity:
-  name: Deepseek-V4-Pro
+  name: deepseek-v4-pro
   total_params: '861.61B'
   num_layers: 61
   quantization: fp8
@@ -69,17 +69,17 @@ modules:
     attn.wq_a.scale: {shape: [12, 56], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
     attn.wq_b.scale: {shape: [512, 12], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
     attn.wkv.weight: {shape: [512, 7168], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
-    attn.wo_a.weight: {shape: [16384, 4096], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
-    attn.wo_b.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
+    attn.wo_a.weight: {shape: [16384, 4096], dtype: F8_E4M3, layers: 61, parallel_strategy: TP}
+    attn.wo_b.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 61, parallel_strategy: TP}
     attn.wq_a.weight: {shape: [1536, 7168], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
-    attn.wq_b.weight: {shape: [65536, 1536], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
+    attn.wq_b.weight: {shape: [65536, 1536], dtype: F8_E4M3, layers: 61, parallel_strategy: TP}
     attn.indexer.compressor.ape: {shape: [4, 256], dtype: F32, layers: 61, parallel_strategy: replicated}
     attn.indexer.compressor.norm.weight: {shape: [128], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.indexer.compressor.wgate.weight: {shape: [256, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
     attn.indexer.compressor.wkv.weight: {shape: [256, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
-    attn.indexer.weights_proj.weight: {shape: [64, 7168], dtype: BF16, layers: 61, parallel_strategy: replicated}
+    attn.indexer.weights_proj.weight: {shape: [64, 7168], dtype: BF16, layers: 61, parallel_strategy: TP}
     attn.indexer.wq_b.scale: {shape: [64, 12], dtype: F8_E8M0, layers: 61, parallel_strategy: replicated}
-    attn.indexer.wq_b.weight: {shape: [8192, 1536], dtype: F8_E4M3, layers: 61, parallel_strategy: replicated}
+    attn.indexer.wq_b.weight: {shape: [8192, 1536], dtype: F8_E4M3, layers: 61, parallel_strategy: TP}
     mtp.0.attn.attn_sink: {shape: [128], dtype: F32, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.kv_norm.weight: {shape: [512], dtype: BF16, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.q_norm.weight: {shape: [1536], dtype: BF16, layers: 1, parallel_strategy: replicated}
@@ -89,10 +89,10 @@ modules:
     mtp.0.attn.wq_a.scale: {shape: [12, 56], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wq_b.scale: {shape: [512, 12], dtype: F8_E8M0, layers: 1, parallel_strategy: replicated}
     mtp.0.attn.wkv.weight: {shape: [512, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-    mtp.0.attn.wo_a.weight: {shape: [16384, 4096], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-    mtp.0.attn.wo_b.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
+    mtp.0.attn.wo_a.weight: {shape: [16384, 4096], dtype: F8_E4M3, layers: 1, parallel_strategy: TP}
+    mtp.0.attn.wo_b.weight: {shape: [7168, 16384], dtype: F8_E4M3, layers: 1, parallel_strategy: TP}
     mtp.0.attn.wq_a.weight: {shape: [1536, 7168], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
-    mtp.0.attn.wq_b.weight: {shape: [65536, 1536], dtype: F8_E4M3, layers: 1, parallel_strategy: replicated}
+    mtp.0.attn.wq_b.weight: {shape: [65536, 1536], dtype: F8_E4M3, layers: 1, parallel_strategy: TP}
   ffn_dense:
     ffn.gate.bias: {shape: [384], dtype: F32, layers: 61, parallel_strategy: TP}
     ffn.gate.weight: {shape: [384, 7168], dtype: BF16, layers: 61, parallel_strategy: TP}
@@ -129,5 +129,5 @@ computation_rules:
   recommended_capacity_factor:
     has_prefill: 1.25
     decode: 12.5
-  kv_cache: batch_size * seq_len * (kv_lora_rank + qk_rope_head_dim) * num_layers / cp_size
+  kv_cache: batch_size * (min(seq_len, window_size)*(512*128) * 61 + seq_len*((512*128)*30*4 + (512*128) * 29 * 2) ) / cp_size
   activation: batch_size * seq_len * hidden_size * num_experts_per_tok * recommended_capacity_factor / cp_size
