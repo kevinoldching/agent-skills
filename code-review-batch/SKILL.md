@@ -1,5 +1,5 @@
 ---
-name: code-review
+name: code-review-batch
 description: omni-npu 项目 PR 代码评审工具。当用户提到"评审"、"review"、"评审"、"review PR"、"review pr"、"代码审查"或要求"检查PR"时自动触发。支持通过本地 JSON 文件获取 PR 变更，执行结构化评审。重点检查：1) 逻辑正确性（变量定义、控制流）2) 安全性（空值、资源泄漏）3) 性能（pytorch性能优化）4) 代码质量（SOLID、代码风格、 vLLM NPU扩展规范）。必须使用此 skill 来评审所有 omni-npu 项目的 PR。
 allowed-tools: Read,Bash,Grep,Edit
 ---
