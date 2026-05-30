@@ -85,17 +85,20 @@ def get_pr_diff_json(pr_num, base_branch="master", context_len=5):
                             cur_old += 1
 
                 # 提取带行号的上下文 (HEAD 侧)
-                ctx_new = 0
+                # 每个 hunk 有自己的起始行号，需要重置
                 if diff_ctx:
                     for cl in diff_ctx.split('\n'):
                         if cl.startswith('@@'):
                             m = re.search(r'\+([0-9]+)', cl)
-                            if m: ctx_new = int(m.group(1))
+                            if m:
+                                # 重置为当前 hunk 的起始行号
+                                ctx_new = int(m.group(1))
                         elif cl.startswith(' '):
                             file_item["context"].append({"line": ctx_new, "code": cl[1:] or " "})
                             ctx_new += 1
                         elif cl.startswith('+'):
-                            ctx_new += 1 # 跳过但增加行号计数
+                            # 跳过 added 行，但不添加到 context
+                            ctx_new += 1
 
             # 处理新增文件 (A)
             elif status == 'A':
