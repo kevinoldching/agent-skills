@@ -398,6 +398,7 @@ def main():
                 activation_dtype=args.activation_dtype,
                 tp=args.tp,
                 pp=args.pp,
+                dp=args.dp,
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
@@ -405,6 +406,26 @@ def main():
                 stage=stage,
                 tp_variant_sizes=tp_variant_sizes
             )
+
+            # If no batch can fit (max_batch_size == 0), show Exceeds directly
+            if max_batch_size <= 0:
+                if chip_info and available_memory_gb:
+                    total_memory = estimator.calculate_weights_memory(
+                        tp=args.tp, pp=args.pp, dp=args.dp, cp=args.cp, ep=args.ep,
+                        stage=stage, tp_variant_sizes=tp_variant_sizes
+                    )[0] + system_reserved_gb
+                    available_with_util = available_memory_gb * gpu_util
+                    remaining = available_with_util - total_memory
+                    fit_status = "[FAIL] Exceeds"
+                    print(f"\n## Result")
+                    print(f"- **Maximum batch size: 0**")
+                    print(f"- VRAM * gpu_util - Total = {available_memory_gb} * {gpu_util:.0%} - {total_memory:.2f} = {available_with_util:.2f} - {total_memory:.2f} = {remaining:.2f} GB")
+                    print(f"- Status: {fit_status}")
+                else:
+                    print(f"\n## Result")
+                    print(f"- **Maximum batch size: 0**")
+                    print(f"- Status: [FAIL] Exceeds")
+                return
 
             # Generate report with max batch size
             result = estimator.estimate_memory(
@@ -472,6 +493,7 @@ def main():
                 activation_dtype=args.activation_dtype,
                 tp=args.tp,
                 pp=args.pp,
+                dp=args.dp,
                 cp=args.cp,
                 ep=args.ep,
                 system_reserved_gb=system_reserved_gb,
@@ -626,6 +648,7 @@ def main():
             activation_dtype=args.activation_dtype,
             tp=args.tp,
             pp=args.pp,
+            dp=args.dp,
             cp=args.cp,
             ep=args.ep,
             system_reserved_gb=system_reserved_gb,
