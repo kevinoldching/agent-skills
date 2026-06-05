@@ -532,6 +532,8 @@ class FormulaEvaluator:
             eval_context['tp_size'] = 1
         if 'cp_size' not in eval_context:
             eval_context['cp_size'] = 1
+        if 'dp_size' not in eval_context:
+            eval_context['dp_size'] = 1
 
         # Add safe built-in functions
         safe_builtins = {

@@ -83,7 +83,8 @@ class MemoryEstimator:
         return total_memory, breakdown
 
     def calculate_kv_cache_memory(self, batch_size: int, prompt_len: int, gen_len: int,
-                                   dtype: str = "fp16", tp: int = 1, cp: int = 1) -> float:
+                                   dtype: str = "fp16", tp: int = 1, cp: int = 1,
+                                   dp: int = 1) -> float:
         """Calculate KV cache memory
 
         Args:
@@ -93,6 +94,7 @@ class MemoryEstimator:
             dtype: KV cache data type
             tp: Tensor Parallel degree
             cp: Context Parallel degree
+            dp: Data Parallel degree
         """
         if 'kv_cache' not in self.config.computation_rules:
             return 0.0
@@ -103,7 +105,7 @@ class MemoryEstimator:
         # Total sequence length = prompt + generated
         total_seq_len = prompt_len + gen_len
 
-        # Evaluate formula (includes tp_size/cp_size in the formula)
+        # Evaluate formula (includes tp_size/cp_size/dp_size in the formula)
         memory_elements = self.evaluator.evaluate(
             formula,
             batch_size=batch_size,
@@ -111,7 +113,8 @@ class MemoryEstimator:
             gen_len=gen_len,
             seq_len=total_seq_len,
             tp_size=tp,
-            cp_size=cp
+            cp_size=cp,
+            dp_size=dp
         )
 
         # Convert to GB
@@ -121,6 +124,7 @@ class MemoryEstimator:
 
     def calculate_activation_memory(self, batch_size: int, seq_len: int,
                                      dtype: str = "fp16", tp: int = 1, cp: int = 1,
+                                     dp: int = 1,
                                      use_decode_factor: bool = True) -> float:
         """Calculate activation memory
 
@@ -130,6 +134,7 @@ class MemoryEstimator:
             dtype: Activation data type
             tp: Tensor Parallel degree
             cp: Context Parallel degree
+            dp: Data Parallel degree
             use_decode_factor: If True, use decode factor (12.5); otherwise use has_prefill factor (1.25)
         """
         if 'activation' not in self.config.computation_rules:
@@ -138,7 +143,7 @@ class MemoryEstimator:
         formula = self.config.computation_rules['activation']
         dtype_bytes = get_dtype_bytes(dtype)
 
-        # Evaluate formula (includes tp_size/cp_size in the formula)
+        # Evaluate formula (includes tp_size/cp_size/dp_size in the formula)
         memory_elements = self.evaluator.evaluate(
             formula,
             use_decode_factor=use_decode_factor,
@@ -146,7 +151,8 @@ class MemoryEstimator:
             gen_len=seq_len,
             seq_len=seq_len,
             tp_size=tp,
-            cp_size=cp
+            cp_size=cp,
+            dp_size=dp
         )
 
         # Convert to GB
@@ -188,7 +194,7 @@ class MemoryEstimator:
 
         # Calculate KV cache memory (prompt_len + gen_len)
         kv_cache_memory = self.calculate_kv_cache_memory(
-            batch_size, prompt_len, gen_len, kv_dtype, tp, cp
+            batch_size, prompt_len, gen_len, kv_dtype, tp, cp, dp=dp
         )
 
         # Calculate activation memory
@@ -198,14 +204,14 @@ class MemoryEstimator:
         elif use_decode_factor:
             # Decode scenario: seq_len = 1
             activation_memory = self.calculate_activation_memory(
-                batch_size, 1, activation_dtype, tp, cp,
+                batch_size, 1, activation_dtype, tp, cp, dp=dp,
                 use_decode_factor=True
             )
         else:
             # Prefill scenario: seq_len = total_seq_len
             total_seq_len = prompt_len + gen_len
             activation_memory = self.calculate_activation_memory(
-                batch_size, total_seq_len, activation_dtype, tp, cp,
+                batch_size, total_seq_len, activation_dtype, tp, cp, dp=dp,
                 use_decode_factor=False
             )
 
@@ -226,7 +232,7 @@ class MemoryEstimator:
     def find_max_sequence_length(self, available_memory_gb: float, batch_size: int = 1,
                                   prompt_len: int = 4096,
                                   kv_dtype: str = "fp16", activation_dtype: str = "fp16",
-                                  tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
+                                  tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                                   system_reserved_gb: float = 2.0,
                                   use_decode_factor: bool = True,
                                   activation_peak_gb: float = None,
@@ -242,6 +248,7 @@ class MemoryEstimator:
             activation_dtype: Activation data type
             tp: Tensor Parallel degree
             pp: Pipeline Parallel degree
+            dp: Data Parallel degree
             cp: Context Parallel degree
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
@@ -251,12 +258,12 @@ class MemoryEstimator:
             tp_variant_sizes: Optional dict mapping TP variant names to their sizes.
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, dp=dp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
         fixed_memory = weights_memory + system_reserved_gb
 
         # KV cache for prompt (fixed)
         prompt_kv_memory = self.calculate_kv_cache_memory(
-            batch_size, prompt_len, 0, kv_dtype, tp, cp
+            batch_size, prompt_len, 0, kv_dtype, tp, cp, dp=dp
         )
 
         # Activation is always fixed in Decode scenario (seq_len=1, not incremental per token)
@@ -266,7 +273,7 @@ class MemoryEstimator:
         else:
             # Decode stage: seq_len = 1, use decode factor
             activation_fixed = self.calculate_activation_memory(
-                batch_size, 1, activation_dtype, tp, cp,
+                batch_size, 1, activation_dtype, tp, cp, dp=dp,
                 use_decode_factor=True
             )
 
@@ -292,7 +299,7 @@ class MemoryEstimator:
 
             # KV grows with prompt + gen_len
             kv_memory = self.calculate_kv_cache_memory(
-                batch_size, prompt_len, mid, kv_dtype, tp, cp
+                batch_size, prompt_len, mid, kv_dtype, tp, cp, dp=dp
             )
 
             # Activation is already accounted in total_fixed (either user-specified or calculated with seq_len=1)
@@ -312,7 +319,7 @@ class MemoryEstimator:
     def find_max_prompt_len(self, available_memory_gb: float, batch_size: int = 1,
                             gen_len: int = 1,
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
-                            tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
+                            tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                             system_reserved_gb: float = 2.0,
                             activation_peak_gb: float = None,
                             stage: Literal["hybrid", "prefill", "decode"] = "hybrid",
@@ -330,6 +337,7 @@ class MemoryEstimator:
             activation_dtype: Activation data type
             tp: Tensor Parallel degree
             pp: Pipeline Parallel degree
+            dp: Data Parallel degree
             cp: Context Parallel degree
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
@@ -338,7 +346,7 @@ class MemoryEstimator:
             tp_variant_sizes: Optional dict mapping TP variant names to their sizes.
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, dp=dp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
         fixed_memory = weights_memory + system_reserved_gb
 
         # Activation peak is fixed when specified (not incremental per token)
@@ -359,7 +367,7 @@ class MemoryEstimator:
 
             # KV grows with prompt_len + gen_len
             kv_memory = self.calculate_kv_cache_memory(
-                batch_size, mid, gen_len, kv_dtype, tp, cp
+                batch_size, mid, gen_len, kv_dtype, tp, cp, dp=dp
             )
 
             # Activation: 0 if activation_peak_gb is specified (already in fixed_memory)
@@ -369,7 +377,7 @@ class MemoryEstimator:
             else:
                 # Prefill stage: use has_prefill factor
                 act_memory = self.calculate_activation_memory(
-                    batch_size, total_seq_len, activation_dtype, tp, cp,
+                    batch_size, total_seq_len, activation_dtype, tp, cp, dp=dp,
                     use_decode_factor=False
                 )
 
@@ -385,7 +393,7 @@ class MemoryEstimator:
 
     def find_max_batch_size(self, available_memory_gb: float, prompt_len: int, gen_len: int,
                             kv_dtype: str = "fp16", activation_dtype: str = "fp16",
-                            tp: int = 1, pp: int = 1, cp: int = 1, ep: int = 1,
+                            tp: int = 1, pp: int = 1, dp: int = 1, cp: int = 1, ep: int = 1,
                             system_reserved_gb: float = 2.0,
                             activation_peak_gb: float = None,
                             stage: Literal["hybrid", "prefill", "decode"] = "hybrid",
@@ -403,6 +411,7 @@ class MemoryEstimator:
             activation_dtype: Activation data type
             tp: Tensor Parallel degree
             pp: Pipeline Parallel degree
+            dp: Data Parallel degree
             cp: Context Parallel degree
             ep: Expert Parallel degree
             system_reserved_gb: System reserved memory in GB
@@ -411,7 +420,7 @@ class MemoryEstimator:
             tp_variant_sizes: Optional dict mapping TP variant names to their sizes.
         """
         # Calculate fixed memory (weights + system reserved)
-        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
+        weights_memory, _ = self.calculate_weights_memory(tp=tp, pp=pp, dp=dp, cp=cp, ep=ep, stage=stage, tp_variant_sizes=tp_variant_sizes)
         fixed_memory = weights_memory + system_reserved_gb
 
         # Activation peak is fixed when specified (not incremental per token)
@@ -429,7 +438,7 @@ class MemoryEstimator:
 
             # KV memory scales with batch_size
             kv_memory = self.calculate_kv_cache_memory(
-                mid, prompt_len, gen_len, kv_dtype, tp, cp
+                mid, prompt_len, gen_len, kv_dtype, tp, cp, dp=dp
             )
 
             # Activation: 0 if activation_peak_gb is specified (already in fixed_memory)
@@ -439,7 +448,7 @@ class MemoryEstimator:
             else:
                 # Prefill stage: has_prefill factor
                 act_memory = self.calculate_activation_memory(
-                    mid, prompt_len + gen_len, activation_dtype, tp, cp,
+                    mid, prompt_len + gen_len, activation_dtype, tp, cp, dp=dp,
                     use_decode_factor=False
                 )
 
